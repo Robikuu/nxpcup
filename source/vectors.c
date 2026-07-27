@@ -1,0 +1,66 @@
+#include <math.h>
+#include <stdint.h>
+#include "fsl_device_registers.h"
+#include "fsl_debug_console.h"
+
+// Calibrated once on your laptop, hardcoded here as constants:
+#define H11 0.0f  // Ensure you use the 'f' suffix for floats
+#define H12 0.0f
+#define H13 0.0f
+#define H21 0.0f
+#define H22 0.0f
+#define H23 0.0f
+#define H31 0.0f
+#define H32 0.0f
+#define H33 1.0f
+
+//transformare homography pt vectori
+void pixel_to_ground(float u, float v, float *X, float *Y) {
+    float Wp = H31*u + H32*v + H33;
+
+    // Safety guard: Prevent division by zero or near-zero
+    if (fabsf(Wp) < 1e-6f) {
+        *X = 0.0f;
+        *Y = 0.0f;
+        return; 
+    }
+
+    float Xp = H11*u + H12*v + H13;
+    float Yp = H21*u + H22*v + H23;
+
+    *X = Xp / Wp;
+    *Y = Yp / Wp;
+}
+
+void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index)
+{
+    int dx = (int)x1 - (int)x0;
+    int dy = (int)y1 - (int)y0;
+
+    // Calculate vector length (magnitude)
+    double length = sqrt((double)(dx * dx + dy * dy));
+
+    // Calculate direction angle in degrees relative to the vertical axis (-dy).
+    // Straight forward is 0 degrees. Left is negative, right is positive.
+    double angle_deg = 0.0;
+    if (dy != 0) {
+        angle_deg = atan2((double)dx, (double)(-dy)) * 180.0 / 3.141592653589793;
+    } else {
+        angle_deg = (dx >= 0) ? 90.0 : -90.0;
+    }
+
+    // Split into integer and fractional parts for printing (avoiding %f format)
+    int len_int = (int)length;
+    int len_frac = (int)((length - len_int) * 100.0);
+    if (len_frac < 0) len_frac = -len_frac;
+
+    int ang_int = (int)angle_deg;
+    int ang_frac = (int)((angle_deg - (double)ang_int) * 100.0);
+    if (ang_frac < 0) ang_frac = -ang_frac;
+
+    PRINTF("Vector [%u] details:\r\n", (unsigned)index);
+    PRINTF("  Start: (%u, %u) -> End: (%u, %u)\r\n", (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
+    PRINTF("  dx: %d, dy: %d\r\n", dx, dy);
+    PRINTF("  Length: %d.%02d px\r\n", len_int, len_frac);
+    PRINTF("  Angle: %d.%02d deg\r\n", ang_int, ang_frac);
+}

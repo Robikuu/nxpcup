@@ -1,0 +1,9 @@
+D:\robotica\workspace\nxpcup\drivers/fsl_gpio.h:427:24:GPIO_PinRead	16	static
+D:\robotica\workspace\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
+../source/utils.c:17:6:esp_steer_test_loop	16	static
+../source/utils.c:38:6:parse_esp_command	32	static
+../source/utils.c:58:6:handle_incoming_uart_byte	16	static
+../source/utils.c:78:6:buttons_init	4	static
+../source/utils.c:83:5:button_pressed_edge	16	static
+../source/utils.c:91:6:request_esp_ip	16	static
+../source/utils.c:127:6:print_double	48	static

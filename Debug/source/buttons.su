@@ -1,0 +1,3 @@
+D:\robotica\workspace\nxpcup\drivers/fsl_gpio.h:427:24:GPIO_PinRead	16	static
+../source/buttons.c:6:6:buttons_init	4	static
+../source/buttons.c:11:5:button_pressed_edge	16	static
