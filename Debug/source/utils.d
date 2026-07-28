@@ -97,7 +97,17 @@ source/utils.o source/utils.d: ../source/utils.c \
  D:\robotica\workspace\nxpcup\drivers/fsl_common.h \
  D:\robotica\workspace\nxpcup\include/servo.h \
  D:\robotica\workspace\nxpcup\drivers/fsl_lpuart.h \
- D:\robotica\workspace\nxpcup\drivers/fsl_lpflexcomm.h
+ D:\robotica\workspace\nxpcup\drivers/fsl_lpflexcomm.h \
+ D:\robotica\workspace\nxpcup\board/peripherals.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_edma.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_edma_core.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_edma_soc.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_ctimer.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_clock.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c_edma.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c.h \
+ D:\robotica\workspace\nxpcup\drivers/fsl_edma.h
 D:\robotica\workspace\nxpcup\source\mcux_config.h:
 ../source/utils.h:
 D:\robotica\workspace\nxpcup\drivers/fsl_gpio.h:
@@ -198,3 +208,13 @@ D:\robotica\workspace\nxpcup\drivers/fsl_common.h:
 D:\robotica\workspace\nxpcup\include/servo.h:
 D:\robotica\workspace\nxpcup\drivers/fsl_lpuart.h:
 D:\robotica\workspace\nxpcup\drivers/fsl_lpflexcomm.h:
+D:\robotica\workspace\nxpcup\board/peripherals.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_edma.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_edma_core.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_edma_soc.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_ctimer.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_clock.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c_edma.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_lpi2c.h:
+D:\robotica\workspace\nxpcup\drivers/fsl_edma.h:

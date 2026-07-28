@@ -135,12 +135,12 @@ int main(void)
                 GPIO0, 27U);
     PRINTF("NXP Board Booted. Waiting for ESP32 Wi-Fi...\r\n");
 
-//     for (volatile uint32_t i = 0; i < 300000000; i++) {
-//     __asm("NOP"); 
-// }
+    while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
+    uint8_t received_byte = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
+    PRINTF("NXP Received: 0x%02X ('%c')\r\n", received_byte, received_byte);
+}
 
-    TestServo();
-
+    esp_steer_test_loop();
 
     pixy_t cam1;
     pixy_init(&cam1, LPI2C2, 0x54U, &LP_FLEXCOMM2_RX_Handle, &LP_FLEXCOMM2_TX_Handle);
