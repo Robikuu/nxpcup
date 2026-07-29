@@ -122,6 +122,9 @@ int main(void)
     uint16_t vectors[MAX_VECTORS * 4];
     size_t   num_vectors;
 
+    char comanda[50];
+    volatile int INDEXXXXX;
+    INDEXXXXX = 0;
     BOARD_InitHardware();
     BOARD_InitBootPins();
     BOARD_InitBootPeripherals();
@@ -135,12 +138,49 @@ int main(void)
                 GPIO0, 27U);
     PRINTF("NXP Board Booted. Waiting for ESP32 Wi-Fi...\r\n");
 
-    while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
-    uint8_t received_byte = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
-    PRINTF("NXP Received: 0x%02X ('%c')\r\n", received_byte, received_byte);
-}
+    while (1) {
+            uint8_t received_char;
 
-    esp_steer_test_loop();
+            // Check the LPUART status flags to see if a new byte has arrived
+            uint32_t flags = LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL);
+
+            if (flags & kLPUART_RxDataRegFullFlag) {
+                // Read the incoming character from the ESP
+                received_char = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
+
+                if (received_char == ';') {
+                // Only process if the string isn't empty
+                    if (INDEXXXXX > 0) {
+                        PRINTF("\r\nCommand received: %s\r\n", comanda);
+                        
+                        if(!strcmp(comanda, "steer")) {
+                            Steer(100);
+                            Delay(2000000U);
+                        }
+                        if(!strcmp(comanda, "steer1")) {
+							Steer(-100);
+							Delay(2000000U);
+						}
+                        INDEXXXXX = 0;
+                        comanda[0] = '\0'; 
+                    }
+                } 
+                // Ignore hidden enter key presses from the terminal
+                else if (received_char != '\n' && received_char != '\r') {
+                    
+                    // Prevent buffer overflow by checking the length
+                    if (INDEXXXXX < (50 - 1)) {
+                        
+                        // Put the character in the array and increment the index
+                        comanda[INDEXXXXX] = received_char;
+                        INDEXXXXX++;
+                        
+                        // Always cap the string with a null terminator so PRINTF and strcmp work safely
+                        comanda[INDEXXXXX] = '\0';
+                    }
+                }
+            }
+        }
 
     pixy_t cam1;
     pixy_init(&cam1, LPI2C2, 0x54U, &LP_FLEXCOMM2_RX_Handle, &LP_FLEXCOMM2_TX_Handle);
