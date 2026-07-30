@@ -155,11 +155,9 @@ int main(void)
                         
                         if(!strcmp(comanda, "steer")) {
                             Steer(100);
-                            Delay(2000000U);
                         }
                         if(!strcmp(comanda, "steer1")) {
 							Steer(-100);
-							Delay(2000000U);
 						}
                         INDEXXXXX = 0;
                         comanda[0] = '\0'; 
