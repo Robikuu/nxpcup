@@ -2,8 +2,8 @@
 #include <ESPmDNS.h>
 
 // ---- Configuration ----
-const char* WIFI_SSID = "ssid";
-const char* WIFI_PASS = "pass";
+const char* WIFI_SSID = "Robotics315";
+const char* WIFI_PASS = "helloworld";
 const char* HOSTNAME  = "nxpcup-bridge";
 
 #define UART_RX 25   // ESP32 RX  <- MCXN947 TX (P2_3)

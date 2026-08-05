@@ -137,93 +137,96 @@ int main(void)
 
     params_init();
 
-    pixy_t cam1;
-    pixy_init(&cam1, LPI2C2, 0x54U, &LP_FLEXCOMM2_RX_Handle, &LP_FLEXCOMM2_TX_Handle);
-    pixy_set_led(&cam1, 255, 0, 0);
+    // pixy_t cam1;
+    // pixy_init(&cam1, LPI2C2, 0x54U, &LP_FLEXCOMM2_RX_Handle, &LP_FLEXCOMM2_TX_Handle);
+    // pixy_set_led(&cam1, 255, 0, 0);
 
     pid_struct steer_pid;
     pid_init(&steer_pid, g_params.kp, g_params.ki, g_params.kd,
              100.0, g_params.alpha);
 
-    const double PIXY_CENTER_X = 39.0;
+    // const double PIXY_CENTER_X = 39.0;
     uint32_t line_lost_counter = 0;
 
     PRINTF("NXP Board Booted. Send commands via ESP32 Wi-Fi (port 3333).\r\n");
 
     while (1)
     {
-    //     command_poll();
+        command_poll();
 
-    //     steer_pid.kp    = g_params.kp;
-    //     steer_pid.ki    = g_params.ki;
-    //     steer_pid.kd    = g_params.kd;
-    //     steer_pid.alpha = g_params.alpha;
+        steer_pid.kp    = g_params.kp;
+        steer_pid.ki    = g_params.ki;
+        steer_pid.kd    = g_params.kd;
+        steer_pid.alpha = g_params.alpha;
 
-    //     if (g_params.state == STATE_RUNNING)
-    //     {
-    //         if (pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors) == kStatus_Success)
-    //         {
-    //             if (num_vectors > 0)
-    //             {
-    //                 line_lost_counter = 0;
+        if (g_params.state == STATE_RUNNING)
+        {
+        //     if (pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors) == kStatus_Success)
+        //     {
+        //         if (num_vectors > 0)
+        //         {
+        //             line_lost_counter = 0;
 
-    //                 size_t primary_idx = 0;
-    //                 uint16_t max_y0 = 0;
+        //             size_t primary_idx = 0;
+        //             uint16_t max_y0 = 0;
 
-    //                 for (size_t i = 0; i < num_vectors; i++) {
-    //                     uint16_t y0 = vectors[4 * i + 1];
-    //                     if (y0 >= max_y0) {
-    //                         max_y0 = y0;
-    //                         primary_idx = i;
-    //                     }
-    //                 }
+        //             for (size_t i = 0; i < num_vectors; i++) {
+        //                 uint16_t y0 = vectors[4 * i + 1];
+        //                 if (y0 >= max_y0) {
+        //                     max_y0 = y0;
+        //                     primary_idx = i;
+        //                 }
+        //             }
 
-    //                 uint16_t x0 = vectors[4 * primary_idx + 0];
-    //                 uint16_t y0 = vectors[4 * primary_idx + 1];
-    //                 uint16_t x1 = vectors[4 * primary_idx + 2];
-    //                 uint16_t y1 = vectors[4 * primary_idx + 3];
+        //             uint16_t x0 = vectors[4 * primary_idx + 0];
+        //             uint16_t y0 = vectors[4 * primary_idx + 1];
+        //             uint16_t x1 = vectors[4 * primary_idx + 2];
+        //             uint16_t y1 = vectors[4 * primary_idx + 3];
 
-    //                 double cte = (double)x0 - PIXY_CENTER_X;
+        //             double cte = (double)x0 - PIXY_CENTER_X;
 
-    //                 double dx = (double)x1 - (double)x0;
-    //                 double dy = (double)y0 - (double)y1;
-    //                 double heading_deg = 0.0;
-    //                 if (dy != 0.0) {
-    //                     heading_deg = atan2(dx, dy) * (180.0 / M_PI);
-    //                 } else {
-    //                     heading_deg = (dx >= 0) ? 90.0 : -90.0;
-    //                 }
+        //             double dx = (double)x1 - (double)x0;
+        //             double dy = (double)y0 - (double)y1;
+        //             double heading_deg = 0.0;
+        //             if (dy != 0.0) {
+        //                 heading_deg = atan2(dx, dy) * (180.0 / M_PI);
+        //             } else {
+        //                 heading_deg = (dx >= 0) ? 90.0 : -90.0;
+        //             }
 
-    //                 double measurement = (g_params.k_cte * cte) + (g_params.k_heading * heading_deg);
-    //                 double setpoint = 0.0;
+        //             double measurement = (g_params.k_cte * cte) + (g_params.k_heading * heading_deg);
+        //             double setpoint = 0.0;
 
-    //                 double steering_output = pid_update(&steer_pid, setpoint, measurement, g_params.dt);
+        //             double steering_output = pid_update(&steer_pid, setpoint, measurement, g_params.dt);
 
-    //                 Steer(steering_output + g_params.steering_offset);
+        //             Steer(steering_output + g_params.steering_offset);
 
-    //                 double speed_left, speed_right;
-    //                 compute_motor_speeds(steering_output, &speed_left, &speed_right);
-    //                 HbridgeSpeed(&g_hbridge, (int16_t)speed_left, (int16_t)speed_right);
-    //             }
-    //             else
-    //             {
-    //                 line_lost_counter++;
-    //                 if (line_lost_counter > 5) {
-    //                     HbridgeBrake(&g_hbridge);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     else
-    //     {
-    //         HbridgeBrake(&g_hbridge);
-    //     }
+        //             double speed_left, speed_right;
+        //             compute_motor_speeds(steering_output, &speed_left, &speed_right);
+        //             HbridgeSpeed(&g_hbridge, (int16_t)speed_left, (int16_t)speed_right);
+        //         }
+        //         else
+        //         {
+        //             line_lost_counter++;
+        //             if (line_lost_counter > 5) {
+        //                 HbridgeBrake(&g_hbridge);
+        //             }
+        //         }
+        //     }
+        // }
+        //else
+        //{
+            HbridgeSpeed(&g_hbridge,g_params.base_speed_left,g_params.base_speed_right);
+            
+        }
+        
 
-    //     if (button_pressed_edge()) {
-    //         g_params.state = STATE_IDLE;
-    //         HbridgeBrake(&g_hbridge);
-    //         PRINTF("Button pressed: STOPPED\r\n");
-    //     }
-    // }
-    HbridgeSpeed(&g_hbridge,50,50);
+        if (button_pressed_edge()) {
+            g_params.state = STATE_IDLE;
+            HbridgeBrake(&g_hbridge);
+            PRINTF("Button pressed: STOPPED\r\n");
+        }
+    }
+    
+
 }

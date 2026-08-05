@@ -22,7 +22,7 @@
 #define TRACK_WIDTH_MM      120.0
 #define MAX_SERVO_ANGLE_DEG  25.0
 #define MAX_LATERAL_ACCEL     3.0
-#define BASE_SPEED           60.0
+#define BASE_SPEED           100.0
 
 // ---- Robot states ----
 #define STATE_IDLE     0

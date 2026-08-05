@@ -171,17 +171,18 @@ static void command_execute(char *cmd)
             "  ki <val>           PID integral\r\n"
             "  kd <val>           PID derivative\r\n"
             "  alpha <val>        Derivative LPF factor\r\n"
-            "  base_speed <val>   Set both wheel base speeds\r\n"
-            "  speed_left <val>   Left wheel base speed\r\n"
-            "  speed_right <val>  Right wheel base speed\r\n"
-            "  max_speed_left <val>   Left speed clamp\r\n"
-            "  max_speed_right <val>  Right speed clamp\r\n"
-            "  steer <val>        Manual steer (-100..100, IDLE only)\r\n"
-            "  steering_offset <val>  Servo center offset\r\n"
-            "  k_cte <val>        Cross-track error weight\r\n"
-            "  k_heading <val>    Heading error weight\r\n"
-            "  status             Show all params\r\n"
-            "  help               This list\r\n");
+            "  base_speed <val>   Set both wheel base speeds\r\n");
+            // send_ack(
+            // "  speed_left <val>   Left wheel base speed\r\n"
+            // "  speed_right <val>  Right wheel base speed\r\n"
+            // "  max_speed_left <val>   Left speed clamp\r\n"
+            // "  max_speed_right <val>  Right speed clamp\r\n"
+            // "  steer <val>        Manual steer (-100..100, IDLE only)\r\n"
+            // "  steering_offset <val>  Servo center offset\r\n"
+            // "  k_cte <val>        Cross-track error weight\r\n"
+            // "  k_heading <val>    Heading error weight\r\n"
+            // "  status             Show all params\r\n"
+            // "  help               This list\r\n");
     }
     else {
         send_ack("ERR unknown. Send 'help;'\r\n");
