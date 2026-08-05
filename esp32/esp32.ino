@@ -2,8 +2,8 @@
 #include <ESPmDNS.h>
 
 // ---- Configuration ----
-const char* WIFI_SSID = "Robotics315";
-const char* WIFI_PASS = "helloworld";
+const char* WIFI_SSID = "ssid";
+const char* WIFI_PASS = "pass";
 const char* HOSTNAME  = "nxpcup-bridge";
 
 #define UART_RX 25   // ESP32 RX  <- MCXN947 TX (P2_3)
@@ -19,13 +19,23 @@ void setup() {
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  int timeout = 0;
+  while (WiFi.status() != WL_CONNECTED && timeout < 30) {  // 15s timeout
     delay(500);
     Serial.print(".");
+    timeout++;
   }
-  Serial.println("\nWiFi connected!");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("\nWiFi connection failed. Starting AP mode...");
+    WiFi.softAP("nxpcup-bridge", "12345678");
+    Serial.print("AP IP Address: ");
+    Serial.println(WiFi.softAPIP());
+  } else {
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+  }
 
   if (MDNS.begin(HOSTNAME)) {
     Serial.println("mDNS started: nxpcup-bridge.local");

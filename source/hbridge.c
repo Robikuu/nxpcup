@@ -75,39 +75,44 @@ void HbridgeBrake(Hbridge *h)
 
 void compute_motor_speeds(double steering_output, double *speed_left, double *speed_right)
 {
-    // 1. Convert abstract PID output (-100..100) into a real steering angle
     double steer_angle_deg = (steering_output / 100.0) * MAX_SERVO_ANGLE_DEG;
     double steer_angle_rad = steer_angle_deg * (M_PI / 180.0);
 
-    // 2. Bicycle-model turn radius from steering angle
-    //    (near-zero angle -> near-infinite radius -> straight line)
     double radius;
     if (fabs(steer_angle_rad) > 0.001) {
         radius = WHEELBASE_MM / tan(fabs(steer_angle_rad));
     } else {
-        radius = 1e6; // effectively straight
+        radius = 1e6;
     }
 
-    // 3. Max safe cornering speed for this radius (classic v = sqrt(a_lat * R))
     double max_corner_speed = sqrt(MAX_LATERAL_ACCEL * radius);
-    double target_speed = BASE_SPEED;
-    if (target_speed > max_corner_speed) target_speed = max_corner_speed;
 
-    // 4. Differential speed from the SAME radius — inside wheel travels a smaller arc
-    double half_track = TRACK_WIDTH_MM / 2.0;
-    double inside_speed  = target_speed * (1.0 - half_track / radius);
-    double outside_speed = target_speed * (1.0 + half_track / radius);
+    double left_base  = g_params.base_speed_left;
+    double right_base = g_params.base_speed_right;
 
-    if (steering_output > 0) { // turning right -> right wheel is inside
-        *speed_right = inside_speed;
-        *speed_left  = outside_speed;
-    } else {
-        *speed_left  = inside_speed;
-        *speed_right = outside_speed;
+    double avg_speed = (left_base + right_base) / 2.0;
+    double speed_scale = 1.0;
+    if (avg_speed > max_corner_speed && avg_speed > 0.0) {
+        speed_scale = max_corner_speed / avg_speed;
     }
 
-    if (*speed_left  > 100.0) *speed_left  = 100.0;
-    if (*speed_right > 100.0) *speed_right = 100.0;
-    if (*speed_left  < -100.0) *speed_left = -100.0;
-    if (*speed_right < -100.0) *speed_right = -100.0;
+    double half_track    = TRACK_WIDTH_MM / 2.0;
+    double inside_scale  = 1.0 - half_track / radius;
+    double outside_scale = 1.0 + half_track / radius;
+
+    if (steering_output > 0.0) {
+        *speed_right = right_base * inside_scale  * speed_scale;
+        *speed_left  = left_base  * outside_scale * speed_scale;
+    } else if (steering_output < 0.0) {
+        *speed_left  = left_base  * inside_scale  * speed_scale;
+        *speed_right = right_base * outside_scale * speed_scale;
+    } else {
+        *speed_left  = left_base  * speed_scale;
+        *speed_right = right_base * speed_scale;
+    }
+
+    if (*speed_left  >  g_params.max_speed_left)  *speed_left  =  g_params.max_speed_left;
+    if (*speed_right >  g_params.max_speed_right) *speed_right =  g_params.max_speed_right;
+    if (*speed_left  < -g_params.max_speed_left)  *speed_left  = -g_params.max_speed_left;
+    if (*speed_right < -g_params.max_speed_right) *speed_right = -g_params.max_speed_right;
 }
