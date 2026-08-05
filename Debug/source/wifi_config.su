@@ -1,0 +1,8 @@
+D:\robotica\workspace\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
+../source/wifi_config.c:18:6:params_init	4	static
+../source/wifi_config.c:35:13:send_ack	16	static
+../source/wifi_config.c:41:13:send_ack_dbl	104	static
+../source/wifi_config.c:52:12:append_dbl	64	static
+../source/wifi_config.c:62:13:command_execute	376	static
+../source/wifi_config.c:193:6:command_poll	16	static
+../source/wifi_config.c:216:6:esp_printf	152	static

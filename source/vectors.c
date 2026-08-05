@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "fsl_device_registers.h"
 #include "fsl_debug_console.h"
+#include "wifi_config.h"
 
 // Calibrated once on your laptop, hardcoded here as constants:
 #define H11 0.0f  // Ensure you use the 'f' suffix for floats
@@ -58,9 +59,9 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
     int ang_frac = (int)((angle_deg - (double)ang_int) * 100.0);
     if (ang_frac < 0) ang_frac = -ang_frac;
 
-    PRINTF("Vector [%u] details:\r\n", (unsigned)index);
-    PRINTF("  Start: (%u, %u) -> End: (%u, %u)\r\n", (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
-    PRINTF("  dx: %d, dy: %d\r\n", dx, dy);
-    PRINTF("  Length: %d.%02d px\r\n", len_int, len_frac);
-    PRINTF("  Angle: %d.%02d deg\r\n", ang_int, ang_frac);
+    esp_printf("Vector [%u] details:\r\n", (unsigned)index);
+    esp_printf("  Start: (%u, %u) -> End: (%u, %u)\r\n", (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
+    esp_printf("  dx: %d, dy: %d\r\n", dx, dy);
+    esp_printf("  Length: %d.%02d px\r\n", len_int, len_frac);
+    esp_printf("  Angle: %d.%02d deg\r\n", ang_int, ang_frac);
 }

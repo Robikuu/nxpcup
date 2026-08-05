@@ -6,6 +6,7 @@
 #include "servo.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #define CMD_BUF_SIZE 64
 
@@ -209,5 +210,22 @@ void command_poll(void)
                 s_cmd_idx++;
             }
         }
+    }
+}
+
+void esp_printf(const char *fmt, ...)
+{
+    char buf[128]; // adjust size if you expect longer lines
+
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    if (len > 0) {
+        // vsnprintf can report a length longer than the buffer if truncated —
+        // clamp to what actually fits
+        size_t actual_len = (len < (int)sizeof(buf)) ? (size_t)len : sizeof(buf) - 1;
+        LPUART_WriteBlocking(LP_FLEXCOMM9_PERIPHERAL, (const uint8_t *)buf, actual_len);
     }
 }

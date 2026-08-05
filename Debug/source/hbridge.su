@@ -2,4 +2,4 @@ D:\robotica\workspace\nxpcup\drivers/fsl_gpio.h:345:20:GPIO_PinWrite	24	static
 ../source/hbridge.c:11:6:HbridgeInit	40	static
 ../source/hbridge.c:32:6:HbridgeSpeed	24	static
 ../source/hbridge.c:67:6:HbridgeBrake	16	static
-../source/hbridge.c:76:6:compute_motor_speeds	88	static
+../source/hbridge.c:76:6:compute_motor_speeds	144	static

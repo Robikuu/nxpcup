@@ -13,7 +13,8 @@ C_SRCS += \
 ../source/servo.c \
 ../source/simple_movement.c \
 ../source/utils.c \
-../source/vectors.c 
+../source/vectors.c \
+../source/wifi_config.c 
 
 C_DEPS += \
 ./source/control_theory.d \
@@ -25,7 +26,8 @@ C_DEPS += \
 ./source/servo.d \
 ./source/simple_movement.d \
 ./source/utils.d \
-./source/vectors.d 
+./source/vectors.d \
+./source/wifi_config.d 
 
 OBJS += \
 ./source/control_theory.o \
@@ -37,7 +39,8 @@ OBJS += \
 ./source/servo.o \
 ./source/simple_movement.o \
 ./source/utils.o \
-./source/vectors.o 
+./source/vectors.o \
+./source/wifi_config.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -52,7 +55,7 @@ source/%.o: ../source/%.c source/subdir.mk
 clean: clean-source
 
 clean-source:
-	-$(RM) ./source/control_theory.d ./source/control_theory.o ./source/esc.d ./source/esc.o ./source/hbridge.d ./source/hbridge.o ./source/main.d ./source/main.o ./source/pixy.d ./source/pixy.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/servo.d ./source/servo.o ./source/simple_movement.d ./source/simple_movement.o ./source/utils.d ./source/utils.o ./source/vectors.d ./source/vectors.o
+	-$(RM) ./source/control_theory.d ./source/control_theory.o ./source/esc.d ./source/esc.o ./source/hbridge.d ./source/hbridge.o ./source/main.d ./source/main.o ./source/pixy.d ./source/pixy.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/servo.d ./source/servo.o ./source/simple_movement.d ./source/simple_movement.o ./source/utils.d ./source/utils.o ./source/vectors.d ./source/vectors.o ./source/wifi_config.d ./source/wifi_config.o
 
 .PHONY: clean-source
 

@@ -20,7 +20,7 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to WiFi");
   int timeout = 0;
-  while (WiFi.status() != WL_CONNECTED && timeout < 30) {  // 15s timeout
+  while (WiFi.status() != WL_CONNECTED && timeout < 0) {  // 15s timeout
     delay(500);
     Serial.print(".");
     timeout++;

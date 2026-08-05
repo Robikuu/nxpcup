@@ -117,7 +117,7 @@ source/main.o source/main.d: ../source/main.c \
  D:\robotica\workspace\nxpcup\include/Config.h \
  D:\robotica\workspace\nxpcup\include/servo.h \
  D:\robotica\workspace\nxpcup\include/esc.h ../source/control_theory.h \
- ../source/utils.h ../source/vectors.h
+ ../source/utils.h ../source/vectors.h ../source/wifi_config.h
 D:\robotica\workspace\nxpcup\source\mcux_config.h:
 D:\robotica\workspace\nxpcup\device/fsl_device_registers.h:
 D:\robotica\workspace\nxpcup\device/MCXN947_cm33_core0.h:
@@ -239,3 +239,4 @@ D:\robotica\workspace\nxpcup\include/esc.h:
 ../source/control_theory.h:
 ../source/utils.h:
 ../source/vectors.h:
+../source/wifi_config.h:
