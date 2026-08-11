@@ -3,31 +3,21 @@
 #include "fsl_device_registers.h"
 #include "fsl_debug_console.h"
 #include "wifi_config.h"
-
-// Calibrated once on your laptop, hardcoded here as constants:
-#define H11 0.0f  // Ensure you use the 'f' suffix for floats
-#define H12 0.0f
-#define H13 0.0f
-#define H21 0.0f
-#define H22 0.0f
-#define H23 0.0f
-#define H31 0.0f
-#define H32 0.0f
-#define H33 1.0f
+#include "vectors.h"
 
 //transformare homography pt vectori
-void pixel_to_ground(float u, float v, float *X, float *Y) {
-    float Wp = H31*u + H32*v + H33;
+void pixel_to_ground(float u, float v, float *X, float *Y)
+{
+    float Wp = H31 * u + H32 * v + H33;
 
-    // Safety guard: Prevent division by zero or near-zero
     if (fabsf(Wp) < 1e-6f) {
         *X = 0.0f;
         *Y = 0.0f;
-        return; 
+        return;
     }
 
-    float Xp = H11*u + H12*v + H13;
-    float Yp = H21*u + H22*v + H23;
+    float Xp = H11 * u + H12 * v + H13;
+    float Yp = H21 * u + H22 * v + H23;
 
     *X = Xp / Wp;
     *Y = Yp / Wp;
