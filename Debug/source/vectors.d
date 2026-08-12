@@ -94,7 +94,7 @@ source/vectors.o source/vectors.d: ../source/vectors.c \
  D:\robotica\workspace\nxpcup\drivers/fsl_clock.h \
  D:\robotica\workspace\nxpcup\drivers/fsl_common.h \
  D:\robotica\workspace\nxpcup\drivers/fsl_reset.h ../source/wifi_config.h \
- D:\robotica\workspace\nxpcup\include/Config.h
+ D:\robotica\workspace\nxpcup\include/Config.h ../source/vectors.h
 D:\robotica\workspace\nxpcup\source\mcux_config.h:
 D:\robotica\workspace\nxpcup\device/fsl_device_registers.h:
 D:\robotica\workspace\nxpcup\device/MCXN947_cm33_core0.h:
@@ -192,3 +192,4 @@ D:\robotica\workspace\nxpcup\drivers/fsl_common.h:
 D:\robotica\workspace\nxpcup\drivers/fsl_reset.h:
 ../source/wifi_config.h:
 D:\robotica\workspace\nxpcup\include/Config.h:
+../source/vectors.h:

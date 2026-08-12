@@ -17,11 +17,8 @@ typedef struct {
 } pixy_t;
 
 
-void pixy_init(pixy_t *cam,
-               LPI2C_Type *inst,
-               uint8_t addr,
-               edma_handle_t *rxHandle,
-               edma_handle_t *txHandle);
+status_t pixy_init(pixy_t *cam, LPI2C_Type *base, uint8_t addr,
+                   edma_handle_t *rxHandle, edma_handle_t *txHandle);
 
 
 status_t pixy_set_led(pixy_t *cam, uint8_t r, uint8_t g, uint8_t b);

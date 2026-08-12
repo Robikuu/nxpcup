@@ -18,6 +18,7 @@
 #define SPEED_RIGHT           40
 #define SPEED_LEFT            -40
 
+#define SPEED_AT_FULL_DUTY_MMPS  2000.0f
 #define WHEELBASE_MM        150.0
 #define TRACK_WIDTH_MM      120.0
 #define MAX_SERVO_ANGLE_DEG  25.0
@@ -40,7 +41,7 @@ typedef struct {
     double base_speed_left;   // Nominal left wheel speed (asymmetric tuning)
     double base_speed_right;  // Nominal right wheel speed (asymmetric tuning)
     double max_speed_left;    // Left motor speed clamp
-    double max_speed_right;   // Right motor speed clamp
+    double max_speed_right;  // Right motor speed clamp
 
     double steering_offset;   // Servo center offset
     double k_cte;             // Cross-track error weight

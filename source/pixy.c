@@ -16,7 +16,7 @@ static void pixy_edma_cb(LPI2C_Type *base,
     }
 }
 
-void pixy_init(pixy_t *cam,
+status_t pixy_init(pixy_t *cam,
                LPI2C_Type *inst,
                uint8_t addr,
                edma_handle_t *rxHandle,
@@ -31,6 +31,7 @@ void pixy_init(pixy_t *cam,
         txHandle,
         pixy_edma_cb,
         NULL);
+    return kStatus_Success;
 }
 
 static status_t pixy_send(pixy_t *cam, const uint8_t *cmd, size_t len)

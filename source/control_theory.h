@@ -1,17 +1,21 @@
 #ifndef CONTROL_THEORY_H
 #define CONTROL_THEORY_H
 
+#include <stdint.h> 
 typedef struct {
-    double kp;
-    double ki;
-    double kd;
-    
-    double integral;
-    double prev_measurement;
-    double d_filtered;       // Stores state for derivative low-pass filter
-    
-    double output_limit;
-    double alpha;            // Filter coefficient (0.0 < alpha <= 1.0)
+    float kp;
+    float ki;
+    float kd;
+
+    float integral;
+    float prev_measurement;
+    float d_filtered;      // Derivative low-pass filter state
+
+    float output_limit;
+    float alpha;           // Filter coefficient (0.0 < alpha <= 1.0)
+
+    float prev_output;     // Last output, returned when dt <= 0
+    uint8_t initialized;   // Guards first-call derivative spike
 } pid_struct;
 
 /**
@@ -23,8 +27,8 @@ typedef struct {
  * @param output_limit Max magnitude for the control output
  * @param alpha Derivative LPF smoothing factor (typically 0.05 to 0.3)
  */
-void pid_init(pid_struct *PID, double kp, double ki, double kd,
-              double output_limit, double alpha);
+void  pid_init(pid_struct *PID, float kp, float ki, float kd,
+               float output_limit, float alpha);
 
 /**
  * @brief Computes the PID output step.
@@ -34,6 +38,6 @@ void pid_init(pid_struct *PID, double kp, double ki, double kd,
  * @param dt Time step in seconds
  * @return Clamped control output
  */
-double pid_update(pid_struct *PID, double setpoint, double measurement, double dt);
+float pid_update(pid_struct *PID, float setpoint, float measurement, float dt);
 
 #endif // CONTROL_THEORY_H

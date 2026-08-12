@@ -6,7 +6,6 @@
 
 void Steer(double angle)
 {
-	PRINTF("AAAAAA");
     if (angle > 100.0)  angle = 100.0;
     if (angle < -100.0) angle = -100.0;
 
