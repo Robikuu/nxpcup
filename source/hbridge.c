@@ -9,59 +9,65 @@ Hbridge g_hbridge;
 static uint32_t s_srcClockHz;
 
 void HbridgeInit(Hbridge *h,
-                 CTIMER_Type *pwmPeriph,
+		 	 	 CTIMER_Type *pwmPeriph,
                  ctimer_match_t periodCh,
                  ctimer_match_t pwm1Ch,
                  ctimer_match_t pwm2Ch,
                  GPIO_Type *m1DirPort, uint32_t m1DirPin,
                  GPIO_Type *m2DirPort, uint32_t m2DirPin)
 {
-    h->periodChannel  = periodCh;
-    h->pwm1Channel    = pwm1Ch;
-    h->pwm2Channel    = pwm2Ch;
-    h->motor1DirPort  = m1DirPort;
-    h->motor1DirPin   = m1DirPin;
-    h->motor2DirPort  = m2DirPort;
-    h->motor2DirPin   = m2DirPin;
-    h->pwmPeripheral  = pwmPeriph;
+    ctimer_config_t config;
+
+    g_hbridge = *h;
+    h->periodChannel    = periodCh;
+    h->pwm1Channel      = pwm1Ch;
+    h->pwm2Channel      = pwm2Ch;
+    h->motor1DirPort    = m1DirPort;
+    h->motor1DirPin     = m1DirPin;
+    h->motor2DirPort    = m2DirPort;
+    h->motor2DirPin     = m2DirPin;
+    h->pwmPeripheral    = pwmPeriph;
 }
 
-static inline int16_t clamp100(int16_t v)
+void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2)
 {
-    if (v >  100) return  100;
-    if (v < -100) return -100;
-    return v;
-}
+    /* Clamp to -100..+100 */
+    if (speed1 >  100) speed1 =  100;
+    if (speed1 < -100) speed1 = -100;
+    if (speed2 >  100) speed2 =  100;
+    if (speed2 < -100) speed2 = -100;
 
-void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right)
-{
-    speed_left  = clamp100(speed_left);
-    speed_right = clamp100(speed_right);
+    uint8_t duty1, duty2;
 
-    uint8_t duty_left  = (uint8_t)(speed_left  >= 0 ? speed_left  : -speed_left);
-    uint8_t duty_right = (uint8_t)(speed_right >= 0 ? speed_right : -speed_right);
+    /* Speed1 (Right Motor): controls motor1DirPort & pwm2Channel */
+    if (speed1 >= 0) {
+        GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
+        duty1 = (uint8_t)(100 - speed1);
+    } else {
+        GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
+        duty1 = (uint8_t)(-speed1);
+    }
 
-    /* LEFT motor: forward = DIR HIGH */
-    GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, speed_left >= 0 ? 1U : 0U);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel,
-                              h->pwm2Channel, duty_left);
+    /* Speed2 (Left Motor): controls motor2DirPort & pwm1Channel */
+    if (speed2 >= 0) {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
+        duty2 = (uint8_t)(100 - speed2);
+    } else {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+        duty2 = (uint8_t)(-speed2);
+    }
 
-    /* RIGHT motor: forward = DIR LOW */
-    GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, speed_right >= 0 ? 0U : 1U);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel,
-                              h->pwm1Channel, duty_right);
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, duty1);
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, duty2);
 }
 
 void HbridgeBrake(Hbridge *h)
 {
-    /* NOTE: with one direction pin per motor, duty=0 COASTS (freewheel).
-       True short-brake on an L298N needs both IN pins at the same level,
-       which this wiring can't do. If stopping distance is too long,
-       implement a brief reverse-pulse brake in software instead. */
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel,
-                              h->pwm1Channel, 0U);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel,
-                              h->pwm2Channel, 0U);
+    GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
+    GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, 0U);
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, 0U);
 }
 
 /*

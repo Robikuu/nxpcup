@@ -4,7 +4,7 @@
 void receive_message();
 void buttons_init(void);
 int button_pressed_edge(void);
-void print_double(const char *label, double val);
+void print_double(const char *label, float val);
 
 
 #endif

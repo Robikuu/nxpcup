@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdint.h>
 
+///DO NOT CHANGE EVER!!!!!!!!!!!!!!!!!!!!!!!!!!
 #define H11  0.007548889315f
 #define H12  0.0002899088594f
 #define H13 -1.290254073f

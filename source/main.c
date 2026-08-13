@@ -90,13 +90,13 @@ void TestPidSteer(void)
     // alpha = 0.2 provides a solid balance for filtering derivative noise
     pid_init(&steer_pid, 2.0, 0.1, 0.5, /*output_limit*/ 100.0, /*alpha*/ 0.2);
 
-    double setpoint = 0.0;            // Target center position/angle
-    double fake_measurement = -80.0;  // Initial measurement (gives error = +80.0)
-    double dt = 0.02;
+    float setpoint = 0.0f;            // Target center position/angle
+    float fake_measurement = -80.0f;  // Initial measurement (gives error = +80.0)
+    float dt = 0.02f;
 
     while (1) {
         // Updated pid_update signature: (PID, setpoint, measurement, dt)
-        double output = pid_update(&steer_pid, setpoint, fake_measurement, dt);
+        float output = pid_update(&steer_pid, setpoint, fake_measurement, dt);
 
         print_double("measurement=", fake_measurement);
         print_double("output=", output);
@@ -227,10 +227,7 @@ int main(void)
                 /* sign convention: positive steer_cmd = RIGHT turn.
                    If your servo is mirrored, flip here instead. */
                 Steer(steer_cmd + g_params.steering_offset);
-
-                float sl, sr;
-                compute_motor_speeds(steer_cmd, &sl, &sr);
-                HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
+                HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
             }
 
         } else {

@@ -4,15 +4,15 @@
 #include "utils.h"
 #include <math.h>
 
-void Steer(double angle)
+void Steer(float angle)
 {
-    if (angle > 100.0)  angle = 100.0;
-    if (angle < -100.0) angle = -100.0;
+    if (angle > 100.0f)  angle = 100.0f;
+    if (angle < -100.0f) angle = -100.0f;
 
-    double duty = 5.0 + ((angle + 100.0) / 200.0) * 5.0;
+    float duty = 5.0f + ((angle + 100.0f) / 200.0f) * 5.0f;
 
     uint32_t periodTicks = CTIMER2_PERIPHERAL->MR[CTIMER2_PWM_PERIOD_CH];
-    uint32_t pulseTicks = (uint32_t)((periodTicks * (100.0 - duty)) / 100.0);
+    uint32_t pulseTicks = (uint32_t)((periodTicks * (100.0f - duty)) / 100.0f);
 
     CTIMER2_PERIPHERAL->MR[2] = pulseTicks;
 }

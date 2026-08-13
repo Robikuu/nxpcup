@@ -29,24 +29,24 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
     int dy = (int)y1 - (int)y0;
 
     // Calculate vector length (magnitude)
-    double length = sqrt((double)(dx * dx + dy * dy));
+    float length = sqrtf((float)(dx * dx + dy * dy));
 
     // Calculate direction angle in degrees relative to the vertical axis (-dy).
     // Straight forward is 0 degrees. Left is negative, right is positive.
-    double angle_deg = 0.0;
+    float angle_deg = 0.0f;
     if (dy != 0) {
-        angle_deg = atan2((double)dx, (double)(-dy)) * 180.0 / 3.141592653589793;
+        angle_deg = atan2f((float)dx, (float)(-dy)) * 180.0f / 3.141592653589793f;
     } else {
-        angle_deg = (dx >= 0) ? 90.0 : -90.0;
+        angle_deg = (dx >= 0) ? 90.0f : -90.0f;
     }
 
     // Split into integer and fractional parts for printing (avoiding %f format)
     int len_int = (int)length;
-    int len_frac = (int)((length - len_int) * 100.0);
+    int len_frac = (int)((length - len_int) * 100.0f);
     if (len_frac < 0) len_frac = -len_frac;
 
     int ang_int = (int)angle_deg;
-    int ang_frac = (int)((angle_deg - (double)ang_int) * 100.0);
+    int ang_frac = (int)((angle_deg - (float)ang_int) * 100.0f);
     if (ang_frac < 0) ang_frac = -ang_frac;
 
     esp_printf("Vector [%u] details:\r\n", (unsigned)index);

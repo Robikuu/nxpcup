@@ -1,2 +1,2 @@
-../source/servo.c:7:6:Steer	40	static
+../source/servo.c:7:6:Steer	32	static
 ../source/servo.c:20:6:TestServo	24	static

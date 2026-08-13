@@ -33,20 +33,20 @@
 // Default values come from the #define constants above.
 // Modified at runtime via Wi-Fi commands received through the ESP32 bridge.
 typedef struct {
-    double kp;                // PID proportional gain
-    double ki;                // PID integral gain
-    double kd;                // PID derivative gain
-    double alpha;             // Derivative LPF smoothing factor (0.0 < alpha <= 1.0)
+    float kp;                // PID proportional gain
+    float ki;                // PID integral gain
+    float kd;                // PID derivative gain
+    float alpha;             // Derivative LPF smoothing factor (0.0 < alpha <= 1.0)
 
-    double base_speed_left;   // Nominal left wheel speed (asymmetric tuning)
-    double base_speed_right;  // Nominal right wheel speed (asymmetric tuning)
-    double max_speed_left;    // Left motor speed clamp
-    double max_speed_right;  // Right motor speed clamp
+    float base_speed_left;   // Nominal left wheel speed (asymmetric tuning)
+    float base_speed_right;  // Nominal right wheel speed (asymmetric tuning)
+    float max_speed_left;    // Left motor speed clamp
+    float max_speed_right;  // Right motor speed clamp
 
-    double steering_offset;   // Servo center offset
-    double k_cte;             // Cross-track error weight
-    double k_heading;         // Heading angle error weight
-    double dt;                // Loop timestep (seconds)
+    float steering_offset;   // Servo center offset
+    float k_cte;             // Cross-track error weight
+    float k_heading;         // Heading angle error weight
+    float dt;                // Loop timestep (seconds)
 
     uint8_t state;            // STATE_IDLE or STATE_RUNNING
 } robot_params_t;

@@ -37,11 +37,11 @@ int button_pressed_edge(void)
     return edge;
 }
 
-void print_double(const char *label, double val)
+void print_double(const char *label, float val)
 {
     int whole = (int)val;
-    double frac_part = val - whole;
+    float frac_part = val - whole;
     if (frac_part < 0) frac_part = -frac_part;
-    int frac = (int)(frac_part * 100.0);
+    int frac = (int)(frac_part * 100.0f);
     PRINTF("%s%d.%02d\r\n", label, whole, frac);
 }

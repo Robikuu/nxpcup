@@ -2,16 +2,16 @@
 #define CONTROL_THEORY_H
 
 typedef struct {
-    double kp,kd,ki;
-    double integral;
-    double prev_error;
-    double integral_limit;
-    double output_limit;
+    float kp,kd,ki;
+    float integral;
+    float prev_error;
+    float integral_limit;
+    float output_limit;
 }pid_struct;
 
-void pid_init(pid_struct *PID, double kp, double ki, double kd,
-              double integral_limit, double output_limit);
+void pid_init(pid_struct *PID, float kp, float ki, float kd,
+              float integral_limit, float output_limit);
 
-double pid_update(pid_struct *PID, double error, double dt);
+float pid_update(pid_struct *PID, float error, float dt);
 
 #endif

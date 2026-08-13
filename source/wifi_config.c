@@ -17,21 +17,21 @@ static size_t s_cmd_idx = 0;
 
 void params_init(void)
 {
-    g_params.kp = 0.5;
-    g_params.ki = 0.0;    /* keep 0 until P+D are tuned */
-    g_params.kd = 0.05;
-    g_params.k_cte     = 1.0;
-    g_params.k_heading = 0.5;
+    g_params.kp = 0.5f;
+    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
+    g_params.kd = 0.05f;
+    g_params.k_cte     = 1.0f;
+    g_params.k_heading = 0.5f;
 
-    g_params.dt    = 0.02;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3;    /* CRITICAL — must be in (0, 1] */
+    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
+    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
 
-    g_params.base_speed_left  = 20.0;   /* replaces base_speed */
-    g_params.base_speed_right = 20.0;
-    g_params.max_speed_left   = 25.0;   /* replaces max_speed */
-    g_params.max_speed_right  = 25.0;
+    g_params.base_speed_left  = 20.0f;   /* replaces base_speed */
+    g_params.base_speed_right = 20.0f;
+    g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
+    g_params.max_speed_right  = 80.0f;
 
-    g_params.steering_offset = 0.0;
+    g_params.steering_offset = 0.0f;
     g_params.state           = STATE_IDLE;
 }
 
@@ -41,23 +41,23 @@ static void send_ack(const char *msg)
                          (const uint8_t *)msg, strlen(msg));
 }
 
-static void send_ack_dbl(const char *prefix, double val)
+static void send_ack_dbl(const char *prefix, float val)
 {
     char buf[48];
     int  whole  = (int)val;
-    double frac = val - whole;
+    float frac = val - whole;
     if (frac < 0) frac = -frac;
-    int  f100   = (int)(frac * 100.0);
+    int  f100   = (int)(frac * 100.0f);
     snprintf(buf, sizeof(buf), "OK %s%d.%02d\r\n", prefix, whole, f100);
     send_ack(buf);
 }
 
-static int append_dbl(char *buf, int off, size_t cap, const char *label, double val)
+static int append_dbl(char *buf, int off, size_t cap, const char *label, float val)
 {
     int whole = (int)val;
-    double frac = val - whole;
+    float frac = val - whole;
     if (frac < 0) frac = -frac;
-    int f100 = (int)(frac * 100.0);
+    int f100 = (int)(frac * 100.0f);
     return off + snprintf(buf + off, cap - (size_t)off,
                           "%s%d.%02d\r\n", label, whole, f100);
 }
@@ -65,7 +65,7 @@ static int append_dbl(char *buf, int off, size_t cap, const char *label, double 
 static void command_execute(char *cmd)
 {
     char   keyword[32];
-    double val     = 0.0;
+    float val     = 0.0f;
     int    has_val = 0;
 
     char *space = strchr(cmd, ' ');
@@ -74,7 +74,7 @@ static void command_execute(char *cmd)
         if (klen >= sizeof(keyword)) klen = sizeof(keyword) - 1;
         memcpy(keyword, cmd, klen);
         keyword[klen] = '\0';
-        if (sscanf(space + 1, "%lf", &val) == 1)
+        if (sscanf(space + 1, "%f", &val) == 1)
             has_val = 1;
     } else {
         strncpy(keyword, cmd, sizeof(keyword) - 1);
@@ -195,9 +195,7 @@ static void command_execute(char *cmd)
 
 void command_poll(void)
 {
-    uint32_t flags = LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL);
-
-    if (flags & kLPUART_RxDataRegFullFlag) {
+    while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
         uint8_t c = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
 
         if (c == ';') {
