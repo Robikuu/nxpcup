@@ -227,11 +227,18 @@ int main(void)
                 /* sign convention: positive steer_cmd = RIGHT turn.
                    If your servo is mirrored, flip here instead. */
                 Steer(steer_cmd + g_params.steering_offset);
+
                 HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
             }
 
         } else {
-            /* IDLE: actually stopped */
+            /* IDLE: clear controller state so next run starts clean */
+            steer_pid.integral         = 0.0f;
+            steer_pid.prev_measurement = 0.0f;
+            steer_pid.d_filtered       = 0.0f;
+            steer_pid.prev_output      = 0.0f;
+            steer_pid.initialized      = 0;
+            line_lost_counter          = 0;
             HbridgeBrake(&g_hbridge);
         }
 

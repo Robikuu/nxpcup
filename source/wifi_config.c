@@ -22,7 +22,14 @@ void params_init(void)
     g_params.kd = 0.05f;
     g_params.k_cte     = 1.0f;
     g_params.k_heading = 0.5f;
+    g_params.kp = 0.5f;
+    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
+    g_params.kd = 0.05f;
+    g_params.k_cte     = 1.0f;
+    g_params.k_heading = 0.5f;
 
+    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
+    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
 
@@ -31,6 +38,7 @@ void params_init(void)
     g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
     g_params.max_speed_right  = 80.0f;
 
+    g_params.steering_offset = 0.0f;
     g_params.steering_offset = 0.0f;
     g_params.state           = STATE_IDLE;
 }
@@ -46,17 +54,20 @@ static void send_ack_dbl(const char *prefix, float val)
     char buf[48];
     int  whole  = (int)val;
     float frac = val - whole;
+    float frac = val - whole;
     if (frac < 0) frac = -frac;
     int  f100   = (int)(frac * 100.0f);
     snprintf(buf, sizeof(buf), "OK %s%d.%02d\r\n", prefix, whole, f100);
     send_ack(buf);
 }
 
-static int append_dbl(char *buf, int off, size_t cap, const char *label, float val)
+static int append_flt(char *buf, int off, size_t cap, const char *label, float val)
 {
     int whole = (int)val;
     float frac = val - whole;
+    float frac = val - whole;
     if (frac < 0) frac = -frac;
+    int f100 = (int)(frac * 100.0f);
     int f100 = (int)(frac * 100.0f);
     return off + snprintf(buf + off, cap - (size_t)off,
                           "%s%d.%02d\r\n", label, whole, f100);
@@ -75,6 +86,7 @@ static void command_execute(char *cmd)
         memcpy(keyword, cmd, klen);
         keyword[klen] = '\0';
         if (sscanf(space + 1, "%f", &val) == 1)
+        if (sscanf(space + 1, "%f", &val) == 1)
             has_val = 1;
     } else {
         strncpy(keyword, cmd, sizeof(keyword) - 1);
@@ -92,76 +104,76 @@ static void command_execute(char *cmd)
     }
     else if (!strcmp(keyword, "kp") && has_val) {
         g_params.kp = val;
-        send_ack_dbl("kp=", val);
+        send_ack_flt("kp=", val);
     }
     else if (!strcmp(keyword, "ki") && has_val) {
         g_params.ki = val;
-        send_ack_dbl("ki=", val);
+        send_ack_flt("ki=", val);
     }
     else if (!strcmp(keyword, "kd") && has_val) {
         g_params.kd = val;
-        send_ack_dbl("kd=", val);
+        send_ack_flt("kd=", val);
     }
     else if (!strcmp(keyword, "alpha") && has_val) {
         g_params.alpha = val;
-        send_ack_dbl("alpha=", val);
+        send_ack_flt("alpha=", val);
     }
     else if (!strcmp(keyword, "base_speed") && has_val) {
         g_params.base_speed_left  = val;
         g_params.base_speed_right = val;
-        send_ack_dbl("base_speed=", val);
+        send_ack_flt("base_speed=", val);
     }
     else if (!strcmp(keyword, "speed_left") && has_val) {
         g_params.base_speed_left = val;
-        send_ack_dbl("speed_left=", val);
+        send_ack_flt("speed_left=", val);
     }
     else if (!strcmp(keyword, "speed_right") && has_val) {
         g_params.base_speed_right = val;
-        send_ack_dbl("speed_right=", val);
+        send_ack_flt("speed_right=", val);
     }
     else if (!strcmp(keyword, "max_speed_left") && has_val) {
         g_params.max_speed_left = val;
-        send_ack_dbl("max_speed_left=", val);
+        send_ack_flt("max_speed_left=", val);
     }
     else if (!strcmp(keyword, "max_speed_right") && has_val) {
         g_params.max_speed_right = val;
-        send_ack_dbl("max_speed_right=", val);
+        send_ack_flt("max_speed_right=", val);
     }
     else if (!strcmp(keyword, "steer") && has_val) {
         if (g_params.state == STATE_RUNNING) {
             send_ack("ERR steer only in IDLE. Send 'stop;' first.\r\n");
         } else {
             Steer(val);
-            send_ack_dbl("steer=", val);
+            send_ack_flt("steer=", val);
         }
     }
     else if (!strcmp(keyword, "steering_offset") && has_val) {
         g_params.steering_offset = val;
-        send_ack_dbl("steering_offset=", val);
+        send_ack_flt("steering_offset=", val);
     }
     else if (!strcmp(keyword, "k_cte") && has_val) {
         g_params.k_cte = val;
-        send_ack_dbl("k_cte=", val);
+        send_ack_flt("k_cte=", val);
     }
     else if (!strcmp(keyword, "k_heading") && has_val) {
         g_params.k_heading = val;
-        send_ack_dbl("k_heading=", val);
+        send_ack_flt("k_heading=", val);
     }
     else if (!strcmp(keyword, "status")) {
         char buf[300];
         int  n = 0;
-        n = append_dbl(buf, n, sizeof(buf), "kp=",              g_params.kp);
-        n = append_dbl(buf, n, sizeof(buf), "ki=",              g_params.ki);
-        n = append_dbl(buf, n, sizeof(buf), "kd=",              g_params.kd);
-        n = append_dbl(buf, n, sizeof(buf), "alpha=",           g_params.alpha);
-        n = append_dbl(buf, n, sizeof(buf), "base_speed_left=",  g_params.base_speed_left);
-        n = append_dbl(buf, n, sizeof(buf), "base_speed_right=", g_params.base_speed_right);
-        n = append_dbl(buf, n, sizeof(buf), "max_speed_left=",   g_params.max_speed_left);
-        n = append_dbl(buf, n, sizeof(buf), "max_speed_right=",  g_params.max_speed_right);
-        n = append_dbl(buf, n, sizeof(buf), "steering_offset=", g_params.steering_offset);
-        n = append_dbl(buf, n, sizeof(buf), "k_cte=",           g_params.k_cte);
-        n = append_dbl(buf, n, sizeof(buf), "k_heading=",       g_params.k_heading);
-        n = append_dbl(buf, n, sizeof(buf), "dt=",              g_params.dt);
+        n = append_flt(buf, n, sizeof(buf), "kp=",              g_params.kp);
+        n = append_flt(buf, n, sizeof(buf), "ki=",              g_params.ki);
+        n = append_flt(buf, n, sizeof(buf), "kd=",              g_params.kd);
+        n = append_flt(buf, n, sizeof(buf), "alpha=",           g_params.alpha);
+        n = append_flt(buf, n, sizeof(buf), "base_speed_left=",  g_params.base_speed_left);
+        n = append_flt(buf, n, sizeof(buf), "base_speed_right=", g_params.base_speed_right);
+        n = append_flt(buf, n, sizeof(buf), "max_speed_left=",   g_params.max_speed_left);
+        n = append_flt(buf, n, sizeof(buf), "max_speed_right=",  g_params.max_speed_right);
+        n = append_flt(buf, n, sizeof(buf), "steering_offset=", g_params.steering_offset);
+        n = append_flt(buf, n, sizeof(buf), "k_cte=",           g_params.k_cte);
+        n = append_flt(buf, n, sizeof(buf), "k_heading=",       g_params.k_heading);
+        n = append_flt(buf, n, sizeof(buf), "dt=",              g_params.dt);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n",
                       g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
@@ -195,6 +207,7 @@ static void command_execute(char *cmd)
 
 void command_poll(void)
 {
+    while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
     while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
         uint8_t c = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
 

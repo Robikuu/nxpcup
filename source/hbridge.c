@@ -10,6 +10,7 @@ static uint32_t s_srcClockHz;
 
 void HbridgeInit(Hbridge *h,
 		 	 	 CTIMER_Type *pwmPeriph,
+		 	 	 CTIMER_Type *pwmPeriph,
                  ctimer_match_t periodCh,
                  ctimer_match_t pwm1Ch,
                  ctimer_match_t pwm2Ch,
