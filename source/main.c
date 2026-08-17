@@ -119,7 +119,6 @@ void TestPidSteer(void)
     }
 }
 
-#define PIXY_GRID_SCALE    4.0f
 
 /* Convert ground-space errors to cm / degrees so the existing gains
    (tuned for pixel/degree-ish scales) stay meaningful. */
@@ -193,42 +192,31 @@ int main(void)
                     HbridgeBrake(&g_hbridge);
                 }
             } else {
-                line_lost_counter = 0;
 
-                /* pick the vector whose tail is closest to the car (max y0) */
-                size_t best = 0;
-                for (size_t i = 1; i < num_vectors; i++) {
-                    if (vectors[4*i + 1] > vectors[4*best + 1]) best = i;
+                lane_result_t lane = compute_lane_center(vectors, num_vectors);
+
+                if (lane.lines_found == 0) {
+                    /* all vectors filtered out — treat as line lost */
+                    if (++line_lost_counter > LINE_LOST_LIMIT) {
+                        HbridgeBrake(&g_hbridge);
+                    }
+                } else {
+                    line_lost_counter = 0;
+
+                    /* errors: lateral offset (cm) + lane heading (deg) */
+                    float e_cte     = lane.cte * CTE_TO_CM;
+                    float e_heading = lane.heading * HEADING_TO_DEG;
+
+                    /* combined error: positive = lane center is to the RIGHT */
+                    float combined = g_params.k_cte * e_cte
+                                   + g_params.k_heading * e_heading;
+
+                    float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+
+                    Steer(steer_cmd + g_params.steering_offset);
+
+                    HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
                 }
-
-                /* scale 79x52 grid -> 316x208 calibration frame */
-                float u0 = vectors[4*best + 0] * PIXY_GRID_SCALE;
-                float v0 = vectors[4*best + 1] * PIXY_GRID_SCALE;
-                float u1 = vectors[4*best + 2] * PIXY_GRID_SCALE;
-                float v1 = vectors[4*best + 3] * PIXY_GRID_SCALE;
-
-                /* pixel -> ground (meters, X right, Y forward) */
-                float X0, Y0, X1, Y1;
-                pixel_to_ground(u0, v0, &X0, &Y0);
-                pixel_to_ground(u1, v1, &X1, &Y1);
-
-                /* errors: lateral offset (cm) + line heading (deg) */
-                float e_cte     = X0 * CTE_TO_CM;
-                float e_heading = atan2f(X1 - X0, Y1 - Y0) * HEADING_TO_DEG;
-
-                /* combined error: positive = line is to the RIGHT / veering right */
-                float combined = g_params.k_cte * e_cte
-                               + g_params.k_heading * e_heading;
-
-                /* PID error = 0 - combined = -combined, so negate the output:
-                   steer_cmd = +kp*combined + ... -> steer TOWARD the line */
-                float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
-
-                /* sign convention: positive steer_cmd = RIGHT turn.
-                   If your servo is mirrored, flip here instead. */
-                Steer(steer_cmd + g_params.steering_offset);
-
-                HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
             }
 
         } else {
