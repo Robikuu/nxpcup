@@ -167,8 +167,10 @@ int main(void)
     }
 
     uint32_t line_lost_counter = 0;
-    uint16_t vectors[MAX_VECTORS * 4];
+    uint16_t vectors[MAX_VECTORS * 6];
     size_t   num_vectors;
+    float    filtered_cte    = 0.0f;
+    int      cte_filter_init = 0;
 
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
@@ -203,21 +205,29 @@ int main(void)
                 } else {
                     line_lost_counter = 0;
 
-                    /* errors: lateral offset (cm) + lane heading (deg) */
+                    /* raw errors: lateral offset (cm) + heading (deg) */
                     float e_cte     = lane.cte * CTE_TO_CM;
                     float e_heading = lane.heading * HEADING_TO_DEG;
 
-                    /* combined error: positive = lane center is to the RIGHT */
-                    float combined = g_params.k_cte * e_cte
+                    /* EMA filter on CTE to smooth frame-to-frame noise */
+                    if (!cte_filter_init) {
+                        filtered_cte    = e_cte;
+                        cte_filter_init = 1;
+                    } else {
+                        filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                    }
+
+                    /* combined error using filtered CTE */
+                    float combined = g_params.k_cte * filtered_cte
                                    + g_params.k_heading * e_heading;
 
                     float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                    /* debug: L=lines_found  C=cte*10  H=heading*10  S=steer*10 */
-                    esp_printf("L:%u C:%d H:%d S:%d\r\n",
+                    /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
+                    esp_printf("L:%u R:%d F:%d S:%d\r\n",
                                (unsigned)lane.lines_found,
                                (int)(e_cte * 10.0f),
-                               (int)(e_heading * 10.0f),
+                               (int)(filtered_cte * 10.0f),
                                (int)(steer_cmd * 10.0f));
 
                     Steer(steer_cmd + g_params.steering_offset);
@@ -234,6 +244,8 @@ int main(void)
             steer_pid.prev_output      = 0.0f;
             steer_pid.initialized      = 0;
             line_lost_counter          = 0;
+            filtered_cte               = 0.0f;
+            cte_filter_init            = 0;
             HbridgeBrake(&g_hbridge);
         }
 

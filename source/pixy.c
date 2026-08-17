@@ -101,10 +101,12 @@ status_t pixy_get_vectors(pixy_t *cam,
 
         for (uint8_t i = 0; i < nvec && count < max_vectors; i++) {
             size_t off = i * 6;
-            vectors[4*count + 0] = data[off + 0];
-            vectors[4*count + 1] = data[off + 1];
-            vectors[4*count + 2] = data[off + 2];
-            vectors[4*count + 3] = data[off + 3];
+            vectors[6*count + 0] = data[off + 0];   /* x0    */
+            vectors[6*count + 1] = data[off + 1];   /* y0    */
+            vectors[6*count + 2] = data[off + 2];   /* x1    */
+            vectors[6*count + 3] = data[off + 3];   /* y1    */
+            vectors[6*count + 4] = data[off + 4];   /* index */
+            vectors[6*count + 5] = data[off + 5];   /* flags */
             count++;
         }
         idx += 2 + featLen;

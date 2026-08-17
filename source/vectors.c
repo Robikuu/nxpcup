@@ -61,89 +61,105 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 }
 
 /* ------------------------------------------------------------------ */
-/*  Two-boundary lane centering                                       */
+/*  Two-boundary lane centering (index-aware)                         */
+/*  vectors[] layout: 6 fields per vector                             */
+/*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
 /* ------------------------------------------------------------------ */
-#define LC_MAX_CANDIDATES 10
+#define LC_MAX 10
 
 lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 {
     lane_result_t result = {0.0f, 0.0f, 0};
-
     if (num_vectors == 0) return result;
 
-    /* --- 1. Transform all vectors to ground space (no angle filter) --- */
-    typedef struct {
-        float x_mid;          /* midpoint X in ground space              */
-        float angle;          /* heading from forward (radians)          */
-    } candidate_t;
+    /* --- 1. Transform to ground space, keep Pixy index --- */
+    struct {
+        float   x_mid;
+        float   angle;
+        uint8_t idx;
+    } v[LC_MAX];
+    size_t n = 0;
 
-    candidate_t cands[LC_MAX_CANDIDATES];
-    size_t      n_cands = 0;
-
-    for (size_t i = 0; i < num_vectors && i < LC_MAX_CANDIDATES; i++) {
-        float u0 = vectors[4*i + 0] * PIXY_GRID_SCALE;
-        float v0 = vectors[4*i + 1] * PIXY_GRID_SCALE;
-        float u1 = vectors[4*i + 2] * PIXY_GRID_SCALE;
-        float v1 = vectors[4*i + 3] * PIXY_GRID_SCALE;
+    for (size_t i = 0; i < num_vectors && i < LC_MAX; i++) {
+        float u0 = vectors[6*i + 0] * PIXY_GRID_SCALE;
+        float v0 = vectors[6*i + 1] * PIXY_GRID_SCALE;
+        float u1 = vectors[6*i + 2] * PIXY_GRID_SCALE;
+        float v1 = vectors[6*i + 3] * PIXY_GRID_SCALE;
 
         float X0, Y0, X1, Y1;
         pixel_to_ground(u0, v0, &X0, &Y0);
         pixel_to_ground(u1, v1, &X1, &Y1);
 
-        cands[n_cands].x_mid = (X0 + X1) * 0.5f;
-        cands[n_cands].angle = atan2f(X1 - X0, Y1 - Y0);
-        n_cands++;
+        v[n].x_mid = (X0 + X1) * 0.5f;
+        v[n].angle = atan2f(X1 - X0, Y1 - Y0);
+        v[n].idx   = (uint8_t)vectors[6*i + 4];
+        n++;
     }
 
-    if (n_cands == 0) return result;
-
-    /* --- 2. Single vector: follow it directly, no offset guessing --- */
-    if (n_cands == 1) {
-        result.cte         = cands[0].x_mid;
-        result.heading     = cands[0].angle;
+    /* --- 2. Single vector: follow directly --- */
+    if (n == 1) {
+        result.cte         = v[0].x_mid;
+        result.heading     = v[0].angle;
         result.lines_found = 1;
         return result;
     }
 
-    /* --- 3. Multiple vectors: try to find one on each side --- */
-    int   best_left  = -1,  best_right  = -1;
-    float best_lx    = -1e6f;          /* want largest  X (closest to center from left)  */
-    float best_rx    =  1e6f;          /* want smallest X (closest to center from right) */
+    /* --- 3. Group by Pixy index, compute average x_mid per group --- */
+    struct {
+        uint8_t idx;
+        float   x_sum;
+        float   a_sum;
+        uint8_t cnt;
+    } grp[LC_MAX];
+    size_t ng = 0;
 
-    for (size_t i = 0; i < n_cands; i++) {
-        if (cands[i].x_mid < 0.0f) {
-            if (cands[i].x_mid > best_lx) {
-                best_lx   = cands[i].x_mid;
-                best_left = (int)i;
-            }
+    for (size_t i = 0; i < n; i++) {
+        int found = -1;
+        for (size_t g = 0; g < ng; g++) {
+            if (grp[g].idx == v[i].idx) { found = (int)g; break; }
+        }
+        if (found >= 0) {
+            grp[found].x_sum += v[i].x_mid;
+            grp[found].a_sum += v[i].angle;
+            grp[found].cnt++;
         } else {
-            if (cands[i].x_mid < best_rx) {
-                best_rx    = cands[i].x_mid;
-                best_right = (int)i;
-            }
+            grp[ng].idx   = v[i].idx;
+            grp[ng].x_sum = v[i].x_mid;
+            grp[ng].a_sum = v[i].angle;
+            grp[ng].cnt   = 1;
+            ng++;
         }
     }
 
-    if (best_left >= 0 && best_right >= 0) {
-        /* Both sides found — center between them */
-        result.cte     = (cands[best_left].x_mid + cands[best_right].x_mid) * 0.5f;
-        result.heading = (cands[best_left].angle  + cands[best_right].angle)  * 0.5f;
+    if (ng >= 2) {
+        /* Two or more distinct lines — find leftmost and rightmost */
+        int   gl = 0, gr = 0;
+        float xl = grp[0].x_sum / grp[0].cnt;
+        float xr = xl;
+
+        for (size_t g = 1; g < ng; g++) {
+            float avg = grp[g].x_sum / grp[g].cnt;
+            if (avg < xl) { xl = avg; gl = (int)g; }
+            if (avg > xr) { xr = avg; gr = (int)g; }
+        }
+
+        result.cte     = (xl + xr) * 0.5f;
+        result.heading = (grp[gl].a_sum / grp[gl].cnt +
+                          grp[gr].a_sum / grp[gr].cnt) * 0.5f;
         result.lines_found = 2;
     } else {
-        /* All vectors on one side — follow the one closest to center */
-        int   best     = 0;
-        float best_abs = fabsf(cands[0].x_mid);
-        for (size_t i = 1; i < n_cands; i++) {
-            float d = fabsf(cands[i].x_mid);
-            if (d < best_abs) {
-                best_abs = d;
-                best     = (int)i;
-            }
+        /* All vectors belong to one line — follow closest to center */
+        int   best   = 0;
+        float best_d = fabsf(v[0].x_mid);
+        for (size_t i = 1; i < n; i++) {
+            float d = fabsf(v[i].x_mid);
+            if (d < best_d) { best_d = d; best = (int)i; }
         }
-        result.cte         = cands[best].x_mid;
-        result.heading     = cands[best].angle;
+        result.cte         = v[best].x_mid;
+        result.heading     = v[best].angle;
         result.lines_found = 1;
     }
 
     return result;
 }
+
