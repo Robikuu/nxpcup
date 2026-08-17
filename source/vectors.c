@@ -61,113 +61,84 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 }
 
 /* ------------------------------------------------------------------ */
-/*  Pure Pixel-Space Virtual Centerline Algorithm                     */
+/*  Raw-Vector Virtual Centerline Algorithm (No Extrapolation)        */
 /*  vectors[] layout: 6 fields per vector                             */
 /*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
 /* ------------------------------------------------------------------ */
-#define LC_MAX 10
-
 lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 {
     lane_result_t result = {0.0f, 0.0f, 0};
     if (num_vectors == 0) return result;
 
-    typedef struct {
-        float x_near;  /* X coordinate evaluated at PIXY_Y_NEAR (bottom) */
-        float x_far;   /* X coordinate evaluated at PIXY_Y_FAR (top)    */
-    } line_cand_t;
+    int   left_found  = 0;
+    int   right_found = 0;
+    float left_x0     = -1e6f, left_x1  = 0.0f;
+    float right_x0    =  1e6f, right_x1 = 0.0f;
 
-    line_cand_t cands[LC_MAX];
-    size_t n_cands = 0;
-
-    for (size_t i = 0; i < num_vectors && n_cands < LC_MAX; i++) {
+    for (size_t i = 0; i < num_vectors; i++) {
         float x0 = (float)vectors[6*i + 0];
         float y0 = (float)vectors[6*i + 1];
         float x1 = (float)vectors[6*i + 2];
         float y1 = (float)vectors[6*i + 3];
 
-        /* Ensure (x0, y0) is the near point (larger Y)
-           and (x1, y1) is the far point (smaller Y) */
+        /* Ensure (x0, y0) is the base/near point (larger Y)
+           and (x1, y1) is the tip/far point (smaller Y) */
         if (y0 < y1) {
             float tx = x0; float ty = y0;
             x0 = x1; y0 = y1;
             x1 = tx; y1 = ty;
         }
 
-        float dy = y0 - y1;
-        if (dy < 2.0f) {
-            /* Ignore purely horizontal or glitch lines */
+        /* Ignore purely horizontal or 1-pixel glitch lines */
+        if ((y0 - y1) < 1.0f) {
             continue;
         }
 
-        /* Calculate line intersection with near and far scanlines */
-        float inv_slope = (x1 - x0) / dy;
-        float x_near    = x0 + inv_slope * (y0 - PIXY_Y_NEAR);
-        float x_far     = x0 + inv_slope * (y0 - PIXY_Y_FAR);
-
-        /* Clamp to reasonable image bounds */
-        if (x_near < -20.0f) x_near = -20.0f;
-        if (x_near > 100.0f) x_near = 100.0f;
-        if (x_far  < -20.0f) x_far  = -20.0f;
-        if (x_far  > 100.0f) x_far  = 100.0f;
-
-        cands[n_cands].x_near = x_near;
-        cands[n_cands].x_far  = x_far;
-        n_cands++;
-    }
-
-    if (n_cands == 0) return result;
-
-    /* Partition into Left (x_near < 39) and Right (x_near >= 39) boundaries */
-    int   best_left  = -1;
-    int   best_right = -1;
-    float max_lx     = -1e6f;  /* closest to center from left (max X) */
-    float min_rx     =  1e6f;  /* closest to center from right (min X) */
-
-    for (size_t i = 0; i < n_cands; i++) {
-        if (cands[i].x_near < PIXY_CENTER_X) {
-            if (cands[i].x_near > max_lx) {
-                max_lx    = cands[i].x_near;
-                best_left = (int)i;
+        /* Classify by actual vector base position on screen (no extrapolation!) */
+        if (x0 < PIXY_CENTER_X) {
+            /* Left boundary: pick the one closest to center (largest x0) */
+            if (!left_found || x0 > left_x0) {
+                left_x0     = x0;
+                left_x1     = x1;
+                left_found  = 1;
             }
         } else {
-            if (cands[i].x_near < min_rx) {
-                min_rx     = cands[i].x_near;
-                best_right = (int)i;
+            /* Right boundary: pick the one closest to center (smallest x0) */
+            if (!right_found || x0 < right_x0) {
+                right_x0    = x0;
+                right_x1    = x1;
+                right_found = 1;
             }
         }
     }
 
-    float center_near;
-    float center_far;
-
-    if (best_left >= 0 && best_right >= 0) {
+    if (left_found && right_found) {
         /* Case 1: Both boundaries found -> true midpoint */
-        center_near = (cands[best_left].x_near + cands[best_right].x_near) * 0.5f;
-        center_far  = (cands[best_left].x_far  + cands[best_right].x_far)  * 0.5f;
+        float center_x0 = (left_x0 + right_x0) * 0.5f;
+        float center_x1 = (left_x1 + right_x1) * 0.5f;
+
+        result.cte         = center_x0 - PIXY_CENTER_X;
+        result.heading     = center_x1 - center_x0;
         result.lines_found = 2;
     }
-    else if (best_left >= 0) {
+    else if (left_found) {
         /* Case 2: Only left boundary -> shift right by half lane width */
-        center_near = cands[best_left].x_near + (LANE_WIDTH_NEAR_PX * 0.5f);
-        center_far  = cands[best_left].x_far  + (LANE_WIDTH_FAR_PX  * 0.5f);
+        float center_x0 = left_x0 + HALF_LANE_OFFSET_PX;
+        float center_x1 = left_x1 + HALF_LANE_OFFSET_PX;
+
+        result.cte         = center_x0 - PIXY_CENTER_X;
+        result.heading     = left_x1 - left_x0;  /* pure vector direction */
         result.lines_found = 1;
     }
-    else if (best_right >= 0) {
+    else if (right_found) {
         /* Case 3: Only right boundary -> shift left by half lane width */
-        center_near = cands[best_right].x_near - (LANE_WIDTH_NEAR_PX * 0.5f);
-        center_far  = cands[best_right].x_far  - (LANE_WIDTH_FAR_PX  * 0.5f);
+        float center_x0 = right_x0 - HALF_LANE_OFFSET_PX;
+        float center_x1 = right_x1 - HALF_LANE_OFFSET_PX;
+
+        result.cte         = center_x0 - PIXY_CENTER_X;
+        result.heading     = right_x1 - right_x0;  /* pure vector direction */
         result.lines_found = 1;
     }
-    else {
-        return result;
-    }
-
-    /* CTE: Lateral offset from image center (39.0) at the near scanline */
-    result.cte = center_near - PIXY_CENTER_X;
-
-    /* Heading: Virtual centerline tilt / direction (far - near) */
-    result.heading = center_far - center_near;
 
     return result;
 }

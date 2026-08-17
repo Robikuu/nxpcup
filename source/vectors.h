@@ -16,17 +16,12 @@
 #define H33  1.0f
 
 /* Pixy2 line-tracking grid dimensions (native sensor frame) */
-#define PIXY_IMAGE_WIDTH   79
-#define PIXY_IMAGE_HEIGHT  52
-#define PIXY_CENTER_X      39.0f
+#define PIXY_IMAGE_WIDTH    79
+#define PIXY_IMAGE_HEIGHT   52
+#define PIXY_CENTER_X       39.0f
 
-/* Pixel-Space Virtual Centerline reference heights */
-#define PIXY_Y_NEAR        45.0f   /* Near scanline (close to front bumper) */
-#define PIXY_Y_FAR         20.0f   /* Far scanline (lookahead into curves)   */
-
-/* Approximate lane width in pixels at the near and far scanlines (for 20cm track) */
-#define LANE_WIDTH_NEAR_PX 34.0f   /* ~34px wide at Y=45 */
-#define LANE_WIDTH_FAR_PX  20.0f   /* ~20px wide at Y=20 due to perspective */
+/* Nominal half-lane pixel offset for single-line synthesis */
+#define HALF_LANE_OFFSET_PX 15.0f
 
 void pixel_to_ground(float u, float v, float *X, float *Y);
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index);
