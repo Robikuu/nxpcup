@@ -54,7 +54,6 @@ static void send_ack_dbl(const char *prefix, float val)
     char buf[48];
     int  whole  = (int)val;
     float frac = val - whole;
-    float frac = val - whole;
     if (frac < 0) frac = -frac;
     int  f100   = (int)(frac * 100.0f);
     snprintf(buf, sizeof(buf), "OK %s%d.%02d\r\n", prefix, whole, f100);
@@ -65,9 +64,7 @@ static int append_flt(char *buf, int off, size_t cap, const char *label, float v
 {
     int whole = (int)val;
     float frac = val - whole;
-    float frac = val - whole;
     if (frac < 0) frac = -frac;
-    int f100 = (int)(frac * 100.0f);
     int f100 = (int)(frac * 100.0f);
     return off + snprintf(buf + off, cap - (size_t)off,
                           "%s%d.%02d\r\n", label, whole, f100);
@@ -104,60 +101,60 @@ static void command_execute(char *cmd)
     }
     else if (!strcmp(keyword, "kp") && has_val) {
         g_params.kp = val;
-        send_ack_flt("kp=", val);
+        send_ack_dbl("kp=", val);
     }
     else if (!strcmp(keyword, "ki") && has_val) {
         g_params.ki = val;
-        send_ack_flt("ki=", val);
+        send_ack_dbl("ki=", val);
     }
     else if (!strcmp(keyword, "kd") && has_val) {
         g_params.kd = val;
-        send_ack_flt("kd=", val);
+        send_ack_dbl("kd=", val);
     }
     else if (!strcmp(keyword, "alpha") && has_val) {
         g_params.alpha = val;
-        send_ack_flt("alpha=", val);
+        send_ack_dbl("alpha=", val);
     }
     else if (!strcmp(keyword, "base_speed") && has_val) {
         g_params.base_speed_left  = val;
         g_params.base_speed_right = val;
-        send_ack_flt("base_speed=", val);
+        send_ack_dbl("base_speed=", val);
     }
     else if (!strcmp(keyword, "speed_left") && has_val) {
         g_params.base_speed_left = val;
-        send_ack_flt("speed_left=", val);
+        send_ack_dbl("speed_left=", val);
     }
     else if (!strcmp(keyword, "speed_right") && has_val) {
         g_params.base_speed_right = val;
-        send_ack_flt("speed_right=", val);
+        send_ack_dbl("speed_right=", val);
     }
     else if (!strcmp(keyword, "max_speed_left") && has_val) {
         g_params.max_speed_left = val;
-        send_ack_flt("max_speed_left=", val);
+        send_ack_dbl("max_speed_left=", val);
     }
     else if (!strcmp(keyword, "max_speed_right") && has_val) {
         g_params.max_speed_right = val;
-        send_ack_flt("max_speed_right=", val);
+        send_ack_dbl("max_speed_right=", val);
     }
     else if (!strcmp(keyword, "steer") && has_val) {
         if (g_params.state == STATE_RUNNING) {
             send_ack("ERR steer only in IDLE. Send 'stop;' first.\r\n");
         } else {
             Steer(val);
-            send_ack_flt("steer=", val);
+            send_ack_dbl("steer=", val);
         }
     }
     else if (!strcmp(keyword, "steering_offset") && has_val) {
         g_params.steering_offset = val;
-        send_ack_flt("steering_offset=", val);
+        send_ack_dbl("steering_offset=", val);
     }
     else if (!strcmp(keyword, "k_cte") && has_val) {
         g_params.k_cte = val;
-        send_ack_flt("k_cte=", val);
+        send_ack_dbl("k_cte=", val);
     }
     else if (!strcmp(keyword, "k_heading") && has_val) {
         g_params.k_heading = val;
-        send_ack_flt("k_heading=", val);
+        send_ack_dbl("k_heading=", val);
     }
     else if (!strcmp(keyword, "status")) {
         char buf[300];
@@ -207,7 +204,6 @@ static void command_execute(char *cmd)
 
 void command_poll(void)
 {
-    while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
     while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
         uint8_t c = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
 

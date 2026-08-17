@@ -5,6 +5,10 @@
 #include "wifi_config.h"
 #include "vectors.h"
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 //transformare homography pt vectori
 void pixel_to_ground(float u, float v, float *X, float *Y)
 {
