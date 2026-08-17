@@ -61,7 +61,7 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 }
 
 /* ------------------------------------------------------------------ */
-/*  Two-boundary lane centering (direction-normalized & fixed lookahead) */
+/*  Pure Pixel-Space Virtual Centerline Algorithm                     */
 /*  vectors[] layout: 6 fields per vector                             */
 /*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
 /* ------------------------------------------------------------------ */
@@ -73,104 +73,101 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
     if (num_vectors == 0) return result;
 
     typedef struct {
-        float   x_eval;   /* lateral position X evaluated at LOOKAHEAD_Y_M */
-        float   angle;    /* forward-facing heading angle in radians       */
-        uint8_t idx;
-    } cand_t;
+        float x_near;  /* X coordinate evaluated at PIXY_Y_NEAR (bottom) */
+        float x_far;   /* X coordinate evaluated at PIXY_Y_FAR (top)    */
+    } line_cand_t;
 
-    cand_t cands[LC_MAX];
+    line_cand_t cands[LC_MAX];
     size_t n_cands = 0;
 
     for (size_t i = 0; i < num_vectors && n_cands < LC_MAX; i++) {
-        float u0 = vectors[6*i + 0] * PIXY_GRID_SCALE;
-        float v0 = vectors[6*i + 1] * PIXY_GRID_SCALE;
-        float u1 = vectors[6*i + 2] * PIXY_GRID_SCALE;
-        float v1 = vectors[6*i + 3] * PIXY_GRID_SCALE;
+        float x0 = (float)vectors[6*i + 0];
+        float y0 = (float)vectors[6*i + 1];
+        float x1 = (float)vectors[6*i + 2];
+        float y1 = (float)vectors[6*i + 3];
 
-        float X0, Y0, X1, Y1;
-        pixel_to_ground(u0, v0, &X0, &Y0);
-        pixel_to_ground(u1, v1, &X1, &Y1);
-
-        /* 1. Direction Normalization:
-              Ensure (X0, Y0) is ALWAYS the near point (smaller Y)
-              and (X1, Y1) is the far point (larger Y).
-              This guarantees the vector strictly points forward. */
-        if (Y0 > Y1) {
-            float tx = X0; float ty = Y0;
-            X0 = X1; Y0 = Y1;
-            X1 = tx; Y1 = ty;
+        /* Ensure (x0, y0) is the near point (larger Y)
+           and (x1, y1) is the far point (smaller Y) */
+        if (y0 < y1) {
+            float tx = x0; float ty = y0;
+            x0 = x1; y0 = y1;
+            x1 = tx; y1 = ty;
         }
 
-        /* 2. Discard if entire vector is beyond horizon limit */
-        if (Y0 > MAX_GROUND_Y_M) {
+        float dy = y0 - y1;
+        if (dy < 2.0f) {
+            /* Ignore purely horizontal or glitch lines */
             continue;
         }
 
-        float dy = Y1 - Y0;
-        float dx = X1 - X0;
+        /* Calculate line intersection with near and far scanlines */
+        float inv_slope = (x1 - x0) / dy;
+        float x_near    = x0 + inv_slope * (y0 - PIXY_Y_NEAR);
+        float x_far     = x0 + inv_slope * (y0 - PIXY_Y_FAR);
 
-        /* 3. Compute forward heading angle (strictly in [-pi/2, pi/2]) */
-        float angle = atan2f(dx, dy + 1e-5f);
+        /* Clamp to reasonable image bounds */
+        if (x_near < -20.0f) x_near = -20.0f;
+        if (x_near > 100.0f) x_near = 100.0f;
+        if (x_far  < -20.0f) x_far  = -20.0f;
+        if (x_far  > 100.0f) x_far  = 100.0f;
 
-        /* 4. Evaluate lateral position at fixed lookahead distance */
-        float x_eval;
-        if (dy > 0.005f) {
-            x_eval = X0 + (dx / dy) * (LOOKAHEAD_Y_M - Y0);
-        } else {
-            x_eval = (X0 + X1) * 0.5f;
-        }
-
-        /* Clamp x_eval to sane physical bounds (+/- 50 cm) */
-        if (x_eval > 0.50f)  x_eval = 0.50f;
-        if (x_eval < -0.50f) x_eval = -0.50f;
-
-        cands[n_cands].x_eval = x_eval;
-        cands[n_cands].angle  = angle;
-        cands[n_cands].idx    = (uint8_t)vectors[6*i + 4];
+        cands[n_cands].x_near = x_near;
+        cands[n_cands].x_far  = x_far;
         n_cands++;
     }
 
     if (n_cands == 0) return result;
 
-    /* 5. Partition into left (x_eval < 0) and right (x_eval >= 0) */
+    /* Partition into Left (x_near < 39) and Right (x_near >= 39) boundaries */
     int   best_left  = -1;
     int   best_right = -1;
-    float max_lx     = -1e6f;  /* closest to center from left (max negative) */
-    float min_rx     =  1e6f;  /* closest to center from right (min positive) */
+    float max_lx     = -1e6f;  /* closest to center from left (max X) */
+    float min_rx     =  1e6f;  /* closest to center from right (min X) */
 
     for (size_t i = 0; i < n_cands; i++) {
-        if (cands[i].x_eval < 0.0f) {
-            if (cands[i].x_eval > max_lx) {
-                max_lx    = cands[i].x_eval;
+        if (cands[i].x_near < PIXY_CENTER_X) {
+            if (cands[i].x_near > max_lx) {
+                max_lx    = cands[i].x_near;
                 best_left = (int)i;
             }
         } else {
-            if (cands[i].x_eval < min_rx) {
-                min_rx     = cands[i].x_eval;
+            if (cands[i].x_near < min_rx) {
+                min_rx     = cands[i].x_near;
                 best_right = (int)i;
             }
         }
     }
 
-    /* 6. Compute lane center */
+    float center_near;
+    float center_far;
+
     if (best_left >= 0 && best_right >= 0) {
-        /* Both lane boundaries visible -> true center between them */
-        result.cte     = (cands[best_left].x_eval + cands[best_right].x_eval) * 0.5f;
-        result.heading = (cands[best_left].angle  + cands[best_right].angle)  * 0.5f;
+        /* Case 1: Both boundaries found -> true midpoint */
+        center_near = (cands[best_left].x_near + cands[best_right].x_near) * 0.5f;
+        center_far  = (cands[best_left].x_far  + cands[best_right].x_far)  * 0.5f;
         result.lines_found = 2;
     }
     else if (best_left >= 0) {
-        /* Only left boundary -> center is half-lane to the right */
-        result.cte     = cands[best_left].x_eval + (LANE_WIDTH_M * 0.5f);
-        result.heading = cands[best_left].angle;
+        /* Case 2: Only left boundary -> shift right by half lane width */
+        center_near = cands[best_left].x_near + (LANE_WIDTH_NEAR_PX * 0.5f);
+        center_far  = cands[best_left].x_far  + (LANE_WIDTH_FAR_PX  * 0.5f);
         result.lines_found = 1;
     }
     else if (best_right >= 0) {
-        /* Only right boundary -> center is half-lane to the left */
-        result.cte     = cands[best_right].x_eval - (LANE_WIDTH_M * 0.5f);
-        result.heading = cands[best_right].angle;
+        /* Case 3: Only right boundary -> shift left by half lane width */
+        center_near = cands[best_right].x_near - (LANE_WIDTH_NEAR_PX * 0.5f);
+        center_far  = cands[best_right].x_far  - (LANE_WIDTH_FAR_PX  * 0.5f);
         result.lines_found = 1;
     }
+    else {
+        return result;
+    }
+
+    /* CTE: Lateral offset from image center (39.0) at the near scanline */
+    result.cte = center_near - PIXY_CENTER_X;
+
+    /* Heading: Virtual centerline tilt / direction (far - near) */
+    result.heading = center_far - center_near;
 
     return result;
 }

@@ -17,14 +17,12 @@ static size_t s_cmd_idx = 0;
 
 void params_init(void)
 {
-    g_params.kp = 1.5f;
-    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
-    g_params.kd = 0.08f;
+    g_params.kp        = 2.0f;
+    g_params.ki        = 0.0f;    /* keep 0 until P+D are tuned */
+    g_params.kd        = 0.10f;
     g_params.k_cte     = 1.0f;
-    g_params.k_heading = 0.0f;
+    g_params.k_heading = 0.5f;
 
-    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
 
@@ -33,7 +31,6 @@ void params_init(void)
     g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
     g_params.max_speed_right  = 80.0f;
 
-    g_params.steering_offset = 0.0f;
     g_params.steering_offset = 0.0f;
     g_params.state           = STATE_IDLE;
 }

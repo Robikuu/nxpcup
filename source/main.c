@@ -120,11 +120,6 @@ void TestPidSteer(void)
 }
 
 
-/* Convert ground-space errors to cm / degrees so the existing gains
-   (tuned for pixel/degree-ish scales) stay meaningful. */
-#define CTE_TO_CM          100.0f
-#define HEADING_TO_DEG     (180.0f / (float)M_PI)
-
 int main(void)
 {
     /* ---------- 1. Hardware ---------- */
@@ -205,29 +200,30 @@ int main(void)
                 } else {
                     line_lost_counter = 0;
 
-                    /* raw errors: lateral offset (cm) + heading (deg) */
-                    float e_cte     = lane.cte * CTE_TO_CM;
-                    float e_heading = lane.heading * HEADING_TO_DEG;
+                    /* Raw pixel errors: lateral offset (px) + centerline tilt (px) */
+                    float e_cte     = lane.cte;
+                    float e_heading = lane.heading;
 
-                    /* EMA filter on CTE to smooth frame-to-frame noise */
+                    /* EMA filter on pixel CTE to smooth frame-to-frame noise */
                     if (!cte_filter_init) {
                         filtered_cte    = e_cte;
                         cte_filter_init = 1;
                     } else {
-                        filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                        filtered_cte = 0.5f * e_cte + 0.5f * filtered_cte;
                     }
 
-                    /* combined error using filtered CTE */
+                    /* Combined error in pixel space */
                     float combined = g_params.k_cte * filtered_cte
                                    + g_params.k_heading * e_heading;
 
                     float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                    /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
-                    esp_printf("L:%u R:%d F:%d S:%d\r\n",
+                    /* debug: L=lines  R=raw_px  F=filtered_px  H=heading_px  S=steer*10 */
+                    esp_printf("L:%u R:%d F:%d H:%d S:%d\r\n",
                                (unsigned)lane.lines_found,
-                               (int)(e_cte * 10.0f),
-                               (int)(filtered_cte * 10.0f),
+                               (int)e_cte,
+                               (int)filtered_cte,
+                               (int)e_heading,
                                (int)(steer_cmd * 10.0f));
 
                     Steer(steer_cmd + g_params.steering_offset);
