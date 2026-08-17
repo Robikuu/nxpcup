@@ -18,9 +18,10 @@
 /* Pixy2 line-tracking grid (79x52) scaled to calibration frame (316x208) */
 #define PIXY_GRID_SCALE    4.0f
 
-/* Track geometry */
+/* Track geometry & Lookahead */
 #define LANE_WIDTH_M       0.20f          /* distance between the two lane lines (meters) */
-#define MAX_LINE_ANGLE_DEG 40.0f          /* reject lines angled more than this from forward */
+#define LOOKAHEAD_Y_M      0.18f          /* fixed lookahead distance ahead of car (meters) */
+#define MAX_GROUND_Y_M     0.40f          /* reject vectors beyond 40cm (horizon noise) */
 
 void pixel_to_ground(float u, float v, float *X, float *Y);
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index);

@@ -61,7 +61,7 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 }
 
 /* ------------------------------------------------------------------ */
-/*  Two-boundary lane centering (index-aware)                         */
+/*  Two-boundary lane centering (direction-normalized & fixed lookahead) */
 /*  vectors[] layout: 6 fields per vector                             */
 /*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
 /* ------------------------------------------------------------------ */
@@ -72,15 +72,16 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
     lane_result_t result = {0.0f, 0.0f, 0};
     if (num_vectors == 0) return result;
 
-    /* --- 1. Transform to ground space, keep Pixy index --- */
-    struct {
-        float   x_mid;
-        float   angle;
+    typedef struct {
+        float   x_eval;   /* lateral position X evaluated at LOOKAHEAD_Y_M */
+        float   angle;    /* forward-facing heading angle in radians       */
         uint8_t idx;
-    } v[LC_MAX];
-    size_t n = 0;
+    } cand_t;
 
-    for (size_t i = 0; i < num_vectors && i < LC_MAX; i++) {
+    cand_t cands[LC_MAX];
+    size_t n_cands = 0;
+
+    for (size_t i = 0; i < num_vectors && n_cands < LC_MAX; i++) {
         float u0 = vectors[6*i + 0] * PIXY_GRID_SCALE;
         float v0 = vectors[6*i + 1] * PIXY_GRID_SCALE;
         float u1 = vectors[6*i + 2] * PIXY_GRID_SCALE;
@@ -90,73 +91,84 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         pixel_to_ground(u0, v0, &X0, &Y0);
         pixel_to_ground(u1, v1, &X1, &Y1);
 
-        v[n].x_mid = (X0 + X1) * 0.5f;
-        v[n].angle = atan2f(X1 - X0, Y1 - Y0);
-        v[n].idx   = (uint8_t)vectors[6*i + 4];
-        n++;
-    }
-
-    /* --- 2. Single vector: follow directly --- */
-    if (n == 1) {
-        result.cte         = v[0].x_mid;
-        result.heading     = v[0].angle;
-        result.lines_found = 1;
-        return result;
-    }
-
-    /* --- 3. Group by Pixy index, compute average x_mid per group --- */
-    struct {
-        uint8_t idx;
-        float   x_sum;
-        float   a_sum;
-        uint8_t cnt;
-    } grp[LC_MAX];
-    size_t ng = 0;
-
-    for (size_t i = 0; i < n; i++) {
-        int found = -1;
-        for (size_t g = 0; g < ng; g++) {
-            if (grp[g].idx == v[i].idx) { found = (int)g; break; }
+        /* 1. Direction Normalization:
+              Ensure (X0, Y0) is ALWAYS the near point (smaller Y)
+              and (X1, Y1) is the far point (larger Y).
+              This guarantees the vector strictly points forward. */
+        if (Y0 > Y1) {
+            float tx = X0; float ty = Y0;
+            X0 = X1; Y0 = Y1;
+            X1 = tx; Y1 = ty;
         }
-        if (found >= 0) {
-            grp[found].x_sum += v[i].x_mid;
-            grp[found].a_sum += v[i].angle;
-            grp[found].cnt++;
+
+        /* 2. Discard if entire vector is beyond horizon limit */
+        if (Y0 > MAX_GROUND_Y_M) {
+            continue;
+        }
+
+        float dy = Y1 - Y0;
+        float dx = X1 - X0;
+
+        /* 3. Compute forward heading angle (strictly in [-pi/2, pi/2]) */
+        float angle = atan2f(dx, dy + 1e-5f);
+
+        /* 4. Evaluate lateral position at fixed lookahead distance */
+        float x_eval;
+        if (dy > 0.005f) {
+            x_eval = X0 + (dx / dy) * (LOOKAHEAD_Y_M - Y0);
         } else {
-            grp[ng].idx   = v[i].idx;
-            grp[ng].x_sum = v[i].x_mid;
-            grp[ng].a_sum = v[i].angle;
-            grp[ng].cnt   = 1;
-            ng++;
+            x_eval = (X0 + X1) * 0.5f;
+        }
+
+        /* Clamp x_eval to sane physical bounds (+/- 50 cm) */
+        if (x_eval > 0.50f)  x_eval = 0.50f;
+        if (x_eval < -0.50f) x_eval = -0.50f;
+
+        cands[n_cands].x_eval = x_eval;
+        cands[n_cands].angle  = angle;
+        cands[n_cands].idx    = (uint8_t)vectors[6*i + 4];
+        n_cands++;
+    }
+
+    if (n_cands == 0) return result;
+
+    /* 5. Partition into left (x_eval < 0) and right (x_eval >= 0) */
+    int   best_left  = -1;
+    int   best_right = -1;
+    float max_lx     = -1e6f;  /* closest to center from left (max negative) */
+    float min_rx     =  1e6f;  /* closest to center from right (min positive) */
+
+    for (size_t i = 0; i < n_cands; i++) {
+        if (cands[i].x_eval < 0.0f) {
+            if (cands[i].x_eval > max_lx) {
+                max_lx    = cands[i].x_eval;
+                best_left = (int)i;
+            }
+        } else {
+            if (cands[i].x_eval < min_rx) {
+                min_rx     = cands[i].x_eval;
+                best_right = (int)i;
+            }
         }
     }
 
-    if (ng >= 2) {
-        /* Two or more distinct lines — find leftmost and rightmost */
-        int   gl = 0, gr = 0;
-        float xl = grp[0].x_sum / grp[0].cnt;
-        float xr = xl;
-
-        for (size_t g = 1; g < ng; g++) {
-            float avg = grp[g].x_sum / grp[g].cnt;
-            if (avg < xl) { xl = avg; gl = (int)g; }
-            if (avg > xr) { xr = avg; gr = (int)g; }
-        }
-
-        result.cte     = (xl + xr) * 0.5f;
-        result.heading = (grp[gl].a_sum / grp[gl].cnt +
-                          grp[gr].a_sum / grp[gr].cnt) * 0.5f;
+    /* 6. Compute lane center */
+    if (best_left >= 0 && best_right >= 0) {
+        /* Both lane boundaries visible -> true center between them */
+        result.cte     = (cands[best_left].x_eval + cands[best_right].x_eval) * 0.5f;
+        result.heading = (cands[best_left].angle  + cands[best_right].angle)  * 0.5f;
         result.lines_found = 2;
-    } else {
-        /* All vectors belong to one line — follow closest to center */
-        int   best   = 0;
-        float best_d = fabsf(v[0].x_mid);
-        for (size_t i = 1; i < n; i++) {
-            float d = fabsf(v[i].x_mid);
-            if (d < best_d) { best_d = d; best = (int)i; }
-        }
-        result.cte         = v[best].x_mid;
-        result.heading     = v[best].angle;
+    }
+    else if (best_left >= 0) {
+        /* Only left boundary -> center is half-lane to the right */
+        result.cte     = cands[best_left].x_eval + (LANE_WIDTH_M * 0.5f);
+        result.heading = cands[best_left].angle;
+        result.lines_found = 1;
+    }
+    else if (best_right >= 0) {
+        /* Only right boundary -> center is half-lane to the left */
+        result.cte     = cands[best_right].x_eval - (LANE_WIDTH_M * 0.5f);
+        result.heading = cands[best_right].angle;
         result.lines_found = 1;
     }
 
