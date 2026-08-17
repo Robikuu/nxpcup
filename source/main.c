@@ -213,6 +213,13 @@ int main(void)
 
                     float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
+                    /* debug: L=lines_found  C=cte*10  H=heading*10  S=steer*10 */
+                    esp_printf("L:%u C:%d H:%d S:%d\r\n",
+                               (unsigned)lane.lines_found,
+                               (int)(e_cte * 10.0f),
+                               (int)(e_heading * 10.0f),
+                               (int)(steer_cmd * 10.0f));
+
                     Steer(steer_cmd + g_params.steering_offset);
 
                     HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);

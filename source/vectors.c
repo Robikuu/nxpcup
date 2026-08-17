@@ -71,7 +71,7 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 
     if (num_vectors == 0) return result;
 
-    /* --- 1. Transform to ground space, optionally angle-filter --- */
+    /* --- 1. Transform all vectors to ground space (no angle filter) --- */
     typedef struct {
         float x_mid;          /* midpoint X in ground space              */
         float angle;          /* heading from forward (radians)          */
@@ -79,9 +79,6 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 
     candidate_t cands[LC_MAX_CANDIDATES];
     size_t      n_cands = 0;
-
-    int skip_angle_filter = (num_vectors == 1);
-    float max_angle_rad   = MAX_LINE_ANGLE_DEG * ((float)M_PI / 180.0f);
 
     for (size_t i = 0; i < num_vectors && i < LC_MAX_CANDIDATES; i++) {
         float u0 = vectors[4*i + 0] * PIXY_GRID_SCALE;
@@ -93,19 +90,22 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         pixel_to_ground(u0, v0, &X0, &Y0);
         pixel_to_ground(u1, v1, &X1, &Y1);
 
-        float angle = atan2f(X1 - X0, Y1 - Y0);
-
-        if (!skip_angle_filter && fabsf(angle) > max_angle_rad)
-            continue;
-
         cands[n_cands].x_mid = (X0 + X1) * 0.5f;
-        cands[n_cands].angle = angle;
+        cands[n_cands].angle = atan2f(X1 - X0, Y1 - Y0);
         n_cands++;
     }
 
-    if (n_cands == 0) return result;   /* everything filtered out */
+    if (n_cands == 0) return result;
 
-    /* --- 2. Partition into left / right by midpoint X --- */
+    /* --- 2. Single vector: follow it directly, no offset guessing --- */
+    if (n_cands == 1) {
+        result.cte         = cands[0].x_mid;
+        result.heading     = cands[0].angle;
+        result.lines_found = 1;
+        return result;
+    }
+
+    /* --- 3. Multiple vectors: try to find one on each side --- */
     int   best_left  = -1,  best_right  = -1;
     float best_lx    = -1e6f;          /* want largest  X (closest to center from left)  */
     float best_rx    =  1e6f;          /* want smallest X (closest to center from right) */
@@ -124,23 +124,24 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         }
     }
 
-    /* --- 3. Compute CTE + heading --- */
     if (best_left >= 0 && best_right >= 0) {
-        /* Both boundaries visible: center between them */
+        /* Both sides found — center between them */
         result.cte     = (cands[best_left].x_mid + cands[best_right].x_mid) * 0.5f;
         result.heading = (cands[best_left].angle  + cands[best_right].angle)  * 0.5f;
         result.lines_found = 2;
-    }
-    else if (best_left >= 0) {
-        /* Only left boundary: estimate center = left_x + half lane width */
-        result.cte     = cands[best_left].x_mid + LANE_WIDTH_M * 0.5f;
-        result.heading = cands[best_left].angle;
-        result.lines_found = 1;
-    }
-    else if (best_right >= 0) {
-        /* Only right boundary: estimate center = right_x - half lane width */
-        result.cte     = cands[best_right].x_mid - LANE_WIDTH_M * 0.5f;
-        result.heading = cands[best_right].angle;
+    } else {
+        /* All vectors on one side — follow the one closest to center */
+        int   best     = 0;
+        float best_abs = fabsf(cands[0].x_mid);
+        for (size_t i = 1; i < n_cands; i++) {
+            float d = fabsf(cands[i].x_mid);
+            if (d < best_abs) {
+                best_abs = d;
+                best     = (int)i;
+            }
+        }
+        result.cte         = cands[best].x_mid;
+        result.heading     = cands[best].angle;
         result.lines_found = 1;
     }
 
