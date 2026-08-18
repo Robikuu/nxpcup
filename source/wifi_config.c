@@ -26,8 +26,8 @@ void params_init(void)
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.2f;    /* derivative filter smoothing */
 
-    g_params.base_speed_left  = 20.0f;   /* replaces base_speed */
-    g_params.base_speed_right = 20.0f;
+    g_params.base_speed_left  = 38.0f;   /* cornering speed floor to overcome tire scrub */
+    g_params.base_speed_right = 38.0f;
     g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
     g_params.max_speed_right  = 80.0f;
 

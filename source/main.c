@@ -266,6 +266,16 @@ int main(void)
                                                                           fabsf(filtered_cte), fabsf(e_heading));
                     steer_cmd *= steer_scale;
 
+                    /* Slew-rate limiter on steering command (max 450% duty / sec) to prevent erratic twitching */
+                    const float MAX_STEER_RATE_PER_SEC = 450.0f;
+                    float max_steer_step = MAX_STEER_RATE_PER_SEC * real_dt;
+                    float steer_diff     = steer_cmd - last_steer_cmd;
+                    if (steer_diff > max_steer_step) {
+                        steer_cmd = last_steer_cmd + max_steer_step;
+                    } else if (steer_diff < -max_steer_step) {
+                        steer_cmd = last_steer_cmd - max_steer_step;
+                    }
+
                     last_steer_cmd = steer_cmd;
 
                     /* Telemetry: CTE×10, heading×100, steer×10, dt_ms */

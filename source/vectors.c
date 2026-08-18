@@ -4,8 +4,8 @@
 #include "wifi_config.h"
 #include "vectors.h"
 
-#define MIN_VALID_LANE_WIDTH_PX 16.0f
-#define MAX_VALID_LANE_WIDTH_PX 65.0f
+#define MIN_VALID_LANE_WIDTH_PX 28.0f
+#define MAX_VALID_LANE_WIDTH_PX 52.0f
 #define DEFAULT_HALF_LANE_PX    19.0f
 
 static float s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
@@ -138,18 +138,31 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         }
     }
 
-    if (cand_count >= 2) {
+    /* Merge adjacent piecewise segments on the same boundary (gap < 18px) */
+    cand_t merged[MAX_LOCAL_CANDS];
+    size_t merged_count = 0;
+    for (size_t i = 0; i < cand_count; i++) {
+        if (merged_count > 0 && (cands[i].x_at_look - merged[merged_count - 1].x_at_look) < 18.0f) {
+            /* Average the two segments on the same boundary */
+            merged[merged_count - 1].x_at_look = 0.5f * (merged[merged_count - 1].x_at_look + cands[i].x_at_look);
+            merged[merged_count - 1].slope     = 0.5f * (merged[merged_count - 1].slope + cands[i].slope);
+        } else {
+            merged[merged_count++] = cands[i];
+        }
+    }
+
+    if (merged_count >= 2) {
         /* Find best pair matching plausible lane width */
         float best_diff = 1e6f;
         int best_i = -1, best_j = -1;
         float target_w = s_tracked_half_lane * 2.0f;
 
-        for (size_t i = 0; i < cand_count - 1; i++) {
-            for (size_t j = i + 1; j < cand_count; j++) {
-                float w = cands[j].x_at_look - cands[i].x_at_look;
+        for (size_t i = 0; i < merged_count - 1; i++) {
+            for (size_t j = i + 1; j < merged_count; j++) {
+                float w = merged[j].x_at_look - merged[i].x_at_look;
                 if (w >= MIN_VALID_LANE_WIDTH_PX && w <= MAX_VALID_LANE_WIDTH_PX) {
                     float score = fabsf(w - target_w);
-                    if (score < best_diff) {
+                    if (score <= 14.0f && score < best_diff) {
                         best_diff = score;
                         best_i = (int)i;
                         best_j = (int)j;
@@ -159,8 +172,8 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         }
 
         if (best_i >= 0 && best_j >= 0) {
-            float left_x   = cands[best_i].x_at_look;
-            float right_x  = cands[best_j].x_at_look;
+            float left_x   = merged[best_i].x_at_look;
+            float right_x  = merged[best_j].x_at_look;
             float center_x = 0.5f * (left_x + right_x);
             float width    = right_x - left_x;
 
@@ -170,22 +183,22 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
             s_last_right_x      = right_x;
 
             result.cte         = center_x - PIXY_CENTER_X;
-            result.heading     = 0.5f * (cands[best_i].slope + cands[best_j].slope);
+            result.heading     = 0.5f * (merged[best_i].slope + merged[best_j].slope);
             result.lines_found = 2;
             return result;
         }
     }
 
     /* Single line fallback: select candidate closest to either tracked boundary */
-    cand_t *c = &cands[0];
+    cand_t *c = &merged[0];
     float min_dist = 1e6f;
-    for (size_t i = 0; i < cand_count; i++) {
-        float dl = fabsf(cands[i].x_at_look - s_last_left_x);
-        float dr = fabsf(cands[i].x_at_look - s_last_right_x);
+    for (size_t i = 0; i < merged_count; i++) {
+        float dl = fabsf(merged[i].x_at_look - s_last_left_x);
+        float dr = fabsf(merged[i].x_at_look - s_last_right_x);
         float d  = (dl < dr) ? dl : dr;
         if (d < min_dist) {
             min_dist = d;
-            c = &cands[i];
+            c = &merged[i];
         }
     }
 
