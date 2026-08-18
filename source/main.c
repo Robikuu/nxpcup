@@ -204,6 +204,13 @@ int main(void)
                 /* camera failure and "no line" get identical treatment */
                 if (++line_lost_counter > LINE_LOST_LIMIT) {
                     HbridgeBrake(&g_hbridge);
+                    motor_speeds_reset();
+                } else {
+                    /* Hold last steering command and decelerate to safe speed */
+                    Steer(last_steer_cmd + g_params.steering_offset);
+                    float sl, sr;
+                    compute_motor_speeds(last_steer_cmd, 0.0f, 0, real_dt, &sl, &sr);
+                    HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
                 }
             } else {
 
@@ -216,12 +223,13 @@ int main(void)
                     /* All vectors filtered out (mid-intersection or all glitch) */
                     if (++line_lost_counter > LINE_LOST_LIMIT) {
                         HbridgeBrake(&g_hbridge);
+                        motor_speeds_reset();
                     } else {
                         /* Hold last steering command through intersection */
                         Steer(last_steer_cmd + g_params.steering_offset);
-                        HbridgeSpeed(&g_hbridge,
-                                     (int16_t)g_params.base_speed_left,
-                                     (int16_t)g_params.base_speed_right);
+                        float sl, sr;
+                        compute_motor_speeds(last_steer_cmd, 0.0f, 0, real_dt, &sl, &sr);
+                        HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
                     }
                 } else {
                     line_lost_counter = 0;
@@ -249,6 +257,14 @@ int main(void)
                     if (steer_cmd >  100.0f) steer_cmd =  100.0f;
                     if (steer_cmd < -100.0f) steer_cmd = -100.0f;
 
+                    /* Speed-dependent steering gain scheduling (Anti-Wobble):
+                     * Retains 100% authority at cornering speeds, scales down to 55% at max speed on straights. */
+                    float current_spd = motor_speeds_get_current();
+                    float base_avg    = 0.5f * (g_params.base_speed_left + g_params.base_speed_right);
+                    float max_avg     = 0.5f * (g_params.max_speed_left + g_params.max_speed_right);
+                    float steer_scale = compute_speed_steer_gain(current_spd, base_avg, max_avg, 0.55f);
+                    steer_cmd *= steer_scale;
+
                     last_steer_cmd = steer_cmd;
 
                     /* Telemetry: CTE×10, heading×100, steer×10, dt_ms */
@@ -262,9 +278,9 @@ int main(void)
 
                     Steer(steer_cmd + g_params.steering_offset);
 
-                    /* Differential drive: slow inner wheel in corners */
+                    /* Differential drive: curvature-scaled & rate-limited */
                     float sl, sr;
-                    compute_motor_speeds(steer_cmd, &sl, &sr);
+                    compute_motor_speeds(steer_cmd, e_heading, lane.lines_found, real_dt, &sl, &sr);
                     HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
                 }
             }
@@ -281,11 +297,13 @@ int main(void)
             cte_filter_init            = 0;
             last_steer_cmd             = 0.0f;
             last_cyccnt                = DWT->CYCCNT;
+            motor_speeds_reset();
             HbridgeBrake(&g_hbridge);
         }
 
         if (button_pressed_edge()) {
             g_params.state = STATE_IDLE;
+            motor_speeds_reset();
             HbridgeBrake(&g_hbridge);
             PRINTF("Button: STOPPED\r\n");
         }

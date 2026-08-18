@@ -40,4 +40,14 @@ void  pid_init(pid_struct *PID, float kp, float ki, float kd,
  */
 float pid_update(pid_struct *PID, float setpoint, float measurement, float dt);
 
+/**
+ * @brief Computes speed-dependent steering gain scale (anti-wobble).
+ * @param current_speed Current tracked vehicle speed
+ * @param base_speed Minimum cornering speed (scale = 1.0)
+ * @param max_speed Maximum straight line speed (scale = min_scale)
+ * @param min_scale Gain scale at max speed (e.g., 0.55 for 55% authority)
+ * @return Multiplier for steering command [min_scale, 1.0]
+ */
+float compute_speed_steer_gain(float current_speed, float base_speed, float max_speed, float min_scale);
+
 #endif // CONTROL_THEORY_H

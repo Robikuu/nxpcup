@@ -55,3 +55,14 @@ float pid_update(pid_struct *PID, float setpoint, float measurement, float dt)
     PID->prev_output = output;
     return output;
 }
+
+float compute_speed_steer_gain(float current_speed, float base_speed, float max_speed, float min_scale)
+{
+    if (max_speed <= base_speed) {
+        return 1.0f;
+    }
+    float speed_ratio = (current_speed - base_speed) / (max_speed - base_speed);
+    if (speed_ratio < 0.0f) speed_ratio = 0.0f;
+    if (speed_ratio > 1.0f) speed_ratio = 1.0f;
+    return 1.0f - ((1.0f - min_scale) * speed_ratio);
+}

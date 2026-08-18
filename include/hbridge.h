@@ -37,7 +37,9 @@ void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2);
 
 void HbridgeBrake(Hbridge *h);
 
-void compute_motor_speeds(float steering_output, float *speed_left, float *speed_right);
+void compute_motor_speeds(float steer_cmd, float heading_err, uint8_t lines_found, float dt, float *speed_left, float *speed_right);
+void motor_speeds_reset(void);
+float motor_speeds_get_current(void);
 
 #ifdef __cplusplus
 }

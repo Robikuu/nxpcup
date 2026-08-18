@@ -18,7 +18,6 @@ void HbridgeInit(Hbridge *h,
 {
     ctimer_config_t config;
 
-    g_hbridge = *h;
     h->periodChannel    = periodCh;
     h->pwm1Channel      = pwm1Ch;
     h->pwm2Channel      = pwm2Ch;
@@ -27,6 +26,7 @@ void HbridgeInit(Hbridge *h,
     h->motor2DirPort    = m2DirPort;
     h->motor2DirPin     = m2DirPin;
     h->pwmPeripheral    = pwmPeriph;
+    g_hbridge = *h;
 }
 
 void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2)
@@ -70,53 +70,93 @@ void HbridgeBrake(Hbridge *h)
     CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, 0U);
 }
 
-/*
- * steering_output: -100..+100, positive = RIGHT turn (must match Steer()
- * sign convention — verify on the bench).
- * speed_left/right outputs are in duty %.
- */
-void compute_motor_speeds(float steering_output, float *speed_left, float *speed_right)
+static float s_current_speed = 0.0f;
+
+void motor_speeds_reset(void)
 {
-    float steer_rad = (steering_output / 100.0f)
+    s_current_speed = 0.0f;
+}
+
+float motor_speeds_get_current(void)
+{
+    return s_current_speed;
+}
+
+/*
+ * steer_cmd: -100..+100, positive = RIGHT turn
+ * heading_err: slope (lateral px / forward px), positive = RIGHT curve
+ * lines_found: 0 = lost, 1 = single line, 2 = dual line
+ * dt: loop duration in seconds
+ * speed_left/right: duty % outputs
+ */
+void compute_motor_speeds(float steer_cmd, float heading_err, uint8_t lines_found, float dt, float *speed_left, float *speed_right)
+{
+    /* 1. Combined Curvature Demand [0.0 to 1.0] from steering + heading preview
+     * HEADING_CURVATURE_GAIN = 2.0f triggers early trail-braking before corner entry. */
+    const float HEADING_CURVATURE_GAIN = 2.0f;
+    float steer_factor   = fabsf(steer_cmd) / 100.0f;
+    float heading_factor = fabsf(heading_err) * HEADING_CURVATURE_GAIN;
+    float turn_intensity = (steer_factor > heading_factor) ? steer_factor : heading_factor;
+    if (turn_intensity > 1.0f) turn_intensity = 1.0f;
+
+    /* 2. Target Speed Interpolation between max_speed (straights) and base_speed (corners) */
+    float target_left  = g_params.max_speed_left  - turn_intensity * (g_params.max_speed_left  - g_params.base_speed_left);
+    float target_right = g_params.max_speed_right - turn_intensity * (g_params.max_speed_right - g_params.base_speed_right);
+    float target_base  = 0.5f * (target_left + target_right);
+
+    /* 3. Safety Derating when vision confidence is degraded */
+    if (lines_found < 2) {
+        float safe_cap = (g_params.base_speed_left + g_params.base_speed_right) * 0.5f;
+        if (target_base > safe_cap) {
+            target_base  = safe_cap;
+            target_left  = g_params.base_speed_left;
+            target_right = g_params.base_speed_right;
+        }
+    }
+
+    /* 4. Slew-Rate Limiter (Asymmetric Accel vs Braking) */
+    const float MAX_ACCEL_PER_SEC = 200.0f; /* max +200% duty/sec */
+    const float MAX_BRAKE_PER_SEC = 500.0f; /* max -500% duty/sec */
+
+    float max_pos_step = MAX_ACCEL_PER_SEC * dt;
+    float max_neg_step = MAX_BRAKE_PER_SEC * dt;
+
+    if (target_base > s_current_speed) {
+        float diff = target_base - s_current_speed;
+        s_current_speed += (diff > max_pos_step) ? max_pos_step : diff;
+    } else {
+        float diff = s_current_speed - target_base;
+        s_current_speed -= (diff > max_neg_step) ? max_neg_step : diff;
+    }
+
+    /* 5. Kinematic Ackermann Differential Drive Split */
+    float steer_rad = (steer_cmd / 100.0f)
                     * (MAX_SERVO_ANGLE_DEG * (float)M_PI / 180.0f);
 
     float radius = (fabsf(steer_rad) > 0.001f)
                  ? (WHEELBASE_MM / tanf(fabsf(steer_rad)))
                  : 1e6f;
 
-    /* Physical cornering speed limit (mm/s) */
-    float max_corner_speed = sqrtf(MAX_LATERAL_ACCEL * radius);
-
-    /* Convert base duty % to approx mm/s via measured top speed.
-       SPEED_AT_FULL_DUTY_MMPS must be measured once: full throttle,
-       measure distance over time. Until then the limiter is approximate. */
-    float left_base  = g_params.base_speed_left;
-    float right_base = g_params.base_speed_right;
-    float avg_mmps   = 0.5f * (left_base + right_base) * 0.01f
-                     * SPEED_AT_FULL_DUTY_MMPS;
-
-    float speed_scale = 1.0f;
-    if (avg_mmps > max_corner_speed && avg_mmps > 0.0f) {
-        speed_scale = max_corner_speed / avg_mmps;
-    }
-
-    /* Ackermann inside/outside wheel split */
     float half_track    = TRACK_WIDTH_MM * 0.5f;
-    float inside_scale  = 1.0f - half_track / radius;
-    float outside_scale = 1.0f + half_track / radius;
-    if (inside_scale < 0.0f) inside_scale = 0.0f;  /* extreme turn guard */
+    float inside_scale  = 1.0f - (half_track / radius);
+    float outside_scale = 1.0f + (half_track / radius);
+    if (inside_scale < 0.0f) inside_scale = 0.0f;
 
-    if (steering_output > 0.0f) {          /* right turn: right wheel inside */
-        *speed_right = right_base * inside_scale  * speed_scale;
-        *speed_left  = left_base  * outside_scale * speed_scale;
-    } else if (steering_output < 0.0f) {   /* left turn: left wheel inside */
-        *speed_left  = left_base  * inside_scale  * speed_scale;
-        *speed_right = right_base * outside_scale * speed_scale;
-    } else {
-        *speed_left  = left_base  * speed_scale;
-        *speed_right = right_base * speed_scale;
+    float base_l = (target_base > 0.0f) ? (s_current_speed * (target_left / target_base)) : s_current_speed;
+    float base_r = (target_base > 0.0f) ? (s_current_speed * (target_right / target_base)) : s_current_speed;
+
+    if (steer_cmd > 0.0f) {          /* Right turn: right wheel inside, left wheel outside */
+        *speed_right = base_r * inside_scale;
+        *speed_left  = base_l * outside_scale;
+    } else if (steer_cmd < 0.0f) {   /* Left turn: left wheel inside, right wheel outside */
+        *speed_left  = base_l * inside_scale;
+        *speed_right = base_r * outside_scale;
+    } else {                         /* Straightaway */
+        *speed_left  = base_l;
+        *speed_right = base_r;
     }
 
+    /* 6. Hardware & Parameter Clamping */
     if (*speed_left  >  g_params.max_speed_left)  *speed_left  =  g_params.max_speed_left;
     if (*speed_left  < -g_params.max_speed_left)  *speed_left  = -g_params.max_speed_left;
     if (*speed_right >  g_params.max_speed_right) *speed_right =  g_params.max_speed_right;
