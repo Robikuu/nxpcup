@@ -24,11 +24,10 @@
 #define HALF_LANE_OFFSET_PX 15.0f
 
 /* Lookahead row for CTE evaluation (0 = top/far, 51 = bottom/near) */
-#define LOOKAHEAD_Y         30
+#define LOOKAHEAD_Y         22
 
-/* Intersection detection thresholds */
-#define INTERSECTION_MIN_VECTORS  3     /* filter only when >= this many vectors */
-#define INTERSECTION_MAX_SLOPE    1.4f  /* tan(55 deg) — reject steeper vectors */
+/* Intersection detection thresholds: reject crossing vectors steeper than ~37 deg */
+#define INTERSECTION_MAX_SLOPE    0.75f
 
 void pixel_to_ground(float u, float v, float *X, float *Y);
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index);

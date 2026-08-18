@@ -21,7 +21,7 @@ void params_init(void)
     g_params.ki        = 0.0f;    /* keep 0 until P+D are tuned */
     g_params.kd        = 0.35f;
     g_params.k_cte     = 1.0f;
-    g_params.k_heading = 6.0f;    /* calibrated lookahead heading feedforward */
+    g_params.k_heading = 10.0f;   /* calibrated lookahead heading feedforward */
 
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.2f;    /* derivative filter smoothing */

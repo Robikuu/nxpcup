@@ -20,7 +20,7 @@
 #include "wifi_config.h"
 
 #define MAX_VECTORS 10
-#define LINE_LOST_LIMIT    5
+#define LINE_LOST_LIMIT    20  /* ~250ms coast window for crossing intersections without braking */
 #define CTE_FILTER_NEW  0.8f   /* weight on new CTE measurement (1.0 = no filter) */
 #define CTE_FILTER_OLD  0.2f   /* weight on previous filtered value               */
 

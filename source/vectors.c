@@ -233,9 +233,7 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 /* ------------------------------------------------------------------ */
 size_t filter_intersection_vectors(uint16_t *vectors, size_t num_vectors)
 {
-    if (num_vectors < INTERSECTION_MIN_VECTORS) {
-        return num_vectors;
-    }
+    if (num_vectors == 0) return 0;
 
     size_t kept = 0;
 
