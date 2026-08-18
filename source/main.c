@@ -257,12 +257,13 @@ int main(void)
                     if (steer_cmd >  100.0f) steer_cmd =  100.0f;
                     if (steer_cmd < -100.0f) steer_cmd = -100.0f;
 
-                    /* Speed-dependent steering gain scheduling (Anti-Wobble):
-                     * Retains 100% authority at cornering speeds, scales down to 55% at max speed on straights. */
+                    /* Speed-dependent steering gain scheduling with Curvature Preservation (Anti-Wobble):
+                     * Retains 100% authority at cornering speeds or during sharp turns, scales down to 55% at max speed on straights. */
                     float current_spd = motor_speeds_get_current();
                     float base_avg    = 0.5f * (g_params.base_speed_left + g_params.base_speed_right);
                     float max_avg     = 0.5f * (g_params.max_speed_left + g_params.max_speed_right);
-                    float steer_scale = compute_speed_steer_gain(current_spd, base_avg, max_avg, 0.55f);
+                    float steer_scale = compute_speed_steer_gain_adaptive(current_spd, base_avg, max_avg, 0.55f,
+                                                                          fabsf(filtered_cte), fabsf(e_heading));
                     steer_cmd *= steer_scale;
 
                     last_steer_cmd = steer_cmd;
@@ -298,12 +299,14 @@ int main(void)
             last_steer_cmd             = 0.0f;
             last_cyccnt                = DWT->CYCCNT;
             motor_speeds_reset();
+            reset_lane_tracker();
             HbridgeBrake(&g_hbridge);
         }
 
         if (button_pressed_edge()) {
             g_params.state = STATE_IDLE;
             motor_speeds_reset();
+            reset_lane_tracker();
             HbridgeBrake(&g_hbridge);
             PRINTF("Button: STOPPED\r\n");
         }

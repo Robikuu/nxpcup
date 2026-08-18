@@ -1,9 +1,21 @@
 #include <math.h>
 #include <stdint.h>
-#include "fsl_device_registers.h"
-#include "fsl_debug_console.h"
+#include <stddef.h>
 #include "wifi_config.h"
 #include "vectors.h"
+
+#define MIN_VALID_LANE_WIDTH_PX 16.0f
+#define MAX_VALID_LANE_WIDTH_PX 65.0f
+#define DEFAULT_HALF_LANE_PX    19.0f
+
+static float s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
+static float s_last_lane_center  = PIXY_CENTER_X;
+
+void reset_lane_tracker(void)
+{
+    s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
+    s_last_lane_center  = PIXY_CENTER_X;
+}
 
 #ifndef M_PI
     #define M_PI 3.14159265358979323846
@@ -70,14 +82,16 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
     lane_result_t result = {0.0f, 0.0f, 0};
     if (num_vectors == 0) return result;
 
-    int   left_found   = 0;
-    int   right_found  = 0;
-    float left_x_look  = -1e6f;
-    float left_slope   = 0.0f;
-    float right_x_look =  1e6f;
-    float right_slope  = 0.0f;
+    typedef struct {
+        float x_at_look;
+        float slope;
+    } cand_t;
 
-    for (size_t i = 0; i < num_vectors; i++) {
+    #define MAX_LOCAL_CANDS 16
+    cand_t cands[MAX_LOCAL_CANDS];
+    size_t cand_count = 0;
+
+    for (size_t i = 0; i < num_vectors && cand_count < MAX_LOCAL_CANDS; i++) {
         float x0 = (float)vectors[6*i + 0];
         float y0 = (float)vectors[6*i + 1];
         float x1 = (float)vectors[6*i + 2];
@@ -104,43 +118,86 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         if (eval_y > y0) eval_y = y0;   /* don't extrapolate past base  */
         float x_at_look = x0 + slope * (y0 - eval_y);
 
-        /* Classify left/right by position at lookahead */
-        if (x_at_look < PIXY_CENTER_X) {
-            /* Left boundary: pick the one closest to center */
-            if (!left_found || x_at_look > left_x_look) {
-                left_x_look = x_at_look;
-                left_slope  = slope;
-                left_found  = 1;
-            }
-        } else {
-            /* Right boundary: pick the one closest to center */
-            if (!right_found || x_at_look < right_x_look) {
-                right_x_look = x_at_look;
-                right_slope  = slope;
-                right_found  = 1;
+        cands[cand_count].x_at_look = x_at_look;
+        cands[cand_count].slope     = slope;
+        cand_count++;
+    }
+
+    if (cand_count == 0) return result;
+
+    /* Sort candidates left-to-right by x_at_look */
+    for (size_t i = 0; i < cand_count - 1; i++) {
+        for (size_t j = i + 1; j < cand_count; j++) {
+            if (cands[j].x_at_look < cands[i].x_at_look) {
+                cand_t tmp = cands[i];
+                cands[i] = cands[j];
+                cands[j] = tmp;
             }
         }
     }
 
-    if (left_found && right_found) {
-        /* Both boundaries visible — true center between them */
-        result.cte         = ((left_x_look + right_x_look) * 0.5f) - PIXY_CENTER_X;
-        result.heading     = (left_slope + right_slope) * 0.5f;
-        result.lines_found = 2;
-    }
-    else if (left_found) {
-        /* Only left boundary — shift right by half lane width */
-        result.cte         = (left_x_look + HALF_LANE_OFFSET_PX) - PIXY_CENTER_X;
-        result.heading     = left_slope;
-        result.lines_found = 1;
-    }
-    else if (right_found) {
-        /* Only right boundary — shift left by half lane width */
-        result.cte         = (right_x_look - HALF_LANE_OFFSET_PX) - PIXY_CENTER_X;
-        result.heading     = right_slope;
-        result.lines_found = 1;
+    if (cand_count >= 2) {
+        /* Find best pair matching plausible lane width */
+        float best_diff = 1e6f;
+        int best_i = -1, best_j = -1;
+        float target_w = s_tracked_half_lane * 2.0f;
+
+        for (size_t i = 0; i < cand_count - 1; i++) {
+            for (size_t j = i + 1; j < cand_count; j++) {
+                float w = cands[j].x_at_look - cands[i].x_at_look;
+                if (w >= MIN_VALID_LANE_WIDTH_PX && w <= MAX_VALID_LANE_WIDTH_PX) {
+                    float score = fabsf(w - target_w);
+                    if (score < best_diff) {
+                        best_diff = score;
+                        best_i = (int)i;
+                        best_j = (int)j;
+                    }
+                }
+            }
+        }
+
+        if (best_i >= 0 && best_j >= 0) {
+            float left_x   = cands[best_i].x_at_look;
+            float right_x  = cands[best_j].x_at_look;
+            float center_x = 0.5f * (left_x + right_x);
+            float width    = right_x - left_x;
+
+            /* EMA update of tracked half-lane width */
+            s_tracked_half_lane = 0.85f * s_tracked_half_lane + 0.15f * (0.5f * width);
+            s_last_lane_center  = center_x;
+
+            result.cte         = center_x - PIXY_CENTER_X;
+            result.heading     = 0.5f * (cands[best_i].slope + cands[best_j].slope);
+            result.lines_found = 2;
+            return result;
+        }
     }
 
+    /* Single line fallback: use closest candidate to last known lane center */
+    cand_t *c = &cands[0];
+    float min_dist = 1e6f;
+    for (size_t i = 0; i < cand_count; i++) {
+        float d = fabsf(cands[i].x_at_look - s_last_lane_center);
+        if (d < min_dist) {
+            min_dist = d;
+            c = &cands[i];
+        }
+    }
+
+    float center_x;
+    /* Classify candidate as left vs right boundary based on position relative to last known center */
+    if (c->x_at_look < s_last_lane_center) {
+        /* Left boundary -> project center to the right */
+        center_x = c->x_at_look + s_tracked_half_lane;
+    } else {
+        /* Right boundary -> project center to the left */
+        center_x = c->x_at_look - s_tracked_half_lane;
+    }
+
+    s_last_lane_center  = center_x;
+    result.cte         = center_x - PIXY_CENTER_X;
+    result.heading     = c->slope;
+    result.lines_found = 1;
     return result;
 }
 

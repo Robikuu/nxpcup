@@ -50,4 +50,11 @@ float pid_update(pid_struct *PID, float setpoint, float measurement, float dt);
  */
 float compute_speed_steer_gain(float current_speed, float base_speed, float max_speed, float min_scale);
 
+/**
+ * @brief Computes speed-dependent steering gain with curvature preservation.
+ * Restores 100% steering authority when significant CTE or heading curvature is present.
+ */
+float compute_speed_steer_gain_adaptive(float current_speed, float base_speed, float max_speed,
+                                       float min_scale, float abs_cte, float abs_heading);
+
 #endif // CONTROL_THEORY_H
