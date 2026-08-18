@@ -71,10 +71,12 @@ void HbridgeBrake(Hbridge *h)
 }
 
 static float s_current_speed = 0.0f;
+static float s_filtered_diff  = 0.0f;
 
 void motor_speeds_reset(void)
 {
     s_current_speed = 0.0f;
+    s_filtered_diff = 0.0f;
 }
 
 float motor_speeds_get_current(void)
@@ -138,8 +140,14 @@ void compute_motor_speeds(float steer_cmd, float heading_err, uint8_t lines_foun
                  : 1e6f;
 
     float half_track    = TRACK_WIDTH_MM * 0.5f;
-    float inside_scale  = 1.0f - (half_track / radius);
-    float outside_scale = 1.0f + (half_track / radius);
+    float raw_diff      = (radius > 1.0f) ? (half_track / radius) : 0.0f;
+    if (raw_diff > 0.25f) raw_diff = 0.25f; /* clamp maximum 25% wheel speed divergence */
+
+    /* Low-pass filter the differential split (alpha = 0.20) to suppress chassis yaw resonance */
+    s_filtered_diff = 0.80f * s_filtered_diff + 0.20f * raw_diff;
+
+    float inside_scale  = 1.0f - s_filtered_diff;
+    float outside_scale = 1.0f + s_filtered_diff;
     if (inside_scale < 0.0f) inside_scale = 0.0f;
 
     float base_l = (target_base > 0.0f) ? (s_current_speed * (target_left / target_base)) : s_current_speed;

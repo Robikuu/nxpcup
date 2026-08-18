@@ -84,6 +84,7 @@ float compute_speed_steer_gain_adaptive(float current_speed, float base_speed, f
     float urgency         = (cte_urgency > heading_urgency) ? cte_urgency : heading_urgency;
     if (urgency > 1.0f) urgency = 1.0f;
 
-    // Blend: when cornering urgency is high, restore full 100% steering authority
-    return straight_attenuation + (1.0f - straight_attenuation) * urgency;
+    // Blend: in turns, restore authority smoothly up to max_authority (0.85 at max speed, 1.0 at base speed)
+    float max_authority = 1.0f - (0.15f * speed_ratio);
+    return straight_attenuation + (max_authority - straight_attenuation) * urgency;
 }

@@ -9,12 +9,14 @@
 #define DEFAULT_HALF_LANE_PX    19.0f
 
 static float s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
-static float s_last_lane_center  = PIXY_CENTER_X;
+static float s_last_left_x       = PIXY_CENTER_X - DEFAULT_HALF_LANE_PX;
+static float s_last_right_x      = PIXY_CENTER_X + DEFAULT_HALF_LANE_PX;
 
 void reset_lane_tracker(void)
 {
     s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
-    s_last_lane_center  = PIXY_CENTER_X;
+    s_last_left_x       = PIXY_CENTER_X - DEFAULT_HALF_LANE_PX;
+    s_last_right_x      = PIXY_CENTER_X + DEFAULT_HALF_LANE_PX;
 }
 
 #ifndef M_PI
@@ -162,9 +164,10 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
             float center_x = 0.5f * (left_x + right_x);
             float width    = right_x - left_x;
 
-            /* EMA update of tracked half-lane width */
+            /* EMA update of tracked half-lane width and boundary coordinates */
             s_tracked_half_lane = 0.85f * s_tracked_half_lane + 0.15f * (0.5f * width);
-            s_last_lane_center  = center_x;
+            s_last_left_x       = left_x;
+            s_last_right_x      = right_x;
 
             result.cte         = center_x - PIXY_CENTER_X;
             result.heading     = 0.5f * (cands[best_i].slope + cands[best_j].slope);
@@ -173,28 +176,36 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         }
     }
 
-    /* Single line fallback: use closest candidate to last known lane center */
+    /* Single line fallback: select candidate closest to either tracked boundary */
     cand_t *c = &cands[0];
     float min_dist = 1e6f;
     for (size_t i = 0; i < cand_count; i++) {
-        float d = fabsf(cands[i].x_at_look - s_last_lane_center);
+        float dl = fabsf(cands[i].x_at_look - s_last_left_x);
+        float dr = fabsf(cands[i].x_at_look - s_last_right_x);
+        float d  = (dl < dr) ? dl : dr;
         if (d < min_dist) {
             min_dist = d;
             c = &cands[i];
         }
     }
 
+    float d_to_left  = fabsf(c->x_at_look - s_last_left_x);
+    float d_to_right = fabsf(c->x_at_look - s_last_right_x);
     float center_x;
-    /* Classify candidate as left vs right boundary based on position relative to last known center */
-    if (c->x_at_look < s_last_lane_center) {
+
+    /* Classify boundary based on proximity to previous persistent track positions */
+    if (d_to_left < d_to_right) {
         /* Left boundary -> project center to the right */
-        center_x = c->x_at_look + s_tracked_half_lane;
+        center_x       = c->x_at_look + s_tracked_half_lane;
+        s_last_left_x  = c->x_at_look;
+        s_last_right_x = c->x_at_look + (2.0f * s_tracked_half_lane);
     } else {
         /* Right boundary -> project center to the left */
-        center_x = c->x_at_look - s_tracked_half_lane;
+        center_x       = c->x_at_look - s_tracked_half_lane;
+        s_last_right_x = c->x_at_look;
+        s_last_left_x  = c->x_at_look - (2.0f * s_tracked_half_lane);
     }
 
-    s_last_lane_center  = center_x;
     result.cte         = center_x - PIXY_CENTER_X;
     result.heading     = c->slope;
     result.lines_found = 1;
