@@ -30,7 +30,7 @@ void TestHbridge(void)
 
     // Phase 1: Both motors forward
     PRINTF("Both motors forward...\r\n");
-    HbridgeSpeed(&g_hbridge, 50, -50);
+    HbridgeSpeed(&g_hbridge, 50, 50);
     for (int i = 0; i < 20; i++) {
         volatile int delay = 1000000;
         while (delay) { delay--; }
@@ -50,7 +50,7 @@ void TestHbridge(void)
 
     // Phase 2: Left motor only
     PRINTF("Left motor only...\r\n");
-    HbridgeSpeed(&g_hbridge, 0, -50);
+    HbridgeSpeed(&g_hbridge, 0, 50);
     for (int i = 0; i < 20; i++) {
         volatile int delay = 1000000;
         while (delay) { delay--; }
@@ -210,7 +210,7 @@ int main(void)
                     Steer(last_steer_cmd + g_params.steering_offset);
                     float sl, sr;
                     compute_motor_speeds(last_steer_cmd, 0.0f, 0, real_dt, &sl, &sr);
-                    HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
+                    HbridgeSpeed(&g_hbridge, (int16_t)sr, (int16_t)sl);
                 }
             } else {
 
@@ -229,7 +229,7 @@ int main(void)
                         Steer(last_steer_cmd + g_params.steering_offset);
                         float sl, sr;
                         compute_motor_speeds(last_steer_cmd, 0.0f, 0, real_dt, &sl, &sr);
-                        HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
+                        HbridgeSpeed(&g_hbridge, (int16_t)sr, (int16_t)sl);
                     }
                 } else {
                     line_lost_counter = 0;
@@ -292,7 +292,7 @@ int main(void)
                     /* Differential drive: curvature-scaled & rate-limited */
                     float sl, sr;
                     compute_motor_speeds(steer_cmd, e_heading, lane.lines_found, real_dt, &sl, &sr);
-                    HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
+                    HbridgeSpeed(&g_hbridge, (int16_t)sr, (int16_t)sl);
                 }
             }
 

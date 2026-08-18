@@ -33,7 +33,7 @@ void HbridgeInit(Hbridge *h,
                  GPIO_Type *m1DirPort, uint32_t m1DirPin,
                  GPIO_Type *m2DirPort, uint32_t m2DirPin);
 
-void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2);
+void HbridgeSpeed(Hbridge *h, int16_t speed_right, int16_t speed_left);
 
 void HbridgeBrake(Hbridge *h);
 
