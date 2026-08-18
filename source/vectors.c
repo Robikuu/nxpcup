@@ -61,7 +61,7 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 }
 
 /* ------------------------------------------------------------------ */
-/*  Raw-Vector Virtual Centerline Algorithm (No Extrapolation)        */
+/*  Lookahead Lane Centering Algorithm                                */
 /*  vectors[] layout: 6 fields per vector                             */
 /*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
 /* ------------------------------------------------------------------ */
@@ -70,10 +70,12 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
     lane_result_t result = {0.0f, 0.0f, 0};
     if (num_vectors == 0) return result;
 
-    int   left_found  = 0;
-    int   right_found = 0;
-    float left_x0     = -1e6f, left_x1  = 0.0f;
-    float right_x0    =  1e6f, right_x1 = 0.0f;
+    int   left_found   = 0;
+    int   right_found  = 0;
+    float left_x_look  = -1e6f;
+    float left_slope   = 0.0f;
+    float right_x_look =  1e6f;
+    float right_slope  = 0.0f;
 
     for (size_t i = 0; i < num_vectors; i++) {
         float x0 = (float)vectors[6*i + 0];
@@ -81,65 +83,109 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         float x1 = (float)vectors[6*i + 2];
         float y1 = (float)vectors[6*i + 3];
 
-        /* Ensure (x0, y0) is the base/near point (larger Y)
-           and (x1, y1) is the tip/far point (smaller Y) */
+        /* Ensure (x0, y0) is near/base (larger Y = bottom of frame)
+           and (x1, y1) is far/tip (smaller Y = top of frame) */
         if (y0 < y1) {
             float tx = x0; float ty = y0;
             x0 = x1; y0 = y1;
             x1 = tx; y1 = ty;
         }
 
+        float dy = y0 - y1;
         /* Ignore purely horizontal or 1-pixel glitch lines */
-        if ((y0 - y1) < 1.0f) {
-            continue;
-        }
+        if (dy < 1.0f) continue;
 
-        /* Classify by actual vector base position on screen (no extrapolation!) */
-        if (x0 < PIXY_CENTER_X) {
-            /* Left boundary: pick the one closest to center (largest x0) */
-            if (!left_found || x0 > left_x0) {
-                left_x0     = x0;
-                left_x1     = x1;
+        /* Normalized slope: positive = tilting right going forward */
+        float slope = (x1 - x0) / dy;
+
+        /* Evaluate X at the lookahead row, clamped to vector extent */
+        float eval_y = (float)LOOKAHEAD_Y;
+        if (eval_y < y1) eval_y = y1;   /* don't extrapolate past tip   */
+        if (eval_y > y0) eval_y = y0;   /* don't extrapolate past base  */
+        float x_at_look = x0 + slope * (y0 - eval_y);
+
+        /* Classify left/right by position at lookahead */
+        if (x_at_look < PIXY_CENTER_X) {
+            /* Left boundary: pick the one closest to center */
+            if (!left_found || x_at_look > left_x_look) {
+                left_x_look = x_at_look;
+                left_slope  = slope;
                 left_found  = 1;
             }
         } else {
-            /* Right boundary: pick the one closest to center (smallest x0) */
-            if (!right_found || x0 < right_x0) {
-                right_x0    = x0;
-                right_x1    = x1;
-                right_found = 1;
+            /* Right boundary: pick the one closest to center */
+            if (!right_found || x_at_look < right_x_look) {
+                right_x_look = x_at_look;
+                right_slope  = slope;
+                right_found  = 1;
             }
         }
     }
 
     if (left_found && right_found) {
-        /* Case 1: Both boundaries found -> true midpoint */
-        float center_x0 = (left_x0 + right_x0) * 0.5f;
-        float center_x1 = (left_x1 + right_x1) * 0.5f;
-
-        result.cte         = center_x0 - PIXY_CENTER_X;
-        result.heading     = center_x1 - center_x0;
+        /* Both boundaries visible — true center between them */
+        result.cte         = ((left_x_look + right_x_look) * 0.5f) - PIXY_CENTER_X;
+        result.heading     = (left_slope + right_slope) * 0.5f;
         result.lines_found = 2;
     }
     else if (left_found) {
-        /* Case 2: Only left boundary -> shift right by half lane width */
-        float center_x0 = left_x0 + HALF_LANE_OFFSET_PX;
-        float center_x1 = left_x1 + HALF_LANE_OFFSET_PX;
-
-        result.cte         = center_x0 - PIXY_CENTER_X;
-        result.heading     = left_x1 - left_x0;  /* pure vector direction */
+        /* Only left boundary — shift right by half lane width */
+        result.cte         = (left_x_look + HALF_LANE_OFFSET_PX) - PIXY_CENTER_X;
+        result.heading     = left_slope;
         result.lines_found = 1;
     }
     else if (right_found) {
-        /* Case 3: Only right boundary -> shift left by half lane width */
-        float center_x0 = right_x0 - HALF_LANE_OFFSET_PX;
-        float center_x1 = right_x1 - HALF_LANE_OFFSET_PX;
-
-        result.cte         = center_x0 - PIXY_CENTER_X;
-        result.heading     = right_x1 - right_x0;  /* pure vector direction */
+        /* Only right boundary — shift left by half lane width */
+        result.cte         = (right_x_look - HALF_LANE_OFFSET_PX) - PIXY_CENTER_X;
+        result.heading     = right_slope;
         result.lines_found = 1;
     }
 
     return result;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Intersection filter: discard crossing-line vectors                 */
+/*  Only activates when vector count >= INTERSECTION_MIN_VECTORS.      */
+/*  Returns the new (reduced) vector count; vectors[] is modified      */
+/*  in-place.                                                          */
+/* ------------------------------------------------------------------ */
+size_t filter_intersection_vectors(uint16_t *vectors, size_t num_vectors)
+{
+    if (num_vectors < INTERSECTION_MIN_VECTORS) {
+        return num_vectors;
+    }
+
+    size_t kept = 0;
+
+    for (size_t i = 0; i < num_vectors; i++) {
+        float x0 = (float)vectors[6*i + 0];
+        float y0 = (float)vectors[6*i + 1];
+        float x1 = (float)vectors[6*i + 2];
+        float y1 = (float)vectors[6*i + 3];
+
+        /* Normalize: near point at bottom (larger Y) */
+        if (y0 < y1) {
+            float tx = x0; float ty = y0;
+            x0 = x1; y0 = y1;
+            x1 = tx; y1 = ty;
+        }
+
+        float dy = y0 - y1;
+        if (dy < 1.0f) continue;  /* horizontal = crossing line, discard */
+
+        float abs_slope = fabsf((x1 - x0) / dy);
+        if (abs_slope <= INTERSECTION_MAX_SLOPE) {
+            /* Lane-like vector — keep it */
+            if (kept != i) {
+                for (int j = 0; j < 6; j++) {
+                    vectors[6*kept + j] = vectors[6*i + j];
+                }
+            }
+            kept++;
+        }
+    }
+
+    return kept;
 }
 

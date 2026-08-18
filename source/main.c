@@ -21,6 +21,8 @@
 
 #define MAX_VECTORS 10
 #define LINE_LOST_LIMIT    5
+#define CTE_FILTER_NEW  0.8f   /* weight on new CTE measurement (1.0 = no filter) */
+#define CTE_FILTER_OLD  0.2f   /* weight on previous filtered value               */
 
 void TestHbridge(void)
 {
@@ -130,6 +132,11 @@ int main(void)
     /* ---------- 2. Params FIRST (everything below reads g_params) ---------- */
     params_init();
 
+    /* ---------- 2b. DWT cycle counter for real dt measurement ---------- */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
+
     /* ---------- 3. Actuators: safe state immediately ---------- */
     HbridgeInit(&g_hbridge,
                 CTIMER0_PERIPHERAL,
@@ -166,12 +173,22 @@ int main(void)
     size_t   num_vectors;
     float    filtered_cte    = 0.0f;
     int      cte_filter_init = 0;
+    float    last_steer_cmd  = 0.0f;
+    uint32_t last_cyccnt     = DWT->CYCCNT;
 
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
     /* ---------- 6. Main loop ---------- */
     while (1) {
         command_poll();
+
+        /* ---- Measure real loop dt from hardware cycle counter ---- */
+        uint32_t now_cyccnt     = DWT->CYCCNT;
+        uint32_t elapsed_cycles = now_cyccnt - last_cyccnt;
+        last_cyccnt = now_cyccnt;
+        float real_dt = (float)elapsed_cycles / (float)SystemCoreClock;
+        if (real_dt < 0.001f) real_dt = 0.001f;   /* clamp floor    */
+        if (real_dt > 0.100f) real_dt = 0.100f;   /* clamp ceiling  */
 
         /* live-update gains from remote tuning (no pid_init re-call!) */
         steer_pid.kp    = g_params.kp;
@@ -190,45 +207,65 @@ int main(void)
                 }
             } else {
 
+                /* Intersection filter: discard crossing-line vectors */
+                num_vectors = filter_intersection_vectors(vectors, num_vectors);
+
                 lane_result_t lane = compute_lane_center(vectors, num_vectors);
 
                 if (lane.lines_found == 0) {
-                    /* all vectors filtered out — treat as line lost */
+                    /* All vectors filtered out (mid-intersection or all glitch) */
                     if (++line_lost_counter > LINE_LOST_LIMIT) {
                         HbridgeBrake(&g_hbridge);
+                    } else {
+                        /* Hold last steering command through intersection */
+                        Steer(last_steer_cmd + g_params.steering_offset);
+                        HbridgeSpeed(&g_hbridge,
+                                     (int16_t)g_params.base_speed_left,
+                                     (int16_t)g_params.base_speed_right);
                     }
                 } else {
                     line_lost_counter = 0;
 
-                    /* Raw pixel errors: lateral offset (px) + centerline tilt (px) */
                     float e_cte     = lane.cte;
                     float e_heading = lane.heading;
 
-                    /* EMA filter on pixel CTE to smooth frame-to-frame noise */
+                    /* Lightweight EMA filter on CTE */
                     if (!cte_filter_init) {
                         filtered_cte    = e_cte;
                         cte_filter_init = 1;
                     } else {
-                        filtered_cte = 0.5f * e_cte + 0.5f * filtered_cte;
+                        filtered_cte = CTE_FILTER_NEW * e_cte
+                                     + CTE_FILTER_OLD * filtered_cte;
                     }
 
-                    /* Combined error in pixel space */
-                    float combined = g_params.k_cte * filtered_cte
-                                   + g_params.k_heading * e_heading;
+                    /* PID on CTE only — heading bypasses PID as feedforward */
+                    float pid_out   = -pid_update(&steer_pid, 0.0f,
+                                                  g_params.k_cte * filtered_cte,
+                                                  real_dt);
+                    float steer_cmd = pid_out
+                                    + g_params.k_heading * e_heading;
 
-                    float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+                    /* Clamp total steering command */
+                    if (steer_cmd >  100.0f) steer_cmd =  100.0f;
+                    if (steer_cmd < -100.0f) steer_cmd = -100.0f;
 
-                    /* debug: L=lines  R=raw_px  F=filtered_px  H=heading_px  S=steer*10 */
-                    esp_printf("L:%u R:%d F:%d H:%d S:%d\r\n",
+                    last_steer_cmd = steer_cmd;
+
+                    /* Telemetry: CTE×10, heading×100, steer×10, dt_ms */
+                    esp_printf("L:%u C:%d F:%d H:%d S:%d dt:%d\r\n",
                                (unsigned)lane.lines_found,
-                               (int)e_cte,
-                               (int)filtered_cte,
-                               (int)e_heading,
-                               (int)(steer_cmd * 10.0f));
+                               (int)(e_cte * 10.0f),
+                               (int)(filtered_cte * 10.0f),
+                               (int)(e_heading * 100.0f),
+                               (int)(steer_cmd * 10.0f),
+                               (int)(real_dt * 1000.0f));
 
                     Steer(steer_cmd + g_params.steering_offset);
 
-                    HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                    /* Differential drive: slow inner wheel in corners */
+                    float sl, sr;
+                    compute_motor_speeds(steer_cmd, &sl, &sr);
+                    HbridgeSpeed(&g_hbridge, (int16_t)sl, (int16_t)sr);
                 }
             }
 
@@ -242,6 +279,8 @@ int main(void)
             line_lost_counter          = 0;
             filtered_cte               = 0.0f;
             cte_filter_init            = 0;
+            last_steer_cmd             = 0.0f;
+            last_cyccnt                = DWT->CYCCNT;
             HbridgeBrake(&g_hbridge);
         }
 

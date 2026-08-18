@@ -23,6 +23,13 @@
 /* Nominal half-lane pixel offset for single-line synthesis */
 #define HALF_LANE_OFFSET_PX 15.0f
 
+/* Lookahead row for CTE evaluation (0 = top/far, 51 = bottom/near) */
+#define LOOKAHEAD_Y         30
+
+/* Intersection detection thresholds */
+#define INTERSECTION_MIN_VECTORS  3     /* filter only when >= this many vectors */
+#define INTERSECTION_MAX_SLOPE    1.4f  /* tan(55 deg) — reject steeper vectors */
+
 void pixel_to_ground(float u, float v, float *X, float *Y);
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index);
 
@@ -34,11 +41,12 @@ typedef struct {
 
 /* Two-boundary lane centering result */
 typedef struct {
-    float   cte;         /* lateral pixel error at near scanline (X - 39.0) */
-    float   heading;     /* direction / tilt in pixels (far_X - near_X)     */
+    float   cte;         /* lateral pixel error at lookahead row             */
+    float   heading;     /* normalized slope: lateral px per forward px      */
     uint8_t lines_found; /* 0 = lost, 1 = single line, 2 = two lines        */
 } lane_result_t;
 
 lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors);
+size_t filter_intersection_vectors(uint16_t *vectors, size_t num_vectors);
 
 #endif
