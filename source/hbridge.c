@@ -37,36 +37,36 @@ void HbridgeInit(Hbridge *h,
     g_hbridge = *h;
 }
 
-void HbridgeSpeed(Hbridge *h, int16_t speed_right, int16_t speed_left)
+void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2)
 {
     /* Clamp to -100..+100 */
-    if (speed_right >  100) speed_right =  100;
-    if (speed_right < -100) speed_right = -100;
-    if (speed_left  >  100) speed_left  =  100;
-    if (speed_left  < -100) speed_left  = -100;
+    if (speed1 >  100) speed1 =  100;
+    if (speed1 < -100) speed1 = -100;
+    if (speed2 >  100) speed2 =  100;
+    if (speed2 < -100) speed2 = -100;
 
-    uint8_t duty_right, duty_left;
+    uint8_t duty1, duty2;
 
-    /* Motor 1 (Right): Forward DIR=1, duty=100-speed. Reverse DIR=0, duty=-speed. */
-    if (speed_right >= 0) {
+    /* Speed1 (Right Motor): controls motor1DirPort & pwm2Channel */
+    if (speed1 >= 0) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
-        duty_right = (uint8_t)(100 - speed_right);
+        duty1 = (uint8_t)(100 - speed1);
     } else {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
-        duty_right = (uint8_t)(-speed_right);
+        duty1 = (uint8_t)(-speed1);
     }
 
-    /* Motor 2 (Left): Forward DIR=0, duty=speed. Reverse DIR=1, duty=100-(-speed). */
-    if (speed_left >= 0) {
-        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
-        duty_left = (uint8_t)speed_left;
-    } else {
+    /* Speed2 (Left Motor): controls motor2DirPort & pwm1Channel */
+    if (speed2 >= 0) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
-        duty_left = (uint8_t)(100 - (-speed_left));
+        duty2 = (uint8_t)(100 - speed2);
+    } else {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+        duty2 = (uint8_t)(-speed2);
     }
 
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, duty_right);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, duty_left);
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, duty1);
+    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, duty2);
 }
 
 void HbridgeBrake(Hbridge *h)
