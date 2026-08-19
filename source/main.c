@@ -130,6 +130,9 @@ int main(void)
     BOARD_InitBootPins();
     BOARD_InitBootPeripherals();
 
+    /* ---------- 2. Initialize default parameters ---------- */
+    params_init();
+
     /* ---------- 2b. DWT cycle counter for real dt measurement ---------- */
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
