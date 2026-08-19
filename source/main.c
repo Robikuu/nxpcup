@@ -19,8 +19,11 @@
 #include "vectors.h"
 #include "wifi_config.h"
 
-#define MAX_VECTORS 10
-#define LINE_LOST_LIMIT    5
+#define MAX_VECTORS             10
+#define LINE_LOST_LIMIT         20
+#define CTE_FILTER_NEW          0.80f
+#define CTE_FILTER_OLD          0.20f
+#define MAX_STEER_RATE_PER_SEC  450.0f
 
 void TestHbridge(void)
 {
@@ -120,11 +123,6 @@ void TestPidSteer(void)
 }
 
 
-/* Convert ground-space errors to cm / degrees so the existing gains
-   (tuned for pixel/degree-ish scales) stay meaningful. */
-#define CTE_TO_CM          100.0f
-#define HEADING_TO_DEG     (180.0f / (float)M_PI)
-
 int main(void)
 {
     /* ---------- 1. Hardware ---------- */
@@ -132,8 +130,10 @@ int main(void)
     BOARD_InitBootPins();
     BOARD_InitBootPeripherals();
 
-    /* ---------- 2. Params FIRST (everything below reads g_params) ---------- */
-    params_init();
+    /* ---------- 2b. DWT cycle counter for real dt measurement ---------- */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
 
     /* ---------- 3. Actuators: safe state immediately ---------- */
     HbridgeInit(&g_hbridge,
@@ -171,12 +171,22 @@ int main(void)
     size_t   num_vectors;
     float    filtered_cte    = 0.0f;
     int      cte_filter_init = 0;
+    float    last_steer_cmd  = 0.0f;
+    uint32_t last_cyccnt     = DWT->CYCCNT;
 
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
     /* ---------- 6. Main loop ---------- */
     while (1) {
         command_poll();
+
+        /* Measure real hardware loop dt from DWT cycle counter */
+        uint32_t now_cyccnt     = DWT->CYCCNT;
+        uint32_t elapsed_cycles = now_cyccnt - last_cyccnt;
+        last_cyccnt = now_cyccnt;
+        float real_dt = (float)elapsed_cycles / (float)SystemCoreClock;
+        if (real_dt < 0.001f) real_dt = 0.001f;   /* clamp floor */
+        if (real_dt > 0.100f) real_dt = 0.100f;   /* clamp ceiling */
 
         /* live-update gains from remote tuning (no pid_init re-call!) */
         steer_pid.kp    = g_params.kp;
@@ -188,52 +198,80 @@ int main(void)
 
             status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
 
-            if (s != kStatus_Success || num_vectors == 0) {
-                /* camera failure and "no line" get identical treatment */
-                if (++line_lost_counter > LINE_LOST_LIMIT) {
+            lane_result_t lane = {0.0f, 0.0f, 0};
+            if (s == kStatus_Success && num_vectors > 0) {
+                num_vectors = filter_intersection_vectors(vectors, num_vectors);
+                if (num_vectors > 0) {
+                    lane = compute_lane_center(vectors, num_vectors);
+                }
+            }
+
+            if (lane.lines_found == 0) {
+                /* all vectors filtered out or no lines — treat as line lost / intersection */
+                if (++line_lost_counter <= LINE_LOST_LIMIT) {
+                    /* Coast through intersection using dead-reckoning without braking */
+                    float sl, sr;
+                    compute_motor_speeds(last_steer_cmd, 0.0f, 0, real_dt, &sl, &sr);
+                    Steer(last_steer_cmd + g_params.steering_offset);
+                    HbridgeSpeed(&g_hbridge, (int16_t)sr, (int16_t)sl);
+                } else {
                     HbridgeBrake(&g_hbridge);
                 }
             } else {
+                line_lost_counter = 0;
 
-                lane_result_t lane = compute_lane_center(vectors, num_vectors);
+                /* raw errors: lateral offset (pixels) + heading slope */
+                float e_cte     = lane.cte;
+                float e_heading = lane.heading;
 
-                if (lane.lines_found == 0) {
-                    /* all vectors filtered out — treat as line lost */
-                    if (++line_lost_counter > LINE_LOST_LIMIT) {
-                        HbridgeBrake(&g_hbridge);
-                    }
+                /* EMA filter on CTE to smooth frame-to-frame noise */
+                if (!cte_filter_init) {
+                    filtered_cte    = e_cte;
+                    cte_filter_init = 1;
                 } else {
-                    line_lost_counter = 0;
-
-                    /* raw errors: lateral offset (cm) + heading (deg) */
-                    float e_cte     = lane.cte * CTE_TO_CM;
-                    float e_heading = lane.heading * HEADING_TO_DEG;
-
-                    /* EMA filter on CTE to smooth frame-to-frame noise */
-                    if (!cte_filter_init) {
-                        filtered_cte    = e_cte;
-                        cte_filter_init = 1;
-                    } else {
-                        filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
-                    }
-
-                    /* combined error using filtered CTE */
-                    float combined = g_params.k_cte * filtered_cte
-                                   + g_params.k_heading * e_heading;
-
-                    float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
-
-                    /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
-                    esp_printf("L:%u R:%d F:%d S:%d\r\n",
-                               (unsigned)lane.lines_found,
-                               (int)(e_cte * 10.0f),
-                               (int)(filtered_cte * 10.0f),
-                               (int)(steer_cmd * 10.0f));
-
-                    Steer(steer_cmd + g_params.steering_offset);
-
-                    HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                    filtered_cte = CTE_FILTER_NEW * e_cte + CTE_FILTER_OLD * filtered_cte;
                 }
+
+                /* Steering command: PID on CTE + k_heading * e_heading */
+                float pid_out = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, real_dt);
+                float steer_raw = pid_out + g_params.k_heading * e_heading;
+
+                if (steer_raw > 100.0f)  steer_raw = 100.0f;
+                if (steer_raw < -100.0f) steer_raw = -100.0f;
+
+                /* Adaptive gain scheduling based on speed, CTE, and heading */
+                float current_spd = motor_speeds_get_current();
+                float base_avg    = 0.5f * (g_params.base_speed_left + g_params.base_speed_right);
+                float max_avg     = 0.5f * (g_params.max_speed_left + g_params.max_speed_right);
+                float steer_gain  = compute_speed_steer_gain_adaptive(current_spd, base_avg, max_avg, 0.55f, fabsf(filtered_cte), fabsf(e_heading));
+                float steer_scaled = steer_raw * steer_gain;
+
+                /* Steering slew-rate limiter */
+                float max_steer_step = MAX_STEER_RATE_PER_SEC * real_dt;
+                float steer_diff = steer_scaled - last_steer_cmd;
+                if (steer_diff > max_steer_step) {
+                    steer_scaled = last_steer_cmd + max_steer_step;
+                } else if (steer_diff < -max_steer_step) {
+                    steer_scaled = last_steer_cmd - max_steer_step;
+                }
+                last_steer_cmd = steer_scaled;
+
+                float steer_cmd = steer_scaled;
+
+                /* Differential drive call */
+                float sl, sr;
+                compute_motor_speeds(steer_cmd, e_heading, lane.lines_found, real_dt, &sl, &sr);
+
+                Steer(steer_cmd + g_params.steering_offset);
+                HbridgeSpeed(&g_hbridge, (int16_t)sr, (int16_t)sl);
+
+                /* debug telemetry: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10  V=speed */
+                esp_printf("L:%u R:%d F:%d S:%d V:%d\r\n",
+                           (unsigned)lane.lines_found,
+                           (int)(e_cte * 10.0f),
+                           (int)(filtered_cte * 10.0f),
+                           (int)(steer_cmd * 10.0f),
+                           (int)current_spd);
             }
 
         } else {
@@ -246,11 +284,25 @@ int main(void)
             line_lost_counter          = 0;
             filtered_cte               = 0.0f;
             cte_filter_init            = 0;
+            last_steer_cmd             = 0.0f;
+            motor_speeds_reset();
+            reset_lane_tracker();
             HbridgeBrake(&g_hbridge);
         }
 
         if (button_pressed_edge()) {
             g_params.state = STATE_IDLE;
+            steer_pid.integral         = 0.0f;
+            steer_pid.prev_measurement = 0.0f;
+            steer_pid.d_filtered       = 0.0f;
+            steer_pid.prev_output      = 0.0f;
+            steer_pid.initialized      = 0;
+            line_lost_counter          = 0;
+            filtered_cte               = 0.0f;
+            cte_filter_init            = 0;
+            last_steer_cmd             = 0.0f;
+            motor_speeds_reset();
+            reset_lane_tracker();
             HbridgeBrake(&g_hbridge);
             PRINTF("Button: STOPPED\r\n");
         }
