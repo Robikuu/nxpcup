@@ -40,4 +40,17 @@ void  pid_init(pid_struct *PID, float kp, float ki, float kd,
  */
 float pid_update(pid_struct *PID, float setpoint, float measurement, float dt);
 
+/**
+ * @brief Computes adaptive steering gain based on speed, CTE, and heading error.
+ * @param current_speed Current vehicle speed
+ * @param base_speed Base speed threshold below which gain is 1.0
+ * @param max_speed Maximum speed threshold
+ * @param min_scale Minimum attenuation scale at maximum speed on straight
+ * @param abs_cte Absolute cross-track error
+ * @param abs_heading Absolute heading error
+ * @return Adaptive steer scale factor (between min_scale and 1.0)
+ */
+float compute_speed_steer_gain_adaptive(float current_speed, float base_speed, float max_speed,
+                                       float min_scale, float abs_cte, float abs_heading);
+
 #endif // CONTROL_THEORY_H

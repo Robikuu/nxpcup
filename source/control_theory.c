@@ -55,3 +55,22 @@ float pid_update(pid_struct *PID, float setpoint, float measurement, float dt)
     PID->prev_output = output;
     return output;
 }
+
+float compute_speed_steer_gain_adaptive(float current_speed, float base_speed, float max_speed,
+                                       float min_scale, float abs_cte, float abs_heading)
+{
+    if (max_speed <= base_speed) return 1.0f;
+
+    float speed_ratio = (current_speed - base_speed) / (max_speed - base_speed);
+    if (speed_ratio < 0.0f) speed_ratio = 0.0f;
+    if (speed_ratio > 1.0f) speed_ratio = 1.0f;
+
+    float straight_attenuation = 1.0f - ((1.0f - min_scale) * speed_ratio);
+
+    float cte_urgency     = abs_cte / 16.0f;
+    float heading_urgency = abs_heading / 0.35f;
+    float urgency         = (cte_urgency > heading_urgency) ? cte_urgency : heading_urgency;
+    if (urgency > 1.0f) urgency = 1.0f;
+
+    return straight_attenuation + (1.0f - straight_attenuation) * urgency;
+}
