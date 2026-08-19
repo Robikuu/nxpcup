@@ -15,6 +15,8 @@ robot_params_t g_params;
 static char   s_cmd_buf[CMD_BUF_SIZE];
 static size_t s_cmd_idx = 0;
 
+//TODO: de vezut si eventual de refacut tot fisierul asta
+
 void params_init(void)
 {
     g_params.kp = 0.5f;

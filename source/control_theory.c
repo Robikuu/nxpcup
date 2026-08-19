@@ -1,6 +1,8 @@
 #include <math.h>
 #include "control_theory.h"
 
+//TODO: intelege cum merge PID-ul implementat de aici (este implementat cu cap, nu e slop doar ca am uitat cum merge exact)
+
 void pid_init(pid_struct *PID, float kp, float ki, float kd,
               float output_limit, float alpha)
 {

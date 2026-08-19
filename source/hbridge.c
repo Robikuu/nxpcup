@@ -8,6 +8,8 @@
 Hbridge g_hbridge;
 static uint32_t s_srcClockHz;
 
+//TODO: incearca sa intelegi cum functioneaza compute motor speeds si vezi daca e worth it sa o mentimen sau nu (eventual doar schimbata)
+
 void HbridgeInit(Hbridge *h,
 		 	 	 CTIMER_Type *pwmPeriph,
                  ctimer_match_t periodCh,

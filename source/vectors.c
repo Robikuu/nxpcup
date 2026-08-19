@@ -9,6 +9,10 @@
     #define M_PI 3.14159265358979323846
 #endif
 
+//TODO: look over the entire vectors.c file
+//testeaza cum sunt vazuti vectorii de la pixy, si cum sunt transformati in coordonate (maybe foloseste python pt vizualizare)
+//refa transformarea homograpfica
+
 //transformare homography pt vectori
 void pixel_to_ground(float u, float v, float *X, float *Y)
 {

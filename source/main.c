@@ -174,6 +174,9 @@ int main(void)
 
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
+    //TODO: refa main loopul si try to make it a state machine (straight, intersection, turn left, turn right, stop)
+    //also go over cum sunt vectori parsati si sa incercam cumva sa le normalizam directia lor
+
     /* ---------- 6. Main loop ---------- */
     while (1) {
         command_poll();
