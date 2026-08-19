@@ -1,30 +1,190 @@
 #include <math.h>
 #include <stdint.h>
-#include "fsl_device_registers.h"
-#include "fsl_debug_console.h"
+#include <stddef.h>
 #include "wifi_config.h"
 #include "vectors.h"
 
-#ifndef M_PI
-    #define M_PI 3.14159265358979323846
-#endif
+#define MIN_VALID_LANE_WIDTH_PX 28.0f
+#define MAX_VALID_LANE_WIDTH_PX 52.0f
+#define DEFAULT_HALF_LANE_PX    19.0f
 
-//transformare homography pt vectori
-void pixel_to_ground(float u, float v, float *X, float *Y)
+static float s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
+static float s_last_left_x       = PIXY_CENTER_X - DEFAULT_HALF_LANE_PX;
+static float s_last_right_x      = PIXY_CENTER_X + DEFAULT_HALF_LANE_PX;
+
+void reset_lane_tracker(void)
 {
-    float Wp = H31 * u + H32 * v + H33;
+    s_tracked_half_lane = DEFAULT_HALF_LANE_PX;
+    s_last_left_x       = PIXY_CENTER_X - DEFAULT_HALF_LANE_PX;
+    s_last_right_x      = PIXY_CENTER_X + DEFAULT_HALF_LANE_PX;
+}
 
-    if (fabsf(Wp) < 1e-6f) {
-        *X = 0.0f;
-        *Y = 0.0f;
-        return;
+lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
+{
+    lane_result_t result = {0.0f, 0.0f, 0};
+    if (num_vectors == 0) return result;
+
+    typedef struct {
+        float x_at_look;
+        float slope;
+    } cand_t;
+
+    #define MAX_LOCAL_CANDS 16
+    cand_t cands[MAX_LOCAL_CANDS];
+    size_t cand_count = 0;
+
+    for (size_t i = 0; i < num_vectors && cand_count < MAX_LOCAL_CANDS; i++) {
+        float x0 = (float)vectors[6*i + 0];
+        float y0 = (float)vectors[6*i + 1];
+        float x1 = (float)vectors[6*i + 2];
+        float y1 = (float)vectors[6*i + 3];
+
+        /* Ensure (x0, y0) is near (larger Y) and (x1, y1) is far (smaller Y) */
+        if (y0 < y1) {
+            float tx = x0; float ty = y0;
+            x0 = x1; y0 = y1;
+            x1 = tx; y1 = ty;
+        }
+
+        float dy = y0 - y1;
+        if (dy < 1.0f) continue;
+
+        float slope = (x1 - x0) / dy;
+        float eval_y = (float)LOOKAHEAD_Y;
+        if (eval_y < y1) eval_y = y1;
+        if (eval_y > y0) eval_y = y0;
+        float x_at_look = x0 + slope * (y0 - eval_y);
+
+        cands[cand_count].x_at_look = x_at_look;
+        cands[cand_count].slope     = slope;
+        cand_count++;
     }
 
-    float Xp = H11 * u + H12 * v + H13;
-    float Yp = H21 * u + H22 * v + H23;
+    if (cand_count == 0) return result;
 
-    *X = Xp / Wp;
-    *Y = Yp / Wp;
+    /* Sort candidates left-to-right */
+    for (size_t i = 0; i < cand_count - 1; i++) {
+        for (size_t j = i + 1; j < cand_count; j++) {
+            if (cands[j].x_at_look < cands[i].x_at_look) {
+                cand_t tmp = cands[i];
+                cands[i] = cands[j];
+                cands[j] = tmp;
+            }
+        }
+    }
+
+    /* Merge adjacent piecewise segments on the same boundary (< 16px gap) */
+    cand_t merged[MAX_LOCAL_CANDS];
+    size_t merged_count = 0;
+    for (size_t i = 0; i < cand_count; i++) {
+        if (merged_count > 0 && (cands[i].x_at_look - merged[merged_count - 1].x_at_look) < 16.0f) {
+            merged[merged_count - 1].x_at_look = 0.5f * (merged[merged_count - 1].x_at_look + cands[i].x_at_look);
+            merged[merged_count - 1].slope     = 0.5f * (merged[merged_count - 1].slope + cands[i].slope);
+        } else {
+            merged[merged_count++] = cands[i];
+        }
+    }
+
+    if (merged_count >= 2) {
+        float best_diff = 1e6f;
+        int best_i = -1, best_j = -1;
+        float target_w = s_tracked_half_lane * 2.0f;
+
+        for (size_t i = 0; i < merged_count - 1; i++) {
+            for (size_t j = i + 1; j < merged_count; j++) {
+                float w = merged[j].x_at_look - merged[i].x_at_look;
+                if (w >= MIN_VALID_LANE_WIDTH_PX && w <= MAX_VALID_LANE_WIDTH_PX) {
+                    float score = fabsf(w - target_w);
+                    if (score <= 14.0f && score < best_diff) {
+                        best_diff = score;
+                        best_i = (int)i;
+                        best_j = (int)j;
+                    }
+                }
+            }
+        }
+
+        if (best_i >= 0 && best_j >= 0) {
+            float left_x   = merged[best_i].x_at_look;
+            float right_x  = merged[best_j].x_at_look;
+            float center_x = 0.5f * (left_x + right_x);
+            float width    = right_x - left_x;
+
+            s_tracked_half_lane = 0.85f * s_tracked_half_lane + 0.15f * (0.5f * width);
+            s_last_left_x       = left_x;
+            s_last_right_x      = right_x;
+
+            result.cte         = center_x - PIXY_CENTER_X;
+            result.heading     = 0.5f * (merged[best_i].slope + merged[best_j].slope);
+            result.lines_found = 2;
+            return result;
+        }
+    }
+
+    /* Single line fallback: select candidate closest to tracked boundary memory */
+    cand_t *c = &merged[0];
+    float min_dist = 1e6f;
+    for (size_t i = 0; i < merged_count; i++) {
+        float dl = fabsf(merged[i].x_at_look - s_last_left_x);
+        float dr = fabsf(merged[i].x_at_look - s_last_right_x);
+        float d  = (dl < dr) ? dl : dr;
+        if (d < min_dist) {
+            min_dist = d;
+            c = &merged[i];
+        }
+    }
+
+    float d_to_left  = fabsf(c->x_at_look - s_last_left_x);
+    float d_to_right = fabsf(c->x_at_look - s_last_right_x);
+    float center_x;
+
+    if (d_to_left < d_to_right) {
+        center_x       = c->x_at_look + s_tracked_half_lane;
+        s_last_left_x  = c->x_at_look;
+        s_last_right_x = c->x_at_look + (2.0f * s_tracked_half_lane);
+    } else {
+        center_x       = c->x_at_look - s_tracked_half_lane;
+        s_last_right_x = c->x_at_look;
+        s_last_left_x  = c->x_at_look - (2.0f * s_tracked_half_lane);
+    }
+
+    result.cte         = center_x - PIXY_CENTER_X;
+    result.heading     = c->slope;
+    result.lines_found = 1;
+    return result;
+}
+
+size_t filter_intersection_vectors(uint16_t *vectors, size_t num_vectors)
+{
+    if (num_vectors == 0) return 0;
+    size_t kept = 0;
+
+    for (size_t i = 0; i < num_vectors; i++) {
+        float x0 = (float)vectors[6*i + 0];
+        float y0 = (float)vectors[6*i + 1];
+        float x1 = (float)vectors[6*i + 2];
+        float y1 = (float)vectors[6*i + 3];
+
+        if (y0 < y1) {
+            float tx = x0; float ty = y0;
+            x0 = x1; y0 = y1;
+            x1 = tx; y1 = ty;
+        }
+
+        float dy = y0 - y1;
+        if (dy < 1.0f) continue;
+
+        float abs_slope = fabsf((x1 - x0) / dy);
+        if (abs_slope <= INTERSECTION_MAX_SLOPE) {
+            if (kept != i) {
+                for (int j = 0; j < 6; j++) {
+                    vectors[6*kept + j] = vectors[6*i + j];
+                }
+            }
+            kept++;
+        }
+    }
+    return kept;
 }
 
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index)
@@ -32,11 +192,8 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
     int dx = (int)x1 - (int)x0;
     int dy = (int)y1 - (int)y0;
 
-    // Calculate vector length (magnitude)
     float length = sqrtf((float)(dx * dx + dy * dy));
 
-    // Calculate direction angle in degrees relative to the vertical axis (-dy).
-    // Straight forward is 0 degrees. Left is negative, right is positive.
     float angle_deg = 0.0f;
     if (dy != 0) {
         angle_deg = atan2f((float)dx, (float)(-dy)) * 180.0f / 3.141592653589793f;
@@ -44,7 +201,6 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
         angle_deg = (dx >= 0) ? 90.0f : -90.0f;
     }
 
-    // Split into integer and fractional parts for printing (avoiding %f format)
     int len_int = (int)length;
     int len_frac = (int)((length - len_int) * 100.0f);
     if (len_frac < 0) len_frac = -len_frac;
@@ -59,107 +215,3 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
     esp_printf("  Length: %d.%02d px\r\n", len_int, len_frac);
     esp_printf("  Angle: %d.%02d deg\r\n", ang_int, ang_frac);
 }
-
-/* ------------------------------------------------------------------ */
-/*  Two-boundary lane centering (index-aware)                         */
-/*  vectors[] layout: 6 fields per vector                             */
-/*    [0]=x0  [1]=y0  [2]=x1  [3]=y1  [4]=index  [5]=flags           */
-/* ------------------------------------------------------------------ */
-#define LC_MAX 10
-
-lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
-{
-    lane_result_t result = {0.0f, 0.0f, 0};
-    if (num_vectors == 0) return result;
-
-    /* --- 1. Transform to ground space, keep Pixy index --- */
-    struct {
-        float   x_mid;
-        float   angle;
-        uint8_t idx;
-    } v[LC_MAX];
-    size_t n = 0;
-
-    for (size_t i = 0; i < num_vectors && i < LC_MAX; i++) {
-        float u0 = vectors[6*i + 0] * PIXY_GRID_SCALE;
-        float v0 = vectors[6*i + 1] * PIXY_GRID_SCALE;
-        float u1 = vectors[6*i + 2] * PIXY_GRID_SCALE;
-        float v1 = vectors[6*i + 3] * PIXY_GRID_SCALE;
-
-        float X0, Y0, X1, Y1;
-        pixel_to_ground(u0, v0, &X0, &Y0);
-        pixel_to_ground(u1, v1, &X1, &Y1);
-
-        v[n].x_mid = (X0 + X1) * 0.5f;
-        v[n].angle = atan2f(X1 - X0, Y1 - Y0);
-        v[n].idx   = (uint8_t)vectors[6*i + 4];
-        n++;
-    }
-
-    /* --- 2. Single vector: follow directly --- */
-    if (n == 1) {
-        result.cte         = v[0].x_mid;
-        result.heading     = v[0].angle;
-        result.lines_found = 1;
-        return result;
-    }
-
-    /* --- 3. Group by Pixy index, compute average x_mid per group --- */
-    struct {
-        uint8_t idx;
-        float   x_sum;
-        float   a_sum;
-        uint8_t cnt;
-    } grp[LC_MAX];
-    size_t ng = 0;
-
-    for (size_t i = 0; i < n; i++) {
-        int found = -1;
-        for (size_t g = 0; g < ng; g++) {
-            if (grp[g].idx == v[i].idx) { found = (int)g; break; }
-        }
-        if (found >= 0) {
-            grp[found].x_sum += v[i].x_mid;
-            grp[found].a_sum += v[i].angle;
-            grp[found].cnt++;
-        } else {
-            grp[ng].idx   = v[i].idx;
-            grp[ng].x_sum = v[i].x_mid;
-            grp[ng].a_sum = v[i].angle;
-            grp[ng].cnt   = 1;
-            ng++;
-        }
-    }
-
-    if (ng >= 2) {
-        /* Two or more distinct lines — find leftmost and rightmost */
-        int   gl = 0, gr = 0;
-        float xl = grp[0].x_sum / grp[0].cnt;
-        float xr = xl;
-
-        for (size_t g = 1; g < ng; g++) {
-            float avg = grp[g].x_sum / grp[g].cnt;
-            if (avg < xl) { xl = avg; gl = (int)g; }
-            if (avg > xr) { xr = avg; gr = (int)g; }
-        }
-
-        result.cte     = (xl + xr) * 0.5f;
-        result.heading = (grp[gl].a_sum / grp[gl].cnt +
-                          grp[gr].a_sum / grp[gr].cnt) * 0.5f;
-        result.lines_found = 2;
-    } else {
-        /* All vectors belong to one line — follow closest to center */
-        int   best   = 0;
-        float best_d = fabsf(v[0].x_mid);
-        for (size_t i = 1; i < n; i++) {
-            float d = fabsf(v[i].x_mid);
-            if (d < best_d) { best_d = d; best = (int)i; }
-        }
-        result.cte         = v[best].x_mid;
-        result.heading     = v[best].angle;
-        result.lines_found = 1;
-    }
-
-    return result;
-}
-
