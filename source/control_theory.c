@@ -67,8 +67,8 @@ float compute_speed_steer_gain_adaptive(float current_speed, float base_speed, f
 
     float straight_attenuation = 1.0f - ((1.0f - min_scale) * speed_ratio);
 
-    float cte_urgency     = abs_cte / 16.0f;
-    float heading_urgency = abs_heading / 0.35f;
+    float cte_urgency     = abs_cte / 8.0f;
+    float heading_urgency = abs_heading / 0.15f;
     float urgency         = (cte_urgency > heading_urgency) ? cte_urgency : heading_urgency;
     if (urgency > 1.0f) urgency = 1.0f;
 
