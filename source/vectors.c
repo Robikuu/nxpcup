@@ -46,10 +46,17 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
             x1 = tx; y1 = ty;
         }
 
+        float dx = x1 - x0;
         float dy = y0 - y1;
-        if (dy < 1.0f) continue;
+        if (dy < MIN_VECTOR_DY) continue;
 
-        float slope = (x1 - x0) / dy;
+        float len_sq = dx * dx + dy * dy;
+        if (len_sq < (MIN_VECTOR_LEN * MIN_VECTOR_LEN)) continue;
+
+        float abs_slope = fabsf(dx / dy);
+        if (abs_slope > INTERSECTION_MAX_SLOPE) continue;
+
+        float slope = dx / dy;
         float eval_y = (float)LOOKAHEAD_Y;
         if (eval_y < y1) eval_y = y1;
         if (eval_y > y0) eval_y = y0;
@@ -171,18 +178,22 @@ size_t filter_intersection_vectors(uint16_t *vectors, size_t num_vectors)
             x1 = tx; y1 = ty;
         }
 
+        float dx = x1 - x0;
         float dy = y0 - y1;
-        if (dy < 1.0f) continue;
+        if (dy < MIN_VECTOR_DY) continue;
 
-        float abs_slope = fabsf((x1 - x0) / dy);
-        if (abs_slope <= INTERSECTION_MAX_SLOPE) {
-            if (kept != i) {
-                for (int j = 0; j < 6; j++) {
-                    vectors[6*kept + j] = vectors[6*i + j];
-                }
+        float len_sq = dx * dx + dy * dy;
+        if (len_sq < (MIN_VECTOR_LEN * MIN_VECTOR_LEN)) continue;
+
+        float abs_slope = fabsf(dx / dy);
+        if (abs_slope > INTERSECTION_MAX_SLOPE) continue;
+
+        if (kept != i) {
+            for (int j = 0; j < 6; j++) {
+                vectors[6*kept + j] = vectors[6*i + j];
             }
-            kept++;
         }
+        kept++;
     }
     return kept;
 }

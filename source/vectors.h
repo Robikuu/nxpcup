@@ -7,6 +7,8 @@
 #define PIXY_CENTER_X           39.0f
 #define LOOKAHEAD_Y             22
 #define INTERSECTION_MAX_SLOPE  0.75f
+#define MIN_VECTOR_DY           4.0f
+#define MIN_VECTOR_LEN          8.0f
 
 typedef struct {
     float   cte;          /* lateral offset from center in pixels (+ = right of center) */
