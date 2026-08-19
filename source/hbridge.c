@@ -80,11 +80,13 @@ void HbridgeBrake(Hbridge *h)
 
 static float s_current_speed = 0.0f;
 static float s_filtered_diff  = 0.0f;
+static float s_launch_time    = 0.0f;
 
 void motor_speeds_reset(void)
 {
     s_current_speed = 0.0f;
     s_filtered_diff = 0.0f;
+    s_launch_time   = 0.0f;
 }
 
 float motor_speeds_get_current(void)
@@ -113,8 +115,23 @@ void compute_motor_speeds(float steer_cmd, float heading_err, uint8_t lines_foun
         }
     }
 
-    const float MAX_ACCEL_PER_SEC = 200.0f;
-    const float MAX_BRAKE_PER_SEC = 500.0f;
+    /* Launch Control & Anti-Wheelspin Soft Start */
+    if (s_launch_time == 0.0f && s_current_speed < LAUNCH_START_SPEED) {
+        s_current_speed = LAUNCH_START_SPEED;
+    }
+
+    if (s_launch_time < LAUNCH_DURATION_SEC) {
+        float launch_cap = LAUNCH_START_SPEED + (LAUNCH_RAMP_RATE * s_launch_time);
+        if (target_base > launch_cap) {
+            if (target_base > 0.0f) {
+                float scale = launch_cap / target_base;
+                target_left  *= scale;
+                target_right *= scale;
+            }
+            target_base = launch_cap;
+        }
+        s_launch_time += dt;
+    }
 
     float max_pos_step = MAX_ACCEL_PER_SEC * dt;
     float max_neg_step = MAX_BRAKE_PER_SEC * dt;

@@ -20,6 +20,13 @@ typedef void GPIO_Type;
 typedef uint32_t ctimer_match_t;
 #endif
 
+#define LAUNCH_DURATION_SEC   1.5f
+#define LAUNCH_START_SPEED    20.0f
+#define LAUNCH_RAMP_RATE      40.0f
+#define MAX_ACCEL_PER_SEC     80.0f
+#define MAX_BRAKE_PER_SEC     400.0f
+
+
 typedef struct {
     CTIMER_Type   *pwmPeripheral;
     ctimer_match_t periodChannel;
