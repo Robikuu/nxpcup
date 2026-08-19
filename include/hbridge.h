@@ -9,8 +9,16 @@ extern "C" {
 #define M_PI 3.14159265358979323846
 #endif
 
+#include <stdint.h>
+
+#ifdef __arm__
 #include "fsl_ctimer.h"
 #include "fsl_gpio.h"
+#else
+typedef void CTIMER_Type;
+typedef void GPIO_Type;
+typedef uint32_t ctimer_match_t;
+#endif
 
 typedef struct {
     CTIMER_Type   *pwmPeripheral;
@@ -33,11 +41,11 @@ void HbridgeInit(Hbridge *h,
                  GPIO_Type *m1DirPort, uint32_t m1DirPin,
                  GPIO_Type *m2DirPort, uint32_t m2DirPin);
 
-void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2);
-
-void HbridgeBrake(Hbridge *h);
-
-void compute_motor_speeds(float steering_output, float *speed_left, float *speed_right);
+void  HbridgeSpeed(Hbridge *h, int16_t speed_right, int16_t speed_left);
+void  HbridgeBrake(Hbridge *h);
+void  motor_speeds_reset(void);
+float motor_speeds_get_current(void);
+void  compute_motor_speeds(float steer_cmd, float heading_err, uint8_t lines_found, float dt, float *speed_left, float *speed_right);
 
 #ifdef __cplusplus
 }

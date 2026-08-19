@@ -1,12 +1,22 @@
 #include "wifi_config.h"
-#include "peripherals.h"
-#include "fsl_lpuart.h"
-#include "fsl_debug_console.h"
 #include "hbridge.h"
-#include "servo.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+
+#ifdef __arm__
+#include "peripherals.h"
+#include "fsl_lpuart.h"
+#include "fsl_debug_console.h"
+#include "servo.h"
+#else
+#define LP_FLEXCOMM9_PERIPHERAL ((void *)0)
+#define kLPUART_RxDataRegFullFlag 0
+static inline void LPUART_WriteBlocking(void *b, const uint8_t *d, size_t l) { (void)b; (void)d; (void)l; }
+static inline uint32_t LPUART_GetStatusFlags(void *b) { (void)b; return 0; }
+static inline uint8_t LPUART_ReadByte(void *b) { (void)b; return 0; }
+static inline void Steer(float angle) { (void)angle; }
+#endif
 
 #define CMD_BUF_SIZE 64
 
@@ -17,28 +27,20 @@ static size_t s_cmd_idx = 0;
 
 void params_init(void)
 {
-    g_params.kp = 0.5f;
-    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
-    g_params.kd = 0.05f;
-    g_params.k_cte     = 1.0f;
-    g_params.k_heading = 0.0f;
-    g_params.kp = 0.5f;
-    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
-    g_params.kd = 0.05f;
-    g_params.k_cte     = 1.0f;
-    g_params.k_heading = 0.0f;
+    g_params.kp        = 1.40f;
+    g_params.ki        = 0.00f;    /* keep 0 until P+D are tuned */
+    g_params.kd        = 0.35f;
+    g_params.k_cte     = 1.00f;
+    g_params.k_heading = 10.00f;
 
-    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
-    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
+    g_params.dt        = 0.02f;   /* CRITICAL — must be nonzero */
+    g_params.alpha     = 0.20f;   /* CRITICAL — must be in (0, 1] */
 
-    g_params.base_speed_left  = 20.0f;   /* replaces base_speed */
-    g_params.base_speed_right = 20.0f;
+    g_params.base_speed_left  = 38.0f;   /* replaces base_speed */
+    g_params.base_speed_right = 38.0f;
     g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
     g_params.max_speed_right  = 80.0f;
 
-    g_params.steering_offset = 0.0f;
     g_params.steering_offset = 0.0f;
     g_params.state           = STATE_IDLE;
 }
@@ -82,7 +84,6 @@ static void command_execute(char *cmd)
         if (klen >= sizeof(keyword)) klen = sizeof(keyword) - 1;
         memcpy(keyword, cmd, klen);
         keyword[klen] = '\0';
-        if (sscanf(space + 1, "%f", &val) == 1)
         if (sscanf(space + 1, "%f", &val) == 1)
             has_val = 1;
     } else {
