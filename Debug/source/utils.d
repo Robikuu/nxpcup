@@ -108,7 +108,9 @@ source/utils.o source/utils.d: ../source/utils.c \
  /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_lpi2c.h \
  /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_lpi2c_edma.h \
  /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_lpi2c.h \
- /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_edma.h
+ /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_edma.h \
+ /home/robert/facultate/Practica/workspace/nxpcup/include/hbridge.h \
+ ../source/control_theory.h
 /home/robert/facultate/Practica/workspace/nxpcup/source/mcux_config.h:
 ../source/utils.h:
 /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_gpio.h:
@@ -219,3 +221,5 @@ source/utils.o source/utils.d: ../source/utils.c \
 /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_lpi2c_edma.h:
 /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_lpi2c.h:
 /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_edma.h:
+/home/robert/facultate/Practica/workspace/nxpcup/include/hbridge.h:
+../source/control_theory.h:
