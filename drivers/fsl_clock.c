@@ -329,19 +329,23 @@ status_t CLOCK_SetupExtRefClocking(uint32_t iFreq)
  */
 status_t CLOCK_SetupOsc32KClocking(uint32_t id)
 {
-    /* Enable LDO */
-    SCG0->LDOCSR |= SCG_LDOCSR_LDOEN_MASK | SCG_LDOCSR_VOUT_OK_MASK;
+    uint32_t temp32 = 0U;
 
-    VBAT0->OSCCTLA =
-        (VBAT0->OSCCTLA & ~(VBAT_OSCCTLA_MODE_EN_MASK | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK)) |
-        VBAT_OSCCTLA_MODE_EN(0x0) | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK;
-    VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(0xFFF7E);
+    /* Enable LDO */
+    SCG0->LDOCSR |= SCG_LDOCSR_LDOEN_MASK;
+
+    temp32 = (VBAT0->OSCCTLA & ~(VBAT_OSCCTLA_MODE_EN_MASK | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK)) |
+             VBAT_OSCCTLA_MODE_EN(0x0) | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK;
+    VBAT0->OSCCTLA = temp32;
+    VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(~temp32);
+
     /* Wait for STATUSA[OSC_RDY] to set. */
     while ((VBAT0->STATUSA & VBAT_STATUSA_OSC_RDY_MASK) == 0U)
     {
     }
-    VBAT0->OSCLCKA = VBAT_OSCLCKA_LOCK_MASK;
-    VBAT0->OSCLCKB &= ~VBAT_OSCLCKA_LOCK_MASK;
+
+    /* Clear CAP_SEL */
+    VBAT0->OSCCTLA &= ~(VBAT_OSCCTLA_EXTAL_CAP_SEL_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL_MASK);
 
     VBAT0->OSCCLKE |= VBAT_OSCCLKE_CLKE(id);
 
@@ -378,6 +382,7 @@ status_t CLOCK_SetupOsc32KClocking(uint32_t id)
  *   config->extalCap = kVBAT_OscExtal22pFCap;
  *   config->ampGain  = kVBAT_OscCoarseAdjustment05;
  *   config->id       = kCLOCK_Osc32kToVbat;
+ *   config->updateTrim = false
  * @param   config: Pointer to a configuration structure
  */
 void CLOCK_GetDefaultOsc32KConfig(osc_32k_config_t *config)
@@ -387,13 +392,14 @@ void CLOCK_GetDefaultOsc32KConfig(osc_32k_config_t *config)
     config->dlyTrim  = kVBAT_OscDlyTrim5;
     config->cap2Trim = kVBAT_OscCap2Trim0;
     config->cmpTrim  = kVBAT_OscCmpTrim760mv;
-    
+
     config->mode     = kVBAT_OscNormalModeEnable;
     config->xtalCap  = kVBAT_OscXtal24pFCap;
     config->extalCap = kVBAT_OscExtal22pFCap;
     config->ampGain  = kVBAT_OscCoarseAdjustment05;
-    
-    config->id = kCLOCK_Osc32kToVbat;
+
+    config->id         = kCLOCK_Osc32kToVbat;
+    config->updateTrim = false;
 }
 
 /**
@@ -403,28 +409,81 @@ void CLOCK_GetDefaultOsc32KConfig(osc_32k_config_t *config)
  */
 status_t CLOCK_SetupOsc32KClockingConfig(osc_32k_config_t config)
 {
-    uint32_t temp32;
+    uint32_t temp32      = 0U;
+    uint32_t oscctlaMask = 0U;
 
     /* Enable LDO */
-    SCG0->LDOCSR |= SCG_LDOCSR_LDOEN_MASK | SCG_LDOCSR_VOUT_OK_MASK;
+    SCG0->LDOCSR |= SCG_LDOCSR_LDOEN_MASK;
 
-    temp32 = VBAT_OSCCFGA_INIT_TRIM(config.initTrim) | VBAT_OSCCFGA_CAP_TRIM(config.capTrim) | VBAT_OSCCFGA_DLY_TRIM(config.dlyTrim) |
-    		VBAT_OSCCFGA_CAP2_TRIM(config.cap2Trim) | VBAT_OSCCFGA_CMP_TRIM(config.cmpTrim);
-    VBAT0->OSCCFGA = temp32;
-    VBAT0->OSCCFGB = VBAT_OSCCFGB_INVERSE(~temp32);
+    oscctlaMask =
+        (VBAT_OSCCTLA_MODE_EN_MASK | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK |
+         VBAT_OSCCTLA_XTAL_CAP_SEL_MASK | VBAT_OSCCTLA_EXTAL_CAP_SEL_MASK | VBAT_OSCCTLA_COARSE_AMP_GAIN_MASK);
 
-    temp32 =
-        (VBAT0->OSCCTLA & ~(VBAT_OSCCTLA_MODE_EN_MASK | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_OSC_EN_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL_MASK | VBAT_OSCCTLA_EXTAL_CAP_SEL_MASK | VBAT_OSCCTLA_COARSE_AMP_GAIN_MASK)) |
-        VBAT_OSCCTLA_MODE_EN(config.mode) | VBAT_OSCCTLA_OSC_EN_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL(config.xtalCap) |
-		VBAT_OSCCTLA_EXTAL_CAP_SEL(config.extalCap) | VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_COARSE_AMP_GAIN(config.ampGain);
-
-
-    VBAT0->OSCCTLA = temp32;
-    VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(~temp32);
-
-    /* Wait for STATUSA[OSC_RDY] to set. */
-    while ((VBAT0->STATUSA & VBAT_STATUSA_OSC_RDY_MASK) == 0U)
+    if (config.updateTrim)
     {
+        temp32 = VBAT_OSCCFGA_INIT_TRIM(config.initTrim) | VBAT_OSCCFGA_CAP_TRIM(config.capTrim) |
+                 VBAT_OSCCFGA_DLY_TRIM(config.dlyTrim) | VBAT_OSCCFGA_CAP2_TRIM(config.cap2Trim) |
+                 VBAT_OSCCFGA_CMP_TRIM(config.cmpTrim);
+        VBAT0->OSCCFGA = temp32;
+        VBAT0->OSCCFGB = VBAT_OSCCFGB_INVERSE(~temp32);
+    }
+
+    if (config.mode == kVBAT_OscLowpowerModeEnable)
+    {
+        /* Set INIT_TRIM to a known startup value before entering startup/low power sequence. */
+        temp32         = (VBAT0->OSCCFGA & ~VBAT_OSCCFGA_INIT_TRIM_MASK) | VBAT_OSCCFGA_INIT_TRIM(3U);
+        VBAT0->OSCCFGA = temp32;
+        VBAT0->OSCCFGB = VBAT_OSCCFGB_INVERSE(~temp32);
+
+        /* Low power mode sequence: enter startup mode first, then switch to low power mode. */
+        temp32 = (VBAT0->OSCCTLA & ~oscctlaMask) | VBAT_OSCCTLA_MODE_EN(kVBAT_OscStartupModeEnable) |
+                 VBAT_OSCCTLA_OSC_EN_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL(config.xtalCap) |
+                 VBAT_OSCCTLA_EXTAL_CAP_SEL(config.extalCap) | VBAT_OSCCTLA_CAP_SEL_EN_MASK |
+                 VBAT_OSCCTLA_COARSE_AMP_GAIN(config.ampGain);
+        VBAT0->OSCCTLA = temp32;
+        VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(~temp32);
+
+        /* Wait for STATUSA[OSC_RDY] to set. */
+        while ((VBAT0->STATUSA & VBAT_STATUSA_OSC_RDY_MASK) == 0U)
+        {
+        }
+
+        /* Clear INIT_TRIM after oscillator is ready. */
+        temp32         = (VBAT0->OSCCFGA & ~VBAT_OSCCFGA_INIT_TRIM_MASK);
+        VBAT0->OSCCFGA = temp32;
+        VBAT0->OSCCFGB = VBAT_OSCCFGB_INVERSE(~temp32);
+
+        /* Switch to low power mode. Cap selections are forced to 0. */
+        temp32 = (VBAT0->OSCCTLA & ~oscctlaMask) | VBAT_OSCCTLA_MODE_EN(kVBAT_OscLowpowerModeEnable) |
+                 VBAT_OSCCTLA_OSC_EN_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL(0U) | VBAT_OSCCTLA_EXTAL_CAP_SEL(0U) |
+                 VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_COARSE_AMP_GAIN(config.ampGain);
+        VBAT0->OSCCTLA = temp32;
+        VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(~temp32);
+
+        /* Wait for STATUSA[OSC_RDY] to set. */
+        while ((VBAT0->STATUSA & VBAT_STATUSA_OSC_RDY_MASK) == 0U)
+        {
+        }
+    }
+    else
+    {
+        /* Normal/startup mode sequence. */
+        temp32 = (VBAT0->OSCCTLA & ~oscctlaMask) | VBAT_OSCCTLA_MODE_EN(config.mode) | VBAT_OSCCTLA_OSC_EN_MASK |
+                 VBAT_OSCCTLA_XTAL_CAP_SEL(config.xtalCap) | VBAT_OSCCTLA_EXTAL_CAP_SEL(config.extalCap) |
+                 VBAT_OSCCTLA_CAP_SEL_EN_MASK | VBAT_OSCCTLA_COARSE_AMP_GAIN(config.ampGain);
+        VBAT0->OSCCTLA = temp32;
+        VBAT0->OSCCTLB = VBAT_OSCCTLB_INVERSE(~temp32);
+
+        /* Wait for STATUSA[OSC_RDY] to set. */
+        while ((VBAT0->STATUSA & VBAT_STATUSA_OSC_RDY_MASK) == 0U)
+        {
+        }
+
+        if (config.mode == kVBAT_OscNormalModeEnable)
+        {
+            /* Clear CAP_SEL */
+            VBAT0->OSCCTLA &= ~(VBAT_OSCCTLA_EXTAL_CAP_SEL_MASK | VBAT_OSCCTLA_XTAL_CAP_SEL_MASK);
+        }
     }
 
     VBAT0->OSCCLKE |= VBAT_OSCCLKE_CLKE(config.id);
@@ -481,7 +540,8 @@ status_t CLOCK_FROHFTrimConfig(firc_trim_config_t config)
     }
 
     /* Set trim mode. */
-    SCG0->FIRCCSR = (SCG0->FIRCCSR & ~(SCG_FIRCCSR_FIRCTREN_MASK | SCG_FIRCCSR_FIRCTRUP_MASK)) | (uint32_t)config.trimMode;
+    SCG0->FIRCCSR =
+        (SCG0->FIRCCSR & ~(SCG_FIRCCSR_FIRCTREN_MASK | SCG_FIRCCSR_FIRCTRUP_MASK)) | (uint32_t)config.trimMode;
 
     if ((SCG0->FIRCCSR & SCG_FIRCCSR_FIRCVLD_MASK) == 0U)
     {
@@ -517,7 +577,8 @@ status_t CLOCK_FRO12MTrimConfig(sirc_trim_config_t config)
     }
 
     /* Set trim mode. */
-    SCG0->SIRCCSR = (SCG0->SIRCCSR & ~(SCG_SIRCCSR_SIRCTREN_MASK | SCG_SIRCCSR_SIRCTRUP_MASK)) | (uint32_t)config.trimMode;
+    SCG0->SIRCCSR =
+        (SCG0->SIRCCSR & ~(SCG_SIRCCSR_SIRCTREN_MASK | SCG_SIRCCSR_SIRCTRUP_MASK)) | (uint32_t)config.trimMode;
 
     if ((SCG0->SIRCCSR & SCG_SIRCCSR_SIRCVLD_MASK) == 0U)
     {
@@ -682,7 +743,14 @@ status_t CLOCK_SetFLASHAccessCyclesForFreq(uint32_t system_freq_hz, run_mode_t m
         }
         case (uint32_t)kOD_Mode:
         {
+#if defined(MCXN556S_cm33_core0_SERIES) || defined(MCXN556S_cm33_core1_SERIES) || \
+    defined(MCXN557S_cm33_core0_SERIES) || defined(MCXN557S_cm33_core1_SERIES) || \
+    defined(CPU_MCXN556TCDF_cm33_core0) || defined(CPU_MCXN556TCDF_cm33_core1) || \
+    defined(CPU_MCXN557TCDF_cm33_core0) || defined(CPU_MCXN557TCDF_cm33_core1)
+            if (system_freq_hz > 170000000U)
+#else
             if (system_freq_hz > 150000000U)
+#endif
             {
                 return kStatus_Fail;
             }
@@ -768,9 +836,11 @@ void VBAT_SetOscConfig(VBAT_Type *base, const vbat_osc_config_t *config)
  */
 void CLOCK_AttachClk(clock_attach_id_t connection)
 {
-    uint16_t mux;
+    assert(connection < kNONE_to_NONE);
+
+    uint32_t mux;
     uint8_t sel;
-    uint16_t item;
+    uint32_t item;
     uint32_t tmp32 = (uint32_t)connection;
     uint32_t i;
     volatile uint32_t *pClkSel;
@@ -785,10 +855,10 @@ void CLOCK_AttachClk(clock_attach_id_t connection)
             {
                 break;
             }
-            item = (uint16_t)GET_ID_ITEM(tmp32);
+            item = (uint32_t)GET_ID_ITEM(tmp32);
             if (item != 0U)
             {
-                mux = (uint16_t)GET_ID_ITEM_MUX(item);
+                mux = (uint32_t)GET_ID_ITEM_MUX(item);
                 sel = (uint8_t)GET_ID_ITEM_SEL(item);
                 if (mux == CM_SCGRCCRSCSCLKSEL)
                 {
@@ -799,7 +869,10 @@ void CLOCK_AttachClk(clock_attach_id_t connection)
                 }
                 else
                 {
-                    ((volatile uint32_t *)pClkSel)[mux] = sel;
+                    if (mux <= CM_I3C1FCLKSSEL)
+                    {
+                        pClkSel[mux] = sel;
+                    }
                 }
             }
             tmp32 = GET_ID_NEXT_ITEM(tmp32); /* pick up next descriptor */
@@ -817,7 +890,9 @@ void CLOCK_AttachClk(clock_attach_id_t connection)
  */
 clock_attach_id_t CLOCK_GetClockAttachId(clock_attach_id_t attachId)
 {
-    uint16_t mux;
+    assert(attachId < kNONE_to_NONE);
+
+    uint32_t mux;
     uint32_t actualSel;
     uint32_t tmp32 = (uint32_t)attachId;
     uint32_t i;
@@ -834,7 +909,7 @@ clock_attach_id_t CLOCK_GetClockAttachId(clock_attach_id_t attachId)
 
     for (i = 0U; i < 2U; i++)
     {
-        mux = (uint16_t)GET_ID_ITEM_MUX(tmp32);
+        mux = (uint32_t)GET_ID_ITEM_MUX(tmp32);
         if (tmp32 != 0UL)
         {
             if (mux == CM_SCGRCCRSCSCLKSEL)
@@ -843,18 +918,29 @@ clock_attach_id_t CLOCK_GetClockAttachId(clock_attach_id_t attachId)
             }
             else
             {
-                actualSel = (uint32_t)((volatile uint32_t *)pClkSel)[mux];
+                if (mux <= CM_I3C1FCLKSSEL)
+                {
+                    actualSel = pClkSel[mux];
+                }
+                else
+                {
+                    actualSel = 0U;
+                }
             }
 
             /* Consider the combination of two registers */
-            actualAttachId |= CLK_ATTACH_ID(mux, actualSel, i);
+            if (actualSel < UINT32_MAX)
+            {
+                actualAttachId |= CLK_ATTACH_ID(mux, actualSel, i);
+            }
         }
         tmp32 = GET_ID_NEXT_ITEM(tmp32); /*!<  pick up next descriptor */
     }
 
     actualAttachId |= selector;
+    assert(actualAttachId < (uint32_t)kNONE_to_NONE);
 
-    return (clock_attach_id_t)actualAttachId;
+    return (actualAttachId < (uint32_t)kNONE_to_NONE) ? (clock_attach_id_t)actualAttachId : kNONE_to_NONE;
 }
 
 /* Set IP Clock Divider */
@@ -869,17 +955,40 @@ void CLOCK_SetClkDiv(clock_div_name_t div_name, uint32_t divided_by_value)
     volatile uint32_t *pClkDiv;
 
     pClkDiv = &(SYSCON->SYSTICKCLKDIV[0]);
-    /* halt and reset clock dividers */
-    ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = 0x3UL << 29U;
 
-    if (divided_by_value == 0U) /*!<  halt */
+    /* Early exit: current DIV value already matches the requested value,
+     * and the divider is not in halt state */
+    if ((divided_by_value != 0U) &&
+        ((((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] & (1UL << 30U)) == 0U) &&
+        ((((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] & 0xFFU) == (divided_by_value - 1U)))
     {
-        ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = 1UL << 30U;
+        return;
+    }
+
+    /* AHBCLKDIV does not support HALT(bit30) or RESET(bit29);
+     * writing those bits would corrupt reserved fields. Write the DIV value directly. */
+    if (div_name == kCLOCK_DivAhbClk)
+    {
+        ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = (divided_by_value == 0U) ? 0U : (divided_by_value - 1U);
     }
     else
     {
-        ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = (divided_by_value - 1U);
+        /* halt and reset clock dividers */
+        ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = 0x3UL << 29U;
+
+        if (divided_by_value == 0U) /*!<  halt */
+        {
+            ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = 1UL << 30U;
+        }
+        else
+        {
+            /* Write new DIV value while keeping HALT bit set */
+            ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] = (divided_by_value - 1U) | (1UL << 30U);
+            /* Clear HALT bit to start the divider with the new value */
+            ((volatile uint32_t *)pClkDiv)[(uint32_t)div_name] &= ~(1UL << 30U);
+        }
     }
+
 }
 
 /* Get IP clock dividers */
@@ -2828,7 +2937,14 @@ static pll_error_t CLOCK_GetPllConfig(uint32_t finHz, uint32_t foutHz, pll_setup
     s_PllSetupCacheStruct[s_PllSetupCacheIdx].pllsscg[0] = pSetup->pllsscg[0];
     s_PllSetupCacheStruct[s_PllSetupCacheIdx].pllsscg[1] = pSetup->pllsscg[1];
     /* Update the index for next available buffer. */
-    s_PllSetupCacheIdx = (s_PllSetupCacheIdx + 1U) % CLOCK_USR_CFG_PLL_CONFIG_CACHE_COUNT;
+    if (s_PllSetupCacheIdx < ((uint32_t)CLOCK_USR_CFG_PLL_CONFIG_CACHE_COUNT - 1U))
+    {
+        s_PllSetupCacheIdx++;
+    }
+    else
+    {
+        s_PllSetupCacheIdx = 0U;
+    }
 #endif /* CLOCK_USR_CFG_PLL_CONFIG_CACHE_COUNT */
 
     return retErr;
@@ -2977,7 +3093,8 @@ static pll_error_t CLOCK_GetPllConfigInternal(uint32_t finHz, uint32_t foutHz, p
         fc = ((uint64_t)(uint32_t)(fccoHz % nDivOutHz) << 25UL) / nDivOutHz;
 
         /* Set multiplier */
-        pSetup->pllsscg[0] = (uint32_t)(PLL_SSCG_MD_INT_SET(pllMultiplier) | PLL_SSCG_MD_FRACT_SET((uint32_t)fc));
+        pSetup->pllsscg[0] =
+            (uint32_t)((PLL_SSCG_MD_INT_SET(pllMultiplier) | PLL_SSCG_MD_FRACT_SET((uint32_t)fc)) & 0xFFFFFFFFU);
         pSetup->pllsscg[1] = (uint32_t)(PLL_SSCG_MD_INT_SET(pllMultiplier) >> 32U) | SCG_APLLSSCG1_SEL_SS_MDIV_MASK;
     }
 
@@ -3119,12 +3236,14 @@ bool CLOCK_EnableUsbhsPhyPllClock(clock_usb_phy_src_t src, uint32_t freq)
 
     USBPHY->CTRL_CLR    = USBPHY_CTRL_SFTRST_MASK;
     USBPHY->ANACTRL_SET = USBPHY_ANACTRL_LVI_EN_MASK;
-    USBPHY->PLL_SIC_SET = (USBPHY_PLL_SIC_PLL_POWER(1) | USBPHY_PLL_SIC_PLL_REG_ENABLE_MASK);
+    USBPHY->PLL_SIC_SET = USBPHY_PLL_SIC_PLL_REG_ENABLE_MASK;
+    SDK_DelayAtLeastUs(15U, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+    USBPHY->PLL_SIC_SET = USBPHY_PLL_SIC_PLL_POWER(1);
     if ((480000000UL % freq) != 0UL)
     {
         return false;
     }
-    multiplier = (uint16_t)(480000000UL / freq);
+    multiplier = (uint16_t)((480000000UL / freq) & 0xFFFFU);
 
     switch (multiplier)
     {
