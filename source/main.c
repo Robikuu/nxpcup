@@ -12,23 +12,33 @@
 #include "servo.h"
 #include "esc.h"
 #include <math.h>
+#include <stdio.h>
 #include "fsl_lpuart.h"
 #include "control_theory.h"
 #include "fsl_gpio.h"
 #include "utils.h"
 #include "vectors.h"
 #include "wifi_config.h"
+#include "fsl_ctimer.h"
+#include "fsl_mrt.h"
 
 #define MAX_VECTORS 10
 #define LINE_LOST_LIMIT    5
-
-
-
 
 /* Convert ground-space errors to cm / degrees so the existing gains
    (tuned for pixel/degree-ish scales) stay meaningful. */
 #define CTE_TO_CM          100.0f
 #define HEADING_TO_DEG     (180.0f / (float)M_PI)
+#define TICK_CHANNEL kMRT_Channel_0
+#define TIMER_CLOCK_HZ 150000000U
+
+volatile bool g_tickFlag = false;
+
+void MRT0_IRQHandler(void) {
+	MRT_ClearStatusFlags(MRT0, TICK_CHANNEL, kMRT_TimerInterruptFlag);
+	g_tickFlag = true;
+	SDK_ISR_EXIT_BARRIER;
+}
 
 int main(void)
 {
@@ -83,84 +93,129 @@ int main(void)
     //also go over cum sunt vectori parsati si sa incercam cumva sa le normalizam directia lor
 
     /* ---------- 6. Main loop ---------- */
+//    ctimer_config_t timer_config;
+//    CTIMER_GetDefaultConfig(&timer_config);
+//    timer_config.mode     = kCTIMER_TimerMode;
+//    timer_config.prescale = 0;                 // no prescale = full 150MHz resolution
+//
+//    CTIMER_Init(CTIMER1, &timer_config);
+//    CTIMER_StartTimer(CTIMER1);
+
+    CLOCK_EnableClock(kCLOCK_Mrt);           // ungate MRT0's clock
+
+	mrt_config_t mrtConfig;
+	MRT_GetDefaultConfig(&mrtConfig);
+	MRT_Init(MRT0, &mrtConfig);
+
+	MRT_SetupChannelMode(MRT0, TICK_CHANNEL, kMRT_RepeatMode);
+	MRT_EnableInterrupts(MRT0, TICK_CHANNEL, kMRT_TimerInterruptEnable);
+	EnableIRQ(MRT0_IRQn);
+
+	uint32_t mrtClockHz = CLOCK_GetFreq(kCLOCK_BusClk); // see note below
+	MRT_StartTimer(MRT0, TICK_CHANNEL, MSEC_TO_COUNT(20, mrtClockHz));
+
+    uint32_t max_time = 0;
+    uint32_t tick_count = 0;
+
     while (1) {
-        command_poll();
+    	if (g_tickFlag) {
+    		g_tickFlag = false;
+    		tick_count ++;
 
-        /* live-update gains from remote tuning (no pid_init re-call!) */
-        steer_pid.kp    = g_params.kp;
-        steer_pid.ki    = g_params.ki;
-        steer_pid.kd    = g_params.kd;
-        steer_pid.alpha = g_params.alpha;
+    		if(tick_count % 50 == 0) {
+    			printf("ticks: %u\n", tick_count);
+    		}
 
-        if (g_params.state == STATE_RUNNING) {
+        	//uint32_t start = CTIMER_GetTimerCountValue(CTIMER1);
+            command_poll();
 
-            status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
+            /* live-update gains from remote tuning (no pid_init re-call!) */
+            steer_pid.kp    = g_params.kp;
+            steer_pid.ki    = g_params.ki;
+            steer_pid.kd    = g_params.kd;
+            steer_pid.alpha = g_params.alpha;
 
-            if (s != kStatus_Success || num_vectors == 0) {
-                /* camera failure and "no line" get identical treatment */
-                if (++line_lost_counter > LINE_LOST_LIMIT) {
-                    HbridgeBrake(&g_hbridge);
-                }
-            } else {
+            if (1) {
 
-                lane_result_t lane = compute_lane_center(vectors, num_vectors);
+                status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
 
-                if (lane.lines_found == 0) {
-                    /* all vectors filtered out — treat as line lost */
+                if (s != kStatus_Success || num_vectors == 0) {
+                    /* camera failure and "no line" get identical treatment */
                     if (++line_lost_counter > LINE_LOST_LIMIT) {
                         HbridgeBrake(&g_hbridge);
                     }
                 } else {
-                    line_lost_counter = 0;
 
-                    /* raw errors: lateral offset (cm) + heading (deg) */
-                    float e_cte     = lane.cte * CTE_TO_CM;
-                    float e_heading = lane.heading * HEADING_TO_DEG;
+                    lane_result_t lane = compute_lane_center(vectors, num_vectors);
 
-                    /* EMA filter on CTE to smooth frame-to-frame noise */
-                    if (!cte_filter_init) {
-                        filtered_cte    = e_cte;
-                        cte_filter_init = 1;
+                    if (lane.lines_found == 0) {
+                        /* all vectors filtered out — treat as line lost */
+                        if (++line_lost_counter > LINE_LOST_LIMIT) {
+                            HbridgeBrake(&g_hbridge);
+                        }
                     } else {
-                        filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                        line_lost_counter = 0;
+
+                        /* raw errors: lateral offset (cm) + heading (deg) */
+                        float e_cte     = lane.cte * CTE_TO_CM;
+                        float e_heading = lane.heading * HEADING_TO_DEG;
+
+                        /* EMA filter on CTE to smooth frame-to-frame noise */
+                        if (!cte_filter_init) {
+                            filtered_cte    = e_cte;
+                            cte_filter_init = 1;
+                        } else {
+                            filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                        }
+
+                        /* combined error using filtered CTE */
+                        float combined = g_params.k_cte * filtered_cte
+                                       + g_params.k_heading * e_heading;
+
+                        float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+
+                        /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
+                        esp_printf("L:%u R:%d F:%d S:%d\r\n",
+                                   (unsigned)lane.lines_found,
+                                   (int)(e_cte * 10.0f),
+                                   (int)(filtered_cte * 10.0f),
+                                   (int)(steer_cmd * 10.0f));
+
+                        Steer(steer_cmd + g_params.steering_offset);
+
+                        HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
                     }
-
-                    /* combined error using filtered CTE */
-                    float combined = g_params.k_cte * filtered_cte
-                                   + g_params.k_heading * e_heading;
-
-                    float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
-
-                    /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
-                    esp_printf("L:%u R:%d F:%d S:%d\r\n",
-                               (unsigned)lane.lines_found,
-                               (int)(e_cte * 10.0f),
-                               (int)(filtered_cte * 10.0f),
-                               (int)(steer_cmd * 10.0f));
-
-                    Steer(steer_cmd + g_params.steering_offset);
-
-                    HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
                 }
+
+            } else {
+                /* IDLE: clear controller state so next run starts clean */
+                steer_pid.integral         = 0.0f;
+                steer_pid.prev_measurement = 0.0f;
+                steer_pid.d_filtered       = 0.0f;
+                steer_pid.prev_output      = 0.0f;
+                steer_pid.initialized      = 0;
+                line_lost_counter          = 0;
+                filtered_cte               = 0.0f;
+                cte_filter_init            = 0;
+                HbridgeBrake(&g_hbridge);
             }
 
-        } else {
-            /* IDLE: clear controller state so next run starts clean */
-            steer_pid.integral         = 0.0f;
-            steer_pid.prev_measurement = 0.0f;
-            steer_pid.d_filtered       = 0.0f;
-            steer_pid.prev_output      = 0.0f;
-            steer_pid.initialized      = 0;
-            line_lost_counter          = 0;
-            filtered_cte               = 0.0f;
-            cte_filter_init            = 0;
-            HbridgeBrake(&g_hbridge);
-        }
+            if (button_pressed_edge()) {
+                g_params.state = STATE_IDLE;
+                HbridgeBrake(&g_hbridge);
+                PRINTF("Button: STOPPED\r\n");
+            }
+    //        uint32_t end = CTIMER_GetTimerCountValue(CTIMER1);
+    //        uint32_t ticks = end - start;   // unsigned subtraction handles wraparound safely
+    //
+    //        uint32_t elapsed_us = (uint32_t)(((uint64_t)ticks * 1000000u) / TIMER_CLOCK_HZ);
+    //        if (elapsed_us > (uint32_t)max_time) {
+    //            max_time = elapsed_us;
+    //        }
+    //
+    //        printf("us = %u\nmax = %u\n", elapsed_us, max_time);
+    	}
 
-        if (button_pressed_edge()) {
-            g_params.state = STATE_IDLE;
-            HbridgeBrake(&g_hbridge);
-            PRINTF("Button: STOPPED\r\n");
-        }
+
     }
 }

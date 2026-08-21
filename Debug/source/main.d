@@ -118,7 +118,8 @@ source/main.o source/main.d: ../source/main.c \
  /home/robert/facultate/Practica/workspace/nxpcup/include/servo.h \
  /home/robert/facultate/Practica/workspace/nxpcup/include/esc.h \
  ../source/control_theory.h ../source/utils.h ../source/vectors.h \
- ../source/wifi_config.h
+ ../source/wifi_config.h \
+ /home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_mrt.h
 /home/robert/facultate/Practica/workspace/nxpcup/source/mcux_config.h:
 /home/robert/facultate/Practica/workspace/nxpcup/device/fsl_device_registers.h:
 /home/robert/facultate/Practica/workspace/nxpcup/device/MCXN947_cm33_core0.h:
@@ -241,3 +242,4 @@ source/main.o source/main.d: ../source/main.c \
 ../source/utils.h:
 ../source/vectors.h:
 ../source/wifi_config.h:
+/home/robert/facultate/Practica/workspace/nxpcup/drivers/fsl_mrt.h:
