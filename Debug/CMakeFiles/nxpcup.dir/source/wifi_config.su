@@ -1,0 +1,8 @@
+C:/Users/becbu/Downloads/fratee/drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:20:6:params_init	4	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:48:13:send_ack	16	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:54:13:send_ack_dbl	88	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:65:12:append_flt	56	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:75:13:command_execute	368	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:207:6:command_poll	16	static
+C:/Users/becbu/Downloads/fratee/source/wifi_config.c:228:6:esp_printf	152	static

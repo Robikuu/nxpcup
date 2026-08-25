@@ -1,3 +1,0 @@
-../source/vectors.c:17:6:pixel_to_ground	40	static
-../source/vectors.c:34:6:print_vector_details	64	static
-../source/vectors.c:74:15:compute_lane_center	424	static

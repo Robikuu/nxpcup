@@ -118,16 +118,17 @@ int main(void)
     uint32_t tick_count = 0;
 
     while (1) {
+command_poll();
     	if (g_tickFlag) {
     		g_tickFlag = false;
     		tick_count ++;
 
-    		if(tick_count % 50 == 0) {
-    			printf("ticks: %u\n", tick_count);
-    		}
+    		// if(tick_count % 50 == 0) {
+    		// 	printf("ticks: %u\n", tick_count);
+    		// }
 
         	//uint32_t start = CTIMER_GetTimerCountValue(CTIMER1);
-            command_poll();
+            
 
             /* live-update gains from remote tuning (no pid_init re-call!) */
             steer_pid.kp    = g_params.kp;
@@ -135,13 +136,20 @@ int main(void)
             steer_pid.kd    = g_params.kd;
             steer_pid.alpha = g_params.alpha;
 
-            if (1) {
+            if (g_params.state == STATE_RUNNING) {
 
                 status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
 
                 if (s != kStatus_Success || num_vectors == 0) {
                     /* camera failure and "no line" get identical treatment */
                     if (++line_lost_counter > LINE_LOST_LIMIT) {
+                        steer_pid.integral = 0.0f;
+                        steer_pid.prev_measurement = 0.0f;
+                        steer_pid.d_filtered = 0.0f;
+                        steer_pid.prev_output = 0.0f;
+                        steer_pid.initialized = 0;
+                        filtered_cte = 0.0f;
+                        cte_filter_init = 0;
                         HbridgeBrake(&g_hbridge);
                     }
                 } else {
@@ -151,6 +159,13 @@ int main(void)
                     if (lane.lines_found == 0) {
                         /* all vectors filtered out — treat as line lost */
                         if (++line_lost_counter > LINE_LOST_LIMIT) {
+                            steer_pid.integral = 0.0f;
+                            steer_pid.prev_measurement = 0.0f;
+                            steer_pid.d_filtered = 0.0f;
+                            steer_pid.prev_output = 0.0f;
+                            steer_pid.initialized = 0;
+                            filtered_cte = 0.0f;
+                            cte_filter_init = 0;
                             HbridgeBrake(&g_hbridge);
                         }
                     } else {
@@ -168,18 +183,19 @@ int main(void)
                             filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
                         }
 
-                        /* combined error using filtered CTE */
+                        /* Combine lateral and heading errors before PID control. */
                         float combined = g_params.k_cte * filtered_cte
                                        + g_params.k_heading * e_heading;
 
                         float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                        /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
-                        esp_printf("L:%u R:%d F:%d S:%d\r\n",
-                                   (unsigned)lane.lines_found,
-                                   (int)(e_cte * 10.0f),
-                                   (int)(filtered_cte * 10.0f),
-                                   (int)(steer_cmd * 10.0f));
+                        esp_printf("L:%u CTE:%d F:%d H:%d E:%d OUT:%d\r\n",
+                               (unsigned)lane.lines_found,
+                               (int)(e_cte * 10.0f),
+                               (int)(filtered_cte * 10.0f),
+                               (int)(e_heading * 10.0f),
+                               (int)(combined * 10.0f),
+                               (int)(steer_cmd * 10.0f));
 
                         Steer(steer_cmd + g_params.steering_offset);
 

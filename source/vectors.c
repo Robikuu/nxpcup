@@ -64,6 +64,27 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
     esp_printf("  Angle: %d.%02d deg\r\n", ang_int, ang_frac);
 }
 
+static float closest_error(float x0, float y0, float x1, float y1)
+{
+    float a = sqrtf(x1 * x1 + y1 * y1);
+    float b = sqrtf(x0 * x0 + y0 * y0);
+    float c = sqrtf((x1 - x0) * (x1 - x0) +
+                    (y1 - y0) * (y1 - y0));
+
+    if (c < 1e-6f) {
+        return (x0 >= 0.0f) ? b : -b;
+    }
+
+    float semiperimeter = 0.5f * (a + b + c);
+    float area_squared = semiperimeter * (semiperimeter - a) *
+                         (semiperimeter - b) * (semiperimeter - c);
+    if (area_squared < 0.0f) area_squared = 0.0f;
+
+    float distance = 2.0f * sqrtf(area_squared) / c;
+    float midpoint_x = 0.5f * (x0 + x1);
+    return (midpoint_x >= 0.0f) ? distance : -distance;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Two-boundary lane centering (index-aware)                         */
 /*  vectors[] layout: 6 fields per vector                             */
@@ -78,6 +99,10 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
 
     /* --- 1. Transform to ground space, keep Pixy index --- */
     struct {
+        float   x0;
+        float   y0;
+        float   x1;
+        float   y1;
         float   x_mid;
         float   angle;
         uint8_t idx;
@@ -94,6 +119,10 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
         pixel_to_ground(u0, v0, &X0, &Y0);
         pixel_to_ground(u1, v1, &X1, &Y1);
 
+        v[n].x0 = X0;
+        v[n].y0 = Y0;
+        v[n].x1 = X1;
+        v[n].y1 = Y1;
         v[n].x_mid = (X0 + X1) * 0.5f;
         v[n].angle = atan2f(X1 - X0, Y1 - Y0);
         v[n].idx   = (uint8_t)vectors[6*i + 4];
@@ -136,30 +165,50 @@ lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
     }
 
     if (ng >= 2) {
-        /* Two or more distinct lines — find leftmost and rightmost */
-        int   gl = 0, gr = 0;
-        float xl = grp[0].x_sum / grp[0].cnt;
-        float xr = xl;
+        /* Choose the pair whose lateral separation best matches the lane. */
+        int   gl = 0;
+        int   gr = 1;
+        float best_width_error = INFINITY;
 
-        for (size_t g = 1; g < ng; g++) {
-            float avg = grp[g].x_sum / grp[g].cnt;
-            if (avg < xl) { xl = avg; gl = (int)g; }
-            if (avg > xr) { xr = avg; gr = (int)g; }
+        for (size_t left = 0; left < ng; left++) {
+            float left_x = grp[left].x_sum / grp[left].cnt;
+            for (size_t right = left + 1; right < ng; right++) {
+                float right_x = grp[right].x_sum / grp[right].cnt;
+                float width = fabsf(right_x - left_x);
+                float width_error = fabsf(width - LANE_WIDTH_M);
+
+                if (width_error < best_width_error) {
+                    best_width_error = width_error;
+                    if (left_x <= right_x) {
+                        gl = (int)left;
+                        gr = (int)right;
+                    } else {
+                        gl = (int)right;
+                        gr = (int)left;
+                    }
+                }
+            }
         }
 
+        float xl = grp[gl].x_sum / grp[gl].cnt;
+        float xr = grp[gr].x_sum / grp[gr].cnt;
         result.cte     = (xl + xr) * 0.5f;
         result.heading = (grp[gl].a_sum / grp[gl].cnt +
                           grp[gr].a_sum / grp[gr].cnt) * 0.5f;
         result.lines_found = 2;
     } else {
-        /* All vectors belong to one line — follow closest to center */
+        /* All vectors belong to one line — follow the closest segment. */
         int   best   = 0;
-        float best_d = fabsf(v[0].x_mid);
+        float best_error = closest_error(v[0].x0, v[0].y0,
+                                         v[0].x1, v[0].y1);
+        float best_d = fabsf(best_error);
         for (size_t i = 1; i < n; i++) {
-            float d = fabsf(v[i].x_mid);
+            float d = fabsf(closest_error(v[i].x0, v[i].y0,
+                                          v[i].x1, v[i].y1));
             if (d < best_d) { best_d = d; best = (int)i; }
         }
-        result.cte         = v[best].x_mid;
+        result.cte         = closest_error(v[best].x0, v[best].y0,
+                                           v[best].x1, v[best].y1);
         result.heading     = v[best].angle;
         result.lines_found = 1;
     }

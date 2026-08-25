@@ -19,7 +19,7 @@
 #define PIXY_GRID_SCALE    4.0f
 
 /* Track geometry */
-#define LANE_WIDTH_M       0.20f          /* distance between the two lane lines (meters) */
+#define LANE_WIDTH_M       0.55f          /* expected distance between lane lines (meters) */
 #define MAX_LINE_ANGLE_DEG 40.0f          /* reject lines angled more than this from forward */
 
 void pixel_to_ground(float u, float v, float *X, float *Y);

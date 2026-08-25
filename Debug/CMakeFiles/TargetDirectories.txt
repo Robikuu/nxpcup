@@ -1,0 +1,3 @@
+C:/Users/becbu/Downloads/fratee/Debug/CMakeFiles/nxpcup.dir
+C:/Users/becbu/Downloads/fratee/Debug/CMakeFiles/edit_cache.dir
+C:/Users/becbu/Downloads/fratee/Debug/CMakeFiles/rebuild_cache.dir

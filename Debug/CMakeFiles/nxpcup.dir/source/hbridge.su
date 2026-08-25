@@ -1,0 +1,5 @@
+C:/Users/becbu/Downloads/fratee/drivers/fsl_gpio.h:346:20:GPIO_PinWrite	24	static
+C:/Users/becbu/Downloads/fratee/source/hbridge.c:13:6:HbridgeInit	40	static
+C:/Users/becbu/Downloads/fratee/source/hbridge.c:34:6:HbridgeSpeed	24	static
+C:/Users/becbu/Downloads/fratee/source/hbridge.c:66:6:HbridgeBrake	16	static
+C:/Users/becbu/Downloads/fratee/source/hbridge.c:80:6:compute_motor_speeds	64	static

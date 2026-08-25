@@ -1,0 +1,4 @@
+C:/Users/becbu/Downloads/fratee/source/vectors.c:17:6:pixel_to_ground	40	static
+C:/Users/becbu/Downloads/fratee/source/vectors.c:34:6:print_vector_details	64	static
+C:/Users/becbu/Downloads/fratee/source/vectors.c:67:14:closest_error	56	static
+C:/Users/becbu/Downloads/fratee/source/vectors.c:95:15:compute_lane_center	608	static
