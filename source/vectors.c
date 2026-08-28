@@ -72,7 +72,7 @@ uint8_t pixel_to_ground(float u, float v, float *X, float *Y)
     // pixel issue above. Re-check these against your new calibration's
     // reprojection error once you have it — the plausible X/Y range may
     // shift slightly with the new, correctly-calibrated H.
-    if (Yr < 5.0f || Yr > 110.0f || fabsf(Xr) > 35.0f) {
+    if (Yr < 8.4f || Yr > 135.6f || fabsf(Xr) > (0.330f * Yr + 59.25f)) {
         return 0;
     }
 
@@ -127,6 +127,13 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 
     if (!ok0 || !ok1) {
         esp_printf("  Ground: OUT OF CALIBRATED RANGE\r\n");
+        return;
+    }
+    /* reject near-horizontal vectors so Python doesn't plot them */
+    float dX_g = X1 - X0;
+    float dY_g = Y1 - Y0;
+    if (fabsf(dY_g) < 1e-3f || fabsf(dX_g / dY_g) > 1.73f) {
+        esp_printf("  Ground: FILTERED (too horizontal)\r\n");
         return;
     }
 
@@ -203,6 +210,12 @@ uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
         uint8_t ok1 = pixel_to_ground(u1, v1, &X1, &Y1);
 
         if (!ok0 || !ok1) continue; // drop vectors outside the calibrated/plausible ground region
+
+        float dX = X1 - X0;
+        float dY_vec = Y1 - Y0;
+        if (fabsf(dY_vec) < 1e-3f || fabsf(dX / dY_vec) > 1.73f) {
+            continue;   /* slope > ~60° from forward — not a lane line */
+        }
 
         v[n].X0 = X0; v[n].Y0 = Y0;
         v[n].X1 = X1; v[n].Y1 = Y1;

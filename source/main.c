@@ -24,20 +24,44 @@
 #define MAX_VECTORS 10
 #define LINE_LOST_LIMIT    5
 
-/* Convert ground-space errors to cm / degrees so the existing gains
-   (tuned for pixel/degree-ish scales) stay meaningful. */
-#define CTE_TO_CM          100.0f
+/* heading is already in radians from compute_center_line(); convert to
+   degrees since k_heading/CORNER_HEADING_THRESHOLD_DEG are tuned in degrees.
+   cte from compute_center_line() is already in real cm -- no CTE_TO_CM
+   conversion needed (the old *100.0f here was a leftover double-scale bug). */
 #define HEADING_TO_DEG     (180.0f / (float)M_PI)
+
+/* ---- corner-detection tuning -- these are starting guesses, not
+   measured values. Tune against your actual track using print_frame_debug
+   / live_vectors.py to see what heading your real corners produce, the
+   same way everything else in this pipeline got tuned. ---- */
+#define CORNER_HEADING_THRESHOLD_DEG   20.0f
+#define CORNER_ENTER_STREAK            3   /* consecutive corner-like ticks before braking */
+#define CORNER_EXIT_STREAK             5   /* consecutive straight ticks before resuming -- higher than
+                                               ENTER on purpose: quick to get cautious, slower to fully commit again */
 
 #define TICK_CHANNEL kMRT_Channel_0
 #define TIMER_CLOCK_HZ 150000000U
 
 volatile bool g_tickFlag = false;
 
+typedef enum {
+    DRIVE_FORWARD,
+    DRIVE_BRAKING
+} drive_state_t;
+
 void MRT0_IRQHandler(void) {
 	MRT_ClearStatusFlags(MRT0, TICK_CHANNEL, kMRT_TimerInterruptFlag);
 	g_tickFlag = true;
 	SDK_ISR_EXIT_BARRIER;
+}
+
+static void reset_pid_state(pid_struct *pid)
+{
+    pid->integral         = 0.0f;
+    pid->prev_measurement = 0.0f;
+    pid->d_filtered       = 0.0f;
+    pid->prev_output      = 0.0f;
+    pid->initialized      = 0;
 }
 
 int main(void)
@@ -87,6 +111,10 @@ int main(void)
     float    filtered_cte    = 0.0f;
     int      cte_filter_init = 0;
 
+    drive_state_t drive_state    = DRIVE_FORWARD;
+    uint32_t      corner_streak  = 0;
+    uint32_t      straight_streak = 0;
+
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
     //TODO: refa main loopul si try to make it a state machine (straight, intersection, turn left, turn right, stop)
@@ -109,15 +137,11 @@ int main(void)
 
     /* ---------- 6. Main loop ---------- */
     while (1) {
+
+        command_poll();
+
         if (g_tickFlag) {
         	g_tickFlag = false;
-        	count ++;
-
-        	if (count % 50 == 0) {
-        		printf("%u\n", count);
-        	}
-
-            command_poll();
 
             /* live-update gains from remote tuning (no pid_init re-call!) */
             steer_pid.kp    = g_params.kp;
@@ -130,26 +154,65 @@ int main(void)
                 status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
 
                 if (s != kStatus_Success || num_vectors == 0) {
-                    /* camera failure and "no line" get identical treatment */
+                    /* camera failure and "no line at all" get identical treatment,
+                       unchanged from before -- this is a harder failure than a
+                       corner, so it's kept separate from the drive/brake state
+                       machine below rather than folded into it. */
                     if (++line_lost_counter > LINE_LOST_LIMIT) {
                         HbridgeBrake(&g_hbridge);
                     }
                 } else {
+                    line_lost_counter = 0;
 
-                    lane_result_t lane = compute_lane_center(vectors, num_vectors);
+                    ground_vector_t left, right;
+                    uint8_t found = select_boundary_vectors(vectors, num_vectors, &left, &right);
 
-                    if (lane.lines_found == 0) {
-                        /* all vectors filtered out — treat as line lost */
-                        if (++line_lost_counter > LINE_LOST_LIMIT) {
-                            HbridgeBrake(&g_hbridge);
+                    uint8_t confident_straight = 0;
+                    float   e_cte     = 0.0f;
+                    float   e_heading = 0.0f;
+
+                    if (found == 2) {
+                        center_line_t c = compute_center_line(&left, &right);
+                        if (c.valid) {
+                            e_cte     = c.cte;                       /* already cm */
+                            e_heading = c.heading * HEADING_TO_DEG;  /* rad -> deg */
+
+                            if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
+                                confident_straight = 1;
+                            }
                         }
+                        /* c.valid == 0 (no Y overlap between boundaries) falls
+                           through as NOT confident_straight -- this is exactly
+                           what an intersection produces, so it gets treated as
+                           corner-like/cautious rather than fed to steering. */
+                    }
+                    /* found == 0 or 1: also not confident_straight. Single-line
+                       left/right classification is still deferred, per earlier
+                       discussion -- for now this case is treated the same as a
+                       corner rather than guessed at. */
+
+                    if (confident_straight) {
+                        straight_streak = (straight_streak < CORNER_EXIT_STREAK) ? straight_streak + 1 : straight_streak;
+                        corner_streak   = 0;
                     } else {
-                        line_lost_counter = 0;
+                        corner_streak   = (corner_streak < CORNER_ENTER_STREAK) ? corner_streak + 1 : corner_streak;
+                        straight_streak = 0;
+                    }
 
-                        /* raw errors: lateral offset (cm) + heading (deg) */
-                        float e_cte     = lane.cte * CTE_TO_CM;
-                        float e_heading = lane.heading * HEADING_TO_DEG;
+                    /* state transitions, with hysteresis so a single noisy
+                       frame near the threshold doesn't flicker the state */
+                    if (drive_state == DRIVE_FORWARD && corner_streak >= CORNER_ENTER_STREAK) {
+                        drive_state = DRIVE_BRAKING;
+                        /* reset PID + cte filter so integral windup accumulated
+                           while braking doesn't cause a jerk when resuming */
+                        reset_pid_state(&steer_pid);
+                        filtered_cte    = 0.0f;
+                        cte_filter_init = 0;
+                    } else if (drive_state == DRIVE_BRAKING && straight_streak >= CORNER_EXIT_STREAK) {
+                        drive_state = DRIVE_FORWARD;
+                    }
 
+                    if (drive_state == DRIVE_FORWARD) {
                         /* EMA filter on CTE to smooth frame-to-frame noise */
                         if (!cte_filter_init) {
                             filtered_cte    = e_cte;
@@ -158,35 +221,43 @@ int main(void)
                             filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
                         }
 
-                        /* combined error using filtered CTE */
                         float combined = g_params.k_cte * filtered_cte
                                        + g_params.k_heading * e_heading;
 
                         float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                        /* debug: L=lines  R=raw_cte*10  F=filtered_cte*10  S=steer*10 */
-                        esp_printf("L:%u R:%d F:%d S:%d\r\n",
-                                   (unsigned)lane.lines_found,
+                        /* debug: L=boundaries found  R=raw_cte*10  F=filtered_cte*10  S=steer*10  ST=drive state */
+                        esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n",
+                                   (unsigned)found,
                                    (int)(e_cte * 10.0f),
                                    (int)(filtered_cte * 10.0f),
                                    (int)(steer_cmd * 10.0f));
 
                         Steer(steer_cmd + g_params.steering_offset);
 
+                        /* g_params.base_speed_left/right is your existing tunable
+                           drive speed -- set it to whatever value corresponds to
+                           30% in HbridgeSpeed's own units. Not hardcoding a "30"
+                           literal here since I don't know HbridgeSpeed's actual
+                           scale (could be raw PWM ticks, not a 0-100 percentage). */
                         HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+
+                    } else { /* DRIVE_BRAKING */
+                        esp_printf("L:%u ST:B (corner)\r\n", (unsigned)found);
+                        Steer(g_params.steering_offset);  /* wheels centered while stopped, not left at a stale angle */
+                        HbridgeBrake(&g_hbridge);
                     }
                 }
 
             } else {
-                /* IDLE: clear controller state so next run starts clean */
-                steer_pid.integral         = 0.0f;
-                steer_pid.prev_measurement = 0.0f;
-                steer_pid.d_filtered       = 0.0f;
-                steer_pid.prev_output      = 0.0f;
-                steer_pid.initialized      = 0;
-                line_lost_counter          = 0;
-                filtered_cte               = 0.0f;
-                cte_filter_init            = 0;
+                /* IDLE: clear controller + drive-state so next run starts clean */
+                reset_pid_state(&steer_pid);
+                line_lost_counter  = 0;
+                filtered_cte       = 0.0f;
+                cte_filter_init    = 0;
+                drive_state        = DRIVE_FORWARD;
+                corner_streak      = 0;
+                straight_streak    = 0;
                 HbridgeBrake(&g_hbridge);
             }
 

@@ -19,12 +19,7 @@ static size_t s_cmd_idx = 0;
 
 void params_init(void)
 {
-    g_params.kp = 0.5f;
-    g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
-    g_params.kd = 0.05f;
-    g_params.k_cte     = 1.0f;
-    g_params.k_heading = 0.0f;
-    g_params.kp = 0.5f;
+    g_params.kp = 5.0f;
     g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
     g_params.kd = 0.05f;
     g_params.k_cte     = 1.0f;
@@ -32,17 +27,42 @@ void params_init(void)
 
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
-    g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
 
-    g_params.base_speed_left  = 20.0f;   /* replaces base_speed */
-    g_params.base_speed_right = 20.0f;
-    g_params.max_speed_left   = 80.0f;   /* replaces max_speed */
-    g_params.max_speed_right  = 80.0f;
+    g_params.base_speed_left  = 30.0f;   /* replaces base_speed */
+    g_params.base_speed_right = 30.0f;
 
-    g_params.steering_offset = 0.0f;
-    g_params.steering_offset = 0.0f;
+    g_params.steering_offset = 23.0f;
     g_params.state           = STATE_IDLE;
+}
+
+static int parse_float(const char *s, float *out)
+{
+    while (*s == ' ' || *s == '\t') s++;
+    int sign = 1;
+    if (*s == '-') { sign = -1; s++; }
+    else if (*s == '+') { s++; }
+    if ((*s < '0' || *s > '9') && *s != '.') return 0;
+    float whole = 0.0f;
+    int has_digits = 0;
+    while (*s >= '0' && *s <= '9') {
+        whole = whole * 10.0f + (float)(*s - '0');
+        s++;
+        has_digits = 1;
+    }
+    float frac = 0.0f;
+    if (*s == '.') {
+        s++;
+        float scale = 0.1f;
+        while (*s >= '0' && *s <= '9') {
+            frac += (float)(*s - '0') * scale;
+            scale *= 0.1f;
+            s++;
+            has_digits = 1;
+        }
+    }
+    if (!has_digits) return 0;
+    *out = (float)sign * (whole + frac);
+    return 1;
 }
 
 static void send_ack(const char *msg)
@@ -80,13 +100,14 @@ static void command_execute(char *cmd)
 
     char *space = strchr(cmd, ' ');
     if (space) {
+        send_ack("GOT SPACE\r\n");
         size_t klen = (size_t)(space - cmd);
         if (klen >= sizeof(keyword)) klen = sizeof(keyword) - 1;
         memcpy(keyword, cmd, klen);
         keyword[klen] = '\0';
-        if (sscanf(space + 1, "%f", &val) == 1)
-        if (sscanf(space + 1, "%f", &val) == 1)
+        if (parse_float(space + 1, &val))
             has_val = 1;
+        send_ack("PARSED\r\n");
     } else {
         strncpy(keyword, cmd, sizeof(keyword) - 1);
         keyword[sizeof(keyword) - 1] = '\0';
