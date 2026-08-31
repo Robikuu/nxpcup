@@ -25,19 +25,27 @@
 #define LINE_LOST_LIMIT    5
 
 /* heading is already in radians from compute_center_line(); convert to
-   degrees since k_heading/CORNER_HEADING_THRESHOLD_DEG are tuned in degrees.
+   degrees since k_heading and the turn thresholds are tuned in degrees.
    cte from compute_center_line() is already in real cm -- no CTE_TO_CM
    conversion needed (the old *100.0f here was a leftover double-scale bug). */
 #define HEADING_TO_DEG     (180.0f / (float)M_PI)
 
-/* ---- corner-detection tuning -- these are starting guesses, not
-   measured values. Tune against your actual track using print_frame_debug
-   / live_vectors.py to see what heading your real corners produce, the
-   same way everything else in this pipeline got tuned. ---- */
-#define CORNER_HEADING_THRESHOLD_DEG   20.0f
-#define CORNER_ENTER_STREAK            3   /* consecutive corner-like ticks before braking */
-#define CORNER_EXIT_STREAK             5   /* consecutive straight ticks before resuming -- higher than
-                                               ENTER on purpose: quick to get cautious, slower to fully commit again */
+/* ---- Turn-state tuning -------------------------------------------------
+ * These angles are measured AFTER the homography, where +X is right and
+ * +heading is therefore a right turn.  Tune these from frame logs on the
+ * real track; do not use pixel-space angles here. */
+#define TURN_ENTER_HEADING_DEG         20.0f
+#define TURN_EXIT_HEADING_DEG          12.0f
+#define TURN_ENTER_STREAK              2U
+#define TURN_EXIT_STREAK               2U
+#define TURN_MAX_OBSERVED_HEADING_DEG  85.0f
+
+/* Steering commands use the same -100 (left) .. +100 (right) coordinate
+ * system as Steer().  The slew limiter makes the turn progressive instead
+ * of jumping from the PID output to full lock. */
+#define TURN_MIN_STEER_CMD             30.0f
+#define TURN_FULL_STEER_HEADING_DEG    60.0f
+#define TURN_STEER_SLEW_PER_TICK        4.0f
 
 #define TICK_CHANNEL kMRT_Channel_0
 #define TIMER_CLOCK_HZ 150000000U
@@ -46,7 +54,8 @@ volatile bool g_tickFlag = false;
 
 typedef enum {
     DRIVE_FORWARD,
-    DRIVE_BRAKING
+    DRIVE_TURN_LEFT,
+    DRIVE_TURN_RIGHT
 } drive_state_t;
 
 void MRT0_IRQHandler(void) {
@@ -62,6 +71,83 @@ static void reset_pid_state(pid_struct *pid)
     pid->d_filtered       = 0.0f;
     pid->prev_output      = 0.0f;
     pid->initialized      = 0;
+}
+
+static float clampf(float value, float low, float high)
+{
+    if (value < low)  return low;
+    if (value > high) return high;
+    return value;
+}
+
+static float slew_toward(float current, float target, float maximum_step)
+{
+    if (target > current + maximum_step) return current + maximum_step;
+    if (target < current - maximum_step) return current - maximum_step;
+    return target;
+}
+
+/* Convert one raw Pixy vector to a heading in ground coordinates.  Pixy
+ * may reverse endpoint order, so sort by ground Y before calculating the
+ * heading.  That guarantees a negative result means "the line goes left as
+ * it goes away from the car", and positive means right. */
+static uint8_t raw_vector_ground_heading_deg(const uint16_t *raw,
+                                             float *heading_deg)
+{
+    float x0, y0, x1, y1;
+    if (!pixel_to_ground((float)raw[0], (float)raw[1], &x0, &y0) ||
+        !pixel_to_ground((float)raw[2], (float)raw[3], &x1, &y1)) {
+        return 0;
+    }
+
+    if (y0 > y1) {
+        float temp;
+        temp = x0; x0 = x1; x1 = temp;
+        temp = y0; y0 = y1; y1 = temp;
+    }
+
+    if ((y1 - y0) < 1.0f) {
+        return 0;
+    }
+
+    *heading_deg = atan2f(x1 - x0, y1 - y0) * HEADING_TO_DEG;
+    return (fabsf(*heading_deg) <= TURN_MAX_OBSERVED_HEADING_DEG);
+}
+
+/* Find the strongest usable ground-space line.  While already turning, only
+ * accept a line curving in the commanded direction.  This is deliberately
+ * independent from select_boundary_vectors(), whose normal lane filter
+ * rejects the steep line that is expected during a corner. */
+static uint8_t find_turn_heading(const uint16_t *vectors, size_t num_vectors,
+                                 int direction, float *heading_deg)
+{
+    float best_abs = 0.0f;
+    uint8_t found = 0;
+
+    for (size_t i = 0; i < num_vectors; i++) {
+        float candidate;
+        if (!raw_vector_ground_heading_deg(&vectors[6U * i], &candidate)) {
+            continue;
+        }
+        if (direction != 0 && candidate * (float)direction <= 0.0f) {
+            continue;
+        }
+        if (fabsf(candidate) > best_abs) {
+            best_abs = fabsf(candidate);
+            *heading_deg = candidate;
+            found = 1;
+        }
+    }
+
+    return found;
+}
+
+static float turn_target_from_heading(float heading_deg)
+{
+    float magnitude = fabsf(heading_deg) *
+                      (100.0f / TURN_FULL_STEER_HEADING_DEG);
+    magnitude = clampf(magnitude, TURN_MIN_STEER_CMD, 100.0f);
+    return (heading_deg < 0.0f) ? -magnitude : magnitude;
 }
 
 int main(void)
@@ -102,7 +188,7 @@ int main(void)
     if (ps == kStatus_Success) {
         pixy_set_led(&cam1, 0, 255, 0);      /* green = camera OK */
     } else {
-        PRINTF("Pixy init FAILED\r\n");      /* car stays IDLE */
+        esp_printf("Pixy init FAILED\r\n");      /* car stays IDLE */
     }
 
     uint32_t line_lost_counter = 0;
@@ -111,11 +197,14 @@ int main(void)
     float    filtered_cte    = 0.0f;
     int      cte_filter_init = 0;
 
-    drive_state_t drive_state    = DRIVE_FORWARD;
-    uint32_t      corner_streak  = 0;
-    uint32_t      straight_streak = 0;
+    drive_state_t drive_state       = DRIVE_FORWARD;
+    uint32_t      turn_entry_streak = 0;
+    uint32_t      straight_streak   = 0;
+    float         applied_steer_cmd = 0.0f;
+    float         turn_target_cmd   = 0.0f;
+    uint8_t       recentering       = 0;
 
-    PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
+    esp_printf("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
     //TODO: refa main loopul si try to make it a state machine (straight, intersection, turn left, turn right, stop)
     //also go over cum sunt vectori parsati si sa incercam cumva sa le normalizam directia lor
@@ -153,6 +242,8 @@ int main(void)
 
                 status_t s = pixy_get_vectors(&cam1, vectors, MAX_VECTORS, &num_vectors);
 
+                print_frame_debug(vectors, num_vectors);
+
                 if (s != kStatus_Success || num_vectors == 0) {
                     /* camera failure and "no line at all" get identical treatment,
                        unchanged from before -- this is a harder failure than a
@@ -167,7 +258,7 @@ int main(void)
                     ground_vector_t left, right;
                     uint8_t found = select_boundary_vectors(vectors, num_vectors, &left, &right);
 
-                    uint8_t confident_straight = 0;
+                    uint8_t center_valid = 0;
                     float   e_cte     = 0.0f;
                     float   e_heading = 0.0f;
 
@@ -176,77 +267,123 @@ int main(void)
                         if (c.valid) {
                             e_cte     = c.cte;                       /* already cm */
                             e_heading = c.heading * HEADING_TO_DEG;  /* rad -> deg */
-
-                            if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
-                                confident_straight = 1;
-                            }
+                            center_valid = 1;
                         }
-                        /* c.valid == 0 (no Y overlap between boundaries) falls
-                           through as NOT confident_straight -- this is exactly
-                           what an intersection produces, so it gets treated as
-                           corner-like/cautious rather than fed to steering. */
-                    }
-                    /* found == 0 or 1: also not confident_straight. Single-line
-                       left/right classification is still deferred, per earlier
-                       discussion -- for now this case is treated the same as a
-                       corner rather than guessed at. */
-
-                    if (confident_straight) {
-                        straight_streak = (straight_streak < CORNER_EXIT_STREAK) ? straight_streak + 1 : straight_streak;
-                        corner_streak   = 0;
-                    } else {
-                        corner_streak   = (corner_streak < CORNER_ENTER_STREAK) ? corner_streak + 1 : corner_streak;
-                        straight_streak = 0;
-                    }
-
-                    /* state transitions, with hysteresis so a single noisy
-                       frame near the threshold doesn't flicker the state */
-                    if (drive_state == DRIVE_FORWARD && corner_streak >= CORNER_ENTER_STREAK) {
-                        drive_state = DRIVE_BRAKING;
-                        /* reset PID + cte filter so integral windup accumulated
-                           while braking doesn't cause a jerk when resuming */
-                        reset_pid_state(&steer_pid);
-                        filtered_cte    = 0.0f;
-                        cte_filter_init = 0;
-                    } else if (drive_state == DRIVE_BRAKING && straight_streak >= CORNER_EXIT_STREAK) {
-                        drive_state = DRIVE_FORWARD;
                     }
 
                     if (drive_state == DRIVE_FORWARD) {
-                        /* EMA filter on CTE to smooth frame-to-frame noise */
-                        if (!cte_filter_init) {
-                            filtered_cte    = e_cte;
-                            cte_filter_init = 1;
-                        } else {
-                            filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                        float turn_heading = 0.0f;
+                        uint8_t have_turn_heading = 0;
+
+                        /* With both boundaries, the centerline is the most stable
+                         * turn detector.  Once one boundary disappears, inspect
+                         * the individual transformed lines instead: that steep
+                         * remaining boundary is expected in a turn. */
+                        if (center_valid &&
+                            fabsf(e_heading) >= TURN_ENTER_HEADING_DEG) {
+                            turn_heading = e_heading;
+                            have_turn_heading = 1;
+                        } else if (!center_valid) {
+                            have_turn_heading = find_turn_heading(vectors, num_vectors,
+                                                                  0, &turn_heading);
+                            if (have_turn_heading &&
+                                fabsf(turn_heading) < TURN_ENTER_HEADING_DEG) {
+                                have_turn_heading = 0;
+                            }
                         }
 
-                        float combined = g_params.k_cte * filtered_cte
-                                       + g_params.k_heading * e_heading;
+                        if (have_turn_heading) {
+                            if (turn_entry_streak < TURN_ENTER_STREAK) {
+                                turn_entry_streak++;
+                            }
 
-                        float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+                            if (turn_entry_streak >= TURN_ENTER_STREAK) {
+                                drive_state = (turn_heading < 0.0f) ?
+                                              DRIVE_TURN_LEFT : DRIVE_TURN_RIGHT;
+                                turn_target_cmd = turn_target_from_heading(turn_heading);
+                                straight_streak = 0;
+                                recentering = 0;
+                                reset_pid_state(&steer_pid);
+                                filtered_cte = 0.0f;
+                                cte_filter_init = 0;
+                            }
+                        } else {
+                            turn_entry_streak = 0;
+                        }
 
-                        /* debug: L=boundaries found  R=raw_cte*10  F=filtered_cte*10  S=steer*10  ST=drive state */
-                        esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n",
-                                   (unsigned)found,
-                                   (int)(e_cte * 10.0f),
-                                   (int)(filtered_cte * 10.0f),
-                                   (int)(steer_cmd * 10.0f));
+                        if (drive_state == DRIVE_FORWARD && center_valid) {
+                        /* EMA filter on CTE to smooth frame-to-frame noise */
+                            if (!cte_filter_init) {
+                                filtered_cte    = e_cte;
+                                cte_filter_init = 1;
+                            } else {
+                                filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
+                            }
 
-                        Steer(steer_cmd + g_params.steering_offset);
+                            float combined = g_params.k_cte * filtered_cte
+                                           + g_params.k_heading * e_heading;
+                            float pid_steer_cmd = -pid_update(&steer_pid, 0.0f,
+                                                               combined, g_params.dt);
 
-                        /* g_params.base_speed_left/right is your existing tunable
-                           drive speed -- set it to whatever value corresponds to
-                           30% in HbridgeSpeed's own units. Not hardcoding a "30"
-                           literal here since I don't know HbridgeSpeed's actual
-                           scale (could be raw PWM ticks, not a 0-100 percentage). */
-                        HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
-
-                    } else { /* DRIVE_BRAKING */
-                        esp_printf("L:%u ST:B (corner)\r\n", (unsigned)found);
-                        Steer(g_params.steering_offset);  /* wheels centered while stopped, not left at a stale angle */
-                        HbridgeBrake(&g_hbridge);
+                            /* The first frames after a turn return the wheels to
+                             * the PID target progressively.  Normal straight-line
+                             * PID operation remains unchanged. */
+                            if (recentering) {
+                                applied_steer_cmd = slew_toward(applied_steer_cmd,
+                                                                pid_steer_cmd,
+                                                                TURN_STEER_SLEW_PER_TICK);
+                                if (fabsf(applied_steer_cmd - pid_steer_cmd) <
+                                    TURN_STEER_SLEW_PER_TICK) {
+                                    recentering = 0;
+                                }
+                            } else {
+                                applied_steer_cmd = pid_steer_cmd;
+                            }
+                        }
                     }
+
+                    if (drive_state == DRIVE_TURN_LEFT ||
+                        drive_state == DRIVE_TURN_RIGHT) {
+                        int direction = (drive_state == DRIVE_TURN_LEFT) ? -1 : 1;
+                        float turn_heading;
+
+                        if (find_turn_heading(vectors, num_vectors, direction,
+                                              &turn_heading)) {
+                            turn_target_cmd = turn_target_from_heading(turn_heading);
+                        }
+
+                        applied_steer_cmd = slew_toward(applied_steer_cmd,
+                                                        turn_target_cmd,
+                                                        TURN_STEER_SLEW_PER_TICK);
+
+                        if (center_valid &&
+                            fabsf(e_heading) <= TURN_EXIT_HEADING_DEG) {
+                            if (straight_streak < TURN_EXIT_STREAK) {
+                                straight_streak++;
+                            }
+                        } else {
+                            straight_streak = 0;
+                        }
+
+                        if (straight_streak >= TURN_EXIT_STREAK) {
+                            drive_state = DRIVE_FORWARD;
+                            turn_entry_streak = 0;
+                            straight_streak = 0;
+                            recentering = 1;
+                            reset_pid_state(&steer_pid);
+                            filtered_cte = 0.0f;
+                            cte_filter_init = 0;
+                        }
+                    }
+
+                    /* A single boundary is allowed to persist in either turn
+                     * state.  Keep driving using the last valid steering target;
+                     * only a complete camera/vector loss reaches the separate
+                     * LINE_LOST_LIMIT safety path above. */
+                    Steer(applied_steer_cmd + g_params.steering_offset);
+                    HbridgeSpeed(&g_hbridge,
+                                  (int16_t)g_params.base_speed_left,
+                                  (int16_t)g_params.base_speed_right);
                 }
 
             } else {
@@ -256,15 +393,18 @@ int main(void)
                 filtered_cte       = 0.0f;
                 cte_filter_init    = 0;
                 drive_state        = DRIVE_FORWARD;
-                corner_streak      = 0;
+                turn_entry_streak  = 0;
                 straight_streak    = 0;
+                applied_steer_cmd  = 0.0f;
+                turn_target_cmd    = 0.0f;
+                recentering        = 0;
                 HbridgeBrake(&g_hbridge);
             }
 
             if (button_pressed_edge()) {
                 g_params.state = STATE_IDLE;
                 HbridgeBrake(&g_hbridge);
-                PRINTF("Button: STOPPED\r\n");
+                esp_printf("Button: STOPPED\r\n");
             }
         }
 	}

@@ -6,12 +6,12 @@
  * Generated linker script file for MCXN947
  * Created from library.ldt by FMCreateLinkLibraries
  * Using Freemarker v2.3.30
- * MCUXpresso IDE v25.6 [Build 136] [2025-06-27] on Aug 26, 2026, 1:11:43 PM
+ * MCUXpresso IDE v25.6 [Build 136] [2025-06-27] on 31 Aug 2026, 14:41:14
  */
 
 GROUP (
   "libgcc.a"
-  "libc.a"
+  "libc_nano.a"
   "libm.a"
   "libcr_newlib_semihost.a"
 )
