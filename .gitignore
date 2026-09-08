@@ -5,6 +5,6 @@ CMakeLists.txt
 CMakePresets.json
 flags.cmake
 mcux_config.cmake
-user_overrides.cmake
+user_override.cmake
 armgcc.cmake
-nxpcup_Debug.Id
+nxpcup_Debug.ld
