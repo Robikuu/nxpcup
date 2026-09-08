@@ -8,3 +8,4 @@ mcux_config.cmake
 user_override.cmake
 armgcc.cmake
 nxpcup_Debug.ld
+linkerScripts

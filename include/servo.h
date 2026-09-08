@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#define MAX_STEER 80.0f
+#define MAX_STEER 70.0f
 void Steer(float angle);
 void TestServo();
 

@@ -110,11 +110,15 @@ int main(void)
     uint16_t vectors[MAX_VECTORS * 6];
     size_t   num_vectors;
     float    filtered_cte    = 0.0f;
+    float    filtered_heading = 0.0f;
     int      cte_filter_init = 0;
 
     drive_state_t drive_state    = DRIVE_FORWARD;
     uint32_t      corner_streak  = 0;
     uint32_t      straight_streak = 0;
+    /* Historical blind failsafe variables */
+    static float historical_steer = 0.0f;
+    uint32_t     blind_streak     = 0;
 
     PRINTF("Booted. Send 'start;' to run, 'stop;' to halt.\r\n");
 
@@ -175,41 +179,47 @@ int main(void)
                     uint8_t computed  = 0;
 
                     if (found == 2) {
-                        center_line_t c = compute_center_line(&left, &right);
-                        if (c.valid) {
-                            e_cte     = c.cte;                       /* already cm */
-                            e_heading = c.heading * HEADING_TO_DEG;  /* rad -> deg */
-                            computed  = 1;
+                    center_line_t c = compute_center_line(&left, &right);
+                    if (c.valid) {
+                        e_cte     = c.cte;                       
+                        e_heading = c.heading * HEADING_TO_DEG;  
+                        computed  = 1;
+                    } 
+                } else if (found == 1) {
+                    center_line_t c = compute_center_line_single(&left);
+                    if (c.valid) {
+                        e_cte     = c.cte;
+                        e_heading = c.heading * HEADING_TO_DEG;
+                        computed  = 1;
+                    }
+                }
 
-                            if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
-                                confident_straight = 1;
-                            }
-                        } else {
-                            // Two lines found but no Y overlap. Treat as 1 line using the longer one.
-                            float l_len = (left.Y1 - left.Y0)*(left.Y1 - left.Y0) + (left.X1 - left.X0)*(left.X1 - left.X0);
-                            float r_len = (right.Y1 - right.Y0)*(right.Y1 - right.Y0) + (right.X1 - right.X0)*(right.X1 - right.X0);
-                            center_line_t c_single = compute_center_line_single(l_len > r_len ? &left : &right);
-                            if (c_single.valid) {
-                                e_cte     = c_single.cte;
-                                e_heading = c_single.heading * HEADING_TO_DEG;
-                                computed  = 1;
+                if (computed) {
+                    blind_streak = 0;
 
-                                if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
-                                    confident_straight = 1;
-                                }
-                            }
-                        }
-                    } else if (found == 1) {
-                        center_line_t c = compute_center_line_single(&left);
-                        if (c.valid) {
-                            e_cte     = c.cte;
-                            e_heading = c.heading * HEADING_TO_DEG;
-                            computed  = 1;
-                            
-                            if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
-                                confident_straight = 1;
-                            }
-                        }
+                    /* EMA filter on CTE */
+                    if (!cte_filter_init) {
+                        filtered_cte     = e_cte;
+                        filtered_heading = e_heading;
+                        cte_filter_init  = 1;
+                    } else {
+                        /* Clamp CTE to the pixel screen bounds */
+                        const float MAX_CTE_PX = 39.5f; 
+                        if (e_cte >  MAX_CTE_PX) e_cte =  MAX_CTE_PX;
+                        if (e_cte < -MAX_CTE_PX) e_cte = -MAX_CTE_PX;
+
+                        /* Pixel rate limiter */
+                        const float MAX_CTE_JUMP = 10.0f;
+                        float delta = e_cte - filtered_cte;
+                        if (delta >  MAX_CTE_JUMP) e_cte = filtered_cte + MAX_CTE_JUMP;
+                        if (delta < -MAX_CTE_JUMP) e_cte = filtered_cte - MAX_CTE_JUMP;
+                        
+                        filtered_cte     = 0.4f * e_cte + 0.6f * filtered_cte;
+                        filtered_heading = 0.4f * e_heading + 0.6f * filtered_heading;
+                    }
+
+                    if (fabsf(filtered_heading) < CORNER_HEADING_THRESHOLD_DEG) {
+                        confident_straight = 1;
                     }
 
                     if (confident_straight) {
@@ -220,12 +230,8 @@ int main(void)
                         straight_streak = 0;
                     }
 
-                    /* state transitions, with hysteresis so a single noisy
-                       frame near the threshold doesn't flicker the state */
                     if (drive_state == DRIVE_FORWARD && corner_streak >= CORNER_ENTER_STREAK) {
                         drive_state = DRIVE_BRAKING;
-                        /* reset PID + cte filter so integral windup accumulated
-                           while braking doesn't cause a jerk when resuming */
                         reset_pid_state(&steer_pid);
                         filtered_cte    = 0.0f;
                         cte_filter_init = 0;
@@ -233,76 +239,42 @@ int main(void)
                         drive_state = DRIVE_FORWARD;
                     }
 
-                    if (computed) {
-                        /* ---- Spike rejection ----
-                         * Clamp CTE to a physically reasonable range.
-                         * The car can't be more than half a lane width from center
-                         * and still be on the track. */
-                        const float MAX_CTE_CM = LANE_WIDTH_M * 100.0f + 5.0f; /* half-width + 5 cm margin */
-                        if (e_cte >  MAX_CTE_CM) e_cte =  MAX_CTE_CM;
-                        if (e_cte < -MAX_CTE_CM) e_cte = -MAX_CTE_CM;
+                    float combined = g_params.k_cte * filtered_cte + g_params.k_heading * filtered_heading;
+                    float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                        /* Rate limiter: reject frame-to-frame jumps larger than
-                         * what the car can physically traverse in one tick.
-                         * At 30% duty (~1 m/s) and 20 ms tick, max displacement ~ 2 cm.
-                         * Allow 8 cm/tick to be generous with noise. */
-                        if (cte_filter_init) {
-                            const float MAX_CTE_JUMP = 8.0f;
-                            float delta = e_cte - filtered_cte;
-                            if (delta >  MAX_CTE_JUMP) e_cte = filtered_cte + MAX_CTE_JUMP;
-                            if (delta < -MAX_CTE_JUMP) e_cte = filtered_cte - MAX_CTE_JUMP;
-                        }
+                    /* Update the historical path memory */
+                    historical_steer = 0.90f * historical_steer + 0.10f * steer_cmd;
 
-                        /* EMA filter on CTE to smooth frame-to-frame noise */
-                        if (!cte_filter_init) {
-                            filtered_cte    = e_cte;
-                            cte_filter_init = 1;
-                        } else {
-                            filtered_cte = 0.4f * e_cte + 0.6f * filtered_cte;
-                        }
-
-                        float combined = g_params.k_cte * filtered_cte
-                                       + g_params.k_heading * e_heading;
-
-                        float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
-
-                        if (drive_state == DRIVE_FORWARD) {
-                            esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n",
-                                       (unsigned)found,
-                                       (int)(e_cte * 10.0f),
-                                       (int)(filtered_cte * 10.0f),
-                                       (int)(steer_cmd * 10.0f));
-                        
-
-                            Steer(steer_cmd + g_params.steering_offset);
-                            HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
-                        } else { /* DRIVE_BRAKING */
-                            esp_printf("L:%u R:%d F:%d S:%d ST:B (corner)\r\n", 
-                                       (unsigned)found,
-                                       (int)(e_cte * 10.0f),
-                                       (int)(filtered_cte * 10.0f),
-                                       (int)(steer_cmd * 10.0f));
-            
-                            
-                            Steer(steer_cmd + g_params.steering_offset);
-                            // Do not multiply by 0.6f as it stalls the motors (below deadband)
-                            HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
-                        }
+                    if (drive_state == DRIVE_FORWARD) {
+                        esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n", (unsigned)found, (int)(e_cte * 10.0f), (int)(filtered_cte * 10.0f), (int)(steer_cmd * 10.0f));
+                        Steer(steer_cmd + g_params.steering_offset);
+                        HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                    } else { 
+                        esp_printf("L:%u R:%d F:%d S:%d ST:B (corner)\r\n", (unsigned)found, (int)(e_cte * 10.0f), (int)(filtered_cte * 10.0f), (int)(steer_cmd * 10.0f));
+                        Steer(steer_cmd + g_params.steering_offset);
+                        HbridgeSpeed(&g_hbridge, (int16_t)(g_params.base_speed_left * 1.3f), (int16_t)(g_params.base_speed_right * 1.3f));
+                    }
+                } else {
+                    /* BLIND CORNER FAILSAFE (Uses Temporal Historical Path Memory) */
+                    blind_streak++;
+                    historical_steer *= 0.95f; // Mimic the L_max bound decay limit 
+                    
+                    if (blind_streak > 50) { // Lost for 1 full second
+                        HbridgeBrake(&g_hbridge);
+                        esp_printf("L:%u ST: HALT (Lost track)\r\n", (unsigned)found);
                     } else {
-                        // No valid line computed
                         if (drive_state == DRIVE_FORWARD) {
-                            esp_printf("L:%u ST:F (blind)\r\n", (unsigned)found);
-                            Steer(g_params.steering_offset);
+                            esp_printf("L:%u ST:F (blind, using history)\r\n", (unsigned)found);
+                            Steer(historical_steer + g_params.steering_offset);
                             HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
                         } else {
-                            esp_printf("L:%u ST:B (corner, blind)\r\n", (unsigned)found);
-                            esp_printf("L:%u ST:B (corner, blind)\r\n", (unsigned)found);
-                            Steer(g_params.steering_offset);
-                            // Only brake if we truly see nothing
-                            HbridgeBrake(&g_hbridge);
+                            esp_printf("L:%u ST:B (corner, blind, using history)\r\n", (unsigned)found);
+                            Steer(historical_steer + g_params.steering_offset);
+                            HbridgeSpeed(&g_hbridge, (int16_t)(g_params.base_speed_left * 1.3f), (int16_t)(g_params.base_speed_right * 1.3f));
                         }
                     }
                 }
+            }
 
             } else {
                 /* IDLE: clear controller + drive-state so next run starts clean */
