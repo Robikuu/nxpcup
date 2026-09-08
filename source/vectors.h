@@ -33,6 +33,13 @@
 #define LANE_WIDTH_M       0.50f          /* distance between the two lane lines (meters) */
 #define MAX_LINE_ANGLE_DEG 40.0f          /* reject lines angled more than this from forward */
 
+#define TRACK_HALF_WIDTH_CM 25.75f
+#define DEADZONE_CM 1.0f
+#define SINGLE_VECTOR_ROTATION_SIGN -1
+#define SINGLE_VECTOR_MAX_AGE_TICKS 5000
+#define SINGLE_VECTOR_MAX_JUMP_CM 1000
+
+
 /* A single track-boundary line, already in ground-plane cm.
  * (X0,Y0) and (X1,Y1) are NOT guaranteed to be "near"/"far" in that
  * order — Pixy doesn't guarantee endpoint order, so anything that
@@ -42,6 +49,23 @@ typedef struct {
     float   X1, Y1;
     uint8_t valid;
 } ground_vector_t;
+
+typedef struct {
+    float    cte_est;      // reference centerline position, cm
+    uint8_t  initialized;
+    uint32_t age_ticks;    // ticks since last 2-line update
+} tracked_center_t;
+
+typedef enum { LEFT, RIGHT, UNCERTAIN } side_t;
+
+typedef enum {
+    SVEST_OK = 0,
+    SVEST_NO_REF,
+    SVEST_STALE,
+    SVEST_BAD_SIDE,
+    SVEST_DEGENERATE,
+    SVEST_IMPLAUSIBLE
+} svest_reason_t;
 
 /* The centerline the PID should track: a 2-point vector (extensible
  * to more points / a spline later when curvature gets added), plus
@@ -72,9 +96,18 @@ typedef struct {
 
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index);
 uint8_t pixel_to_ground(float u, float v, float *X, float *Y);
+void update_tracked_center(tracked_center_t *ref, float cte_est);
+void age_tracked_center(tracked_center_t *ref);
+side_t classify_side(float x, const tracked_center_t *ref);
 uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
-                                 ground_vector_t *left, ground_vector_t *right);
+                                 const tracked_center_t *ref,
+                                 ground_vector_t *left, ground_vector_t *right,
+                                 side_t *single_side);
 center_line_t compute_center_line(const ground_vector_t *left, const ground_vector_t *right);
+uint8_t estimate_single_vector_cte(const ground_vector_t *v, side_t side,
+                                    const tracked_center_t *ref, float *cte_out);
+svest_reason_t estimate_single_vector_cte_debug(const ground_vector_t *v, side_t side,
+                                                 const tracked_center_t *ref, float *cte_out);
 void print_frame_debug(const uint16_t *vectors, size_t num_vectors);
 
 lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors);

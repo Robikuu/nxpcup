@@ -21,11 +21,6 @@
 /*  (e.g. wherever the PID/steering code ends up) can use them too.    */
 /* ------------------------------------------------------------------ */
 
-
-
-
-
-
 static void float_parts(float val, const char **sign, int *ip, int *fp)
 {
     *sign = (val < 0.0f) ? "-" : "";
@@ -61,7 +56,7 @@ uint8_t pixel_to_ground(float u, float v, float *X, float *Y)
 {
     float Wp = H31 * u + H32 * v + H33;
 
-    if (fabsf(Wp) < 1e-6f) {
+    if (Wp < 1e-4f) {
         return 0; // degenerate — do not treat as a valid (0,0)
     }
 
@@ -72,15 +67,33 @@ uint8_t pixel_to_ground(float u, float v, float *X, float *Y)
     // pixel issue above. Re-check these against your new calibration's
     // reprojection error once you have it — the plausible X/Y range may
     // shift slightly with the new, correctly-calibrated H.
-    if (Yr < 8.4f || Yr > 135.6f || fabsf(Xr) > (0.330f * Yr + 59.25f)) {
-        return 0;
-    }
+//    if (Yr < 8.4f || Yr > 135.6f || fabsf(Xr) > (0.330f * Yr + 59.25f)) {
+//        return 0;
+//    }
 
     *X = Xr;
     *Y = Yr;
     return 1;
 }
 
+void update_tracked_center(tracked_center_t *ref, float cte_est)
+{
+    ref->cte_est     = cte_est;
+    ref->initialized = 1;
+    ref->age_ticks   = 0;
+}
+
+void age_tracked_center(tracked_center_t *ref)
+{
+    if (ref->initialized) ref->age_ticks++;
+}
+
+side_t classify_side(float x, const tracked_center_t *ref) {
+    if (!ref || !ref->initialized) return UNCERTAIN;
+    float delta = x - ref->cte_est;
+    if (fabsf(delta) < DEADZONE_CM) return UNCERTAIN;
+    return (delta < 0) ? LEFT : RIGHT;
+}
 
 void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, size_t index)
 {
@@ -183,23 +196,21 @@ void print_vector_details(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, si
 #define SBV_MAX 10
 
 uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
-                                 ground_vector_t *left, ground_vector_t *right)
+                                 const tracked_center_t *ref,
+                                 ground_vector_t *left, ground_vector_t *right,
+                                 side_t *single_side)
 {
     left->valid = 0;
     right->valid = 0;
+    if (single_side) *single_side = UNCERTAIN;
 
     if (num_vectors == 0) return 0;
 
     ground_vector_t v[SBV_MAX];
-    float x_mid[SBV_MAX];
+    float x_near[SBV_MAX];
     size_t n = 0;
 
     for (size_t i = 0; i < num_vectors && i < SBV_MAX; i++) {
-        // No scaling here on purpose. vectors[] is Pixy2's native line-
-        // tracking grid — confirmed 79 wide x 52 tall by Pixy's own docs
-        // (pixy.frameWidth/frameHeight in line-tracking mode). H is now
-        // calibrated directly against that grid (see calibration note in
-        // pixel_to_ground below), so these raw values go straight in.
         float u0 = (float)vectors[6*i + 0];
         float v0 = (float)vectors[6*i + 1];
         float u1 = (float)vectors[6*i + 2];
@@ -208,19 +219,17 @@ uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
         float X0, Y0, X1, Y1;
         uint8_t ok0 = pixel_to_ground(u0, v0, &X0, &Y0);
         uint8_t ok1 = pixel_to_ground(u1, v1, &X1, &Y1);
-
-        if (!ok0 || !ok1) continue; // drop vectors outside the calibrated/plausible ground region
+        if (!ok0 || !ok1) continue;
 
         float dX = X1 - X0;
         float dY_vec = Y1 - Y0;
-        if (fabsf(dY_vec) < 1e-3f || fabsf(dX / dY_vec) > 1.73f) {
-            continue;   /* slope > ~60° from forward — not a lane line */
-        }
+        //if (fabsf(dY_vec) < 1e-3f || fabsf(dX / dY_vec) > 1.73f) continue;
+        if (fabsf(dY_vec) < 1e-3f) continue;
 
         v[n].X0 = X0; v[n].Y0 = Y0;
         v[n].X1 = X1; v[n].Y1 = Y1;
         v[n].valid = 1;
-        x_mid[n] = (X0 + X1) * 0.5f;
+        x_near[n] = (Y0 < Y1) ? X0 : X1;
         n++;
     }
 
@@ -228,20 +237,62 @@ uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
 
     if (n == 1) {
         *left = v[0];
+        if (single_side) *single_side = classify_side(x_near[0], ref);
         return 1;
     }
 
-    size_t li = 0, ri = 0;
-    for (size_t i = 1; i < n; i++) {
-        if (x_mid[i] < x_mid[li]) li = i;
-        if (x_mid[i] > x_mid[ri]) ri = i;
+    /* No reference yet (bootstrap case, e.g. very first frames after
+       start/IDLE reset): fall back to raw leftmost/rightmost. Side
+       identity doesn't matter here -- compute_center_line() doesn't
+       need it, and if this frame is valid, main.c will use it to
+       initialize tracked_center_t for every frame after. */
+    if (!ref || !ref->initialized) {
+        size_t li = 0, ri = 0;
+        for (size_t i = 1; i < n; i++) {
+            if (x_near[i] < x_near[li]) li = i;
+            if (x_near[i] > x_near[ri]) ri = i;
+        }
+        *left  = v[li];
+        *right = v[ri];
+        return 2;
     }
 
-    *left  = v[li];
-    *right = v[ri];
-    return 2;
-}
+    /* Reference exists: classify every candidate relative to it, then
+       pick the INNERMOST vector on each side (closest to ref->cte_est)
+       instead of outermost-of-everything -- guards against a spurious
+       far-out duplicate vector (e.g. near the vanishing point) being
+       picked over the real boundary. */
+    int li = -1, ri = -1;
+    for (size_t i = 0; i < n; i++) {
+        side_t s = classify_side(x_near[i], ref);
+        if (s == LEFT) {
+            if (li < 0 || x_near[i] > x_near[li]) li = (int)i;
+        } else if (s == RIGHT) {
+            if (ri < 0 || x_near[i] < x_near[ri]) ri = (int)i;
+        }
+        /* UNCERTAIN candidates are dropped, not assigned -- ambiguous
+           is safer treated as absent. */
+    }
 
+    if (li >= 0 && ri >= 0) {
+        *left  = v[li];
+        *right = v[ri];
+        return 2;
+    }
+
+    if (li >= 0 || ri >= 0) {
+        /* Only one side confidently classified -- report as a single-
+           vector case with real side identity already known. */
+        int idx = (li >= 0) ? li : ri;
+        *left = v[idx];
+        if (single_side) *single_side = (li >= 0) ? LEFT : RIGHT;
+        return 1;
+    }
+
+    /* n >= 2 but everything landed in the dead zone relative to ref --
+       fail closed rather than guess. */
+    return 0;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Step 3: build the centerline from the two boundary vectors.        */
@@ -274,6 +325,92 @@ static uint8_t interp_x_at_y(const ground_vector_t *v, float Y_ref, float *X_out
     return 1;
 }
 
+uint8_t estimate_single_vector_cte(const ground_vector_t *v, side_t side,
+                                    const tracked_center_t *ref, float *cte_out)
+{
+    if (!ref || !ref->initialized) return 0;
+
+    if (ref->age_ticks > SINGLE_VECTOR_MAX_AGE_TICKS) return 0;
+
+    if (side != LEFT && side != RIGHT) return 0;
+
+    float nearX, dx, dy;
+    if (v->Y0 <= v->Y1) {
+        nearX = v->X0;
+        dx = v->X1 - v->X0; dy = v->Y1 - v->Y0;
+    } else {
+        nearX = v->X1;
+        dx = v->X0 - v->X1; dy = v->Y0 - v->Y1;
+    }
+
+    float len = sqrtf(dx*dx + dy*dy);
+	if (len < 1e-3f) return 0; // (return 0 in the non-debug version)
+	dx /= len; dy /= len;
+
+	// Divide by cos(theta) (which is dy) to find the true horizontal X shift.
+	// Clamp dy to 0.1 to prevent dividing by zero if the line is perfectly horizontal.
+	float safe_dy = fabsf(dy);
+	    if (safe_dy < 0.25f) {
+	        safe_dy = 0.25f; // Caps the maximum projection distance to ~64cm
+	    }
+
+	float shiftX = TRACK_HALF_WIDTH_CM / safe_dy;
+
+	float offsetX = (side == LEFT)
+				   ? (nearX + shiftX)
+				   : (nearX - shiftX);
+
+    if (fabsf(offsetX - ref->cte_est) > SINGLE_VECTOR_MAX_JUMP_CM) return 0;
+
+    *cte_out = offsetX;
+    return 1;
+}
+
+
+svest_reason_t estimate_single_vector_cte_debug(const ground_vector_t *v, side_t side,
+                                                 const tracked_center_t *ref, float *cte_out)
+{
+    if (!ref || !ref->initialized) return SVEST_NO_REF;
+    if (ref->age_ticks > SINGLE_VECTOR_MAX_AGE_TICKS) return SVEST_STALE;
+    if (side != LEFT && side != RIGHT) return SVEST_BAD_SIDE;
+
+    float nearX, dx, dy;
+    if (v->Y0 <= v->Y1) {
+        nearX = v->X0; dx = v->X1 - v->X0; dy = v->Y1 - v->Y0;
+    } else {
+        nearX = v->X1; dx = v->X0 - v->X1; dy = v->Y0 - v->Y1;
+    }
+    esp_printf("  nearX=%d dx=%d dy=%d\n", (int)(nearX*100), (int)(dx*1000), (int)(dy*1000));
+
+    float len = sqrtf(dx*dx + dy*dy);
+	if (len < 1e-3f) return SVEST_DEGENERATE; // (return 0 in the non-debug version)
+	dx /= len; dy /= len;
+
+	// Divide by cos(theta) (which is dy) to find the true horizontal X shift.
+	// Clamp dy to 0.1 to prevent dividing by zero if the line is perfectly horizontal.
+	float safe_dy = fabsf(dy);
+	    if (safe_dy < 0.2f) {
+	        safe_dy = 0.2f; // Caps the maximum projection distance to ~64cm
+	    }
+
+	float shiftX = TRACK_HALF_WIDTH_CM / safe_dy;
+
+	float offsetX = (side == LEFT)
+				   ? (nearX + shiftX)
+				   : (nearX - shiftX);
+
+    if (fabsf(offsetX - ref->cte_est) > SINGLE_VECTOR_MAX_JUMP_CM) {
+        esp_printf("  [gate4] offsetX=%d ref=%d diff=%d limit=%d\n",
+                   (int)(offsetX*100), (int)(ref->cte_est*100),
+                   (int)(fabsf(offsetX - ref->cte_est)*100),
+                   (int)(SINGLE_VECTOR_MAX_JUMP_CM*100));
+        return SVEST_IMPLAUSIBLE;
+    }
+
+    *cte_out = offsetX;
+    return SVEST_OK;
+}
+
 center_line_t compute_center_line(const ground_vector_t *left, const ground_vector_t *right)
 {
     center_line_t result;
@@ -300,6 +437,14 @@ center_line_t compute_center_line(const ground_vector_t *left, const ground_vect
     if (!interp_x_at_y(left,  Y_far,  &Xl_far))  return result;
     if (!interp_x_at_y(right, Y_near, &Xr_near)) return result;
     if (!interp_x_at_y(right, Y_far,  &Xr_far))  return result;
+
+    float width_near = Xr_near - Xl_near;
+
+	// SANITY CHECK: If lines are too close or too far apart, reject the pair.
+	// Assuming nominal 51.5cm width. Adjust bounds based on your homography calibration.
+	if (width_near < 35.0f || width_near > 70.0f) {
+		return result; // valid remains 0
+	}
 
     result.X0 = (Xl_near + Xr_near) * 0.5f;
     result.Y0 = Y_near;
@@ -345,7 +490,7 @@ void print_frame_debug(const uint16_t *vectors, size_t num_vectors)
     }
 
     ground_vector_t left, right;
-    uint8_t found = select_boundary_vectors(vectors, num_vectors, &left, &right);
+    uint8_t found = select_boundary_vectors(vectors, num_vectors, NULL, &left, &right, NULL);
     esp_printf("Boundary vectors selected: %u\r\n", (unsigned)found);
 
     if (found == 2) {

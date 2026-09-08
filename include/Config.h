@@ -37,6 +37,7 @@ typedef struct {
     float ki;                // PID integral gain
     float kd;                // PID derivative gain
     float alpha;             // Derivative LPF smoothing factor (0.0 < alpha <= 1.0)
+    float cte_alpha;
 
     float base_speed_left;   // Nominal left wheel speed (asymmetric tuning)
     float base_speed_right;  // Nominal right wheel speed (asymmetric tuning)

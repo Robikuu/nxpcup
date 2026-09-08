@@ -15,21 +15,20 @@ robot_params_t g_params;
 static char   s_cmd_buf[CMD_BUF_SIZE];
 static size_t s_cmd_idx = 0;
 
-//TODO: de vezut si eventual de refacut tot fisierul asta
-
 void params_init(void)
 {
-    g_params.kp = 5.0f;
+    g_params.kp = 3.0f;
     g_params.ki = 0.0f;    /* keep 0 until P+D are tuned */
     g_params.kd = 0.05f;
     g_params.k_cte     = 1.0f;
-    g_params.k_heading = 0.0f;
+    g_params.k_heading = 0.35f;
 
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
-    g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
+    g_params.alpha = 0.25f;    /* CRITICAL — must be in (0, 1] */
+    g_params.cte_alpha = 0.25f;
 
-    g_params.base_speed_left  = 30.0f;   /* replaces base_speed */
-    g_params.base_speed_right = 30.0f;
+    g_params.base_speed_left  = 26.0f;   /* replaces base_speed */
+    g_params.base_speed_right = 26.0f;
 
     g_params.steering_offset = 23.0f;
     g_params.state           = STATE_IDLE;
@@ -163,7 +162,7 @@ static void command_execute(char *cmd)
         if (g_params.state == STATE_RUNNING) {
             send_ack("ERR steer only in IDLE. Send 'stop;' first.\r\n");
         } else {
-            Steer(val);
+            Steer(val + g_params.steering_offset);
             send_ack_dbl("steer=", val);
         }
     }

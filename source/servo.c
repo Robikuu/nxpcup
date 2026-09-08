@@ -6,7 +6,8 @@
 
 void Steer(float angle)
 {
-    if (angle > 100.0f)  angle = 100.0f;
+	// physical limit on the chassis
+    if (angle > 70.0f)  angle = 70.0f;
     if (angle < -100.0f) angle = -100.0f;
 
     float duty = 5.0f + ((angle + 100.0f) / 200.0f) * 5.0f;
