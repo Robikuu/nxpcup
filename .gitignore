@@ -1,1 +1,10 @@
 py/homography.py
+.vscode
+mcux_include.json
+CMakeLists.txt
+CMakePresets.json
+flags.cmake
+mcux_config.cmake
+user_overrides.cmake
+armgcc.cmake
+nxpcup_Debug.Id
