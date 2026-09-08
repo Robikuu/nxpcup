@@ -1,0 +1,8 @@
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:29:13:float_parts	32	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:60:9:pixel_to_ground	40	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:85:6:print_vector_details	112	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:185:9:select_boundary_vectors	368	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:280:16:interp_x_at_y	56	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:301:15:compute_center_line	104	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:350:15:compute_center_line_single	96	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:420:6:print_frame_debug	120	static

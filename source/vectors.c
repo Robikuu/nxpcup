@@ -213,8 +213,8 @@ uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
 
         float dX = X1 - X0;
         float dY_vec = Y1 - Y0;
-        if (fabsf(dY_vec) < 1e-3f || fabsf(dX / dY_vec) > 1.73f) {
-            continue;   /* slope > ~60° from forward — not a lane line */
+        if (fabsf(dY_vec) < 1e-3f || fabsf(dX / dY_vec) > 5.67f) {
+            continue;   /* slope > ~80° from forward — not a lane line */
         }
 
         v[n].X0 = X0; v[n].Y0 = Y0;
@@ -231,15 +231,39 @@ uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
         return 1;
     }
 
+    /* Pick the leftmost and rightmost candidates by x_mid. */
     size_t li = 0, ri = 0;
     for (size_t i = 1; i < n; i++) {
         if (x_mid[i] < x_mid[li]) li = i;
         if (x_mid[i] > x_mid[ri]) ri = i;
     }
 
-    *left  = v[li];
-    *right = v[ri];
-    return 2;
+    /* Validate the pair by checking that their lateral separation is
+     * plausible for the known lane width.  If the two "boundary" vectors
+     * are actually the same line (too close together) or one belongs to a
+     * distant part of the track (too far apart), reject the pair and fall
+     * back to the single candidate that is geometrically closest to the
+     * car centre-line (x = 0). */
+    const float LANE_WIDTH_CM     = LANE_WIDTH_M * 100.0f; /* full width in cm */
+    const float MIN_PAIR_SEP_CM   = LANE_WIDTH_CM * 0.4f;         /* 40 % — noise floor */
+    const float MAX_PAIR_SEP_CM   = LANE_WIDTH_CM * 1.8f;         /* 180 % — far-track ghost */
+
+    float pair_sep = x_mid[ri] - x_mid[li]; /* always >= 0 since ri is rightmost */
+    if (pair_sep >= MIN_PAIR_SEP_CM && pair_sep <= MAX_PAIR_SEP_CM) {
+        *left  = v[li];
+        *right = v[ri];
+        return 2;
+    }
+
+    /* Pair width check failed — pick the single vector closest to x = 0. */
+    size_t best = 0;
+    float  best_d = fabsf(x_mid[0]);
+    for (size_t i = 1; i < n; i++) {
+        float d = fabsf(x_mid[i]);
+        if (d < best_d) { best_d = d; best = i; }
+    }
+    *left = v[best];
+    return 1;
 }
 
 
@@ -319,6 +343,66 @@ center_line_t compute_center_line(const ground_vector_t *left, const ground_vect
     return result;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Step 4: build the centerline from a single boundary vector.        */
+/*  Shifts the line laterally by half the lane width based on heading  */
+/* ------------------------------------------------------------------ */
+center_line_t compute_center_line_single(const ground_vector_t *line)
+{
+    center_line_t result;
+    memset(&result, 0, sizeof(result));
+
+    if (!line->valid) {
+        return result;
+    }
+
+    // Ensure (X0, Y0) is the nearest point and (X1, Y1) is the farthest
+    float x_near = line->X0, y_near = line->Y0;
+    float x_far  = line->X1, y_far  = line->Y1;
+    if (y_near > y_far) {
+        x_near = line->X1; y_near = line->Y1;
+        x_far  = line->X0; y_far  = line->Y0;
+    }
+
+    float heading = atan2f(x_far - x_near, y_far - y_near);
+    float half_width_cm = (LANE_WIDTH_M * 100.0f) / 2.0f;
+
+    float x_mid = (x_near + x_far) * 0.5f;
+
+    // Determine if this single line is the left or right boundary.
+    // In a sharp curve, the inner line leaves the camera view first, so we almost always see the outer line.
+    // Right curve (heading > 0) -> we see the LEFT line.
+    // Left curve (heading < 0)  -> we see the RIGHT line.
+    // On straights (heading ~ 0), we use the X position (x_mid > 0 means right line).
+    int is_right_line = 0;
+    if (fabsf(heading) > 0.15f) { // ~8.5 degrees
+        is_right_line = (heading < 0.0f);
+    } else {
+        is_right_line = (x_mid > 0.0f);
+    }
+
+    // Vector pointing RIGHT relative to the line's forward direction
+    float shift_x = half_width_cm * cosf(heading);
+    float shift_y = half_width_cm * -sinf(heading);
+
+    // If it's the right line, the center is to its LEFT, so we invert the shift
+    if (is_right_line) {
+        shift_x = -shift_x;
+        shift_y = -shift_y;
+    }
+
+    result.X0 = x_near + shift_x;
+    result.Y0 = y_near + shift_y;
+    result.X1 = x_far + shift_x;
+    result.Y1 = y_far + shift_y;
+
+    result.cte = result.X0;
+    result.heading = heading;
+    result.valid = 1;
+
+    return result;
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Debug dump: every raw vector Pixy saw this frame (pixel + ground +  */
@@ -379,99 +463,99 @@ void print_frame_debug(const uint16_t *vectors, size_t num_vectors)
 /*  fail without writing its output params. Recommend migrating call    */
 /*  sites and removing this once confirmed nothing else needs it.       */
 /* ------------------------------------------------------------------ */
-#define LC_MAX 10
+// #define LC_MAX 10
 
-lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
-{
-    lane_result_t result = {0.0f, 0.0f, 0};
-    if (num_vectors == 0) return result;
+// lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors)
+// {
+//     lane_result_t result = {0.0f, 0.0f, 0};
+//     if (num_vectors == 0) return result;
 
-    struct {
-        float   x_mid;
-        float   angle;
-        uint8_t idx;
-    } v[LC_MAX];
-    size_t n = 0;
+//     struct {
+//         float   x_mid;
+//         float   angle;
+//         uint8_t idx;
+//     } v[LC_MAX];
+//     size_t n = 0;
 
-    for (size_t i = 0; i < num_vectors && i < LC_MAX; i++) {
-        // No scaling — see select_boundary_vectors() above for why.
-        float u0 = (float)vectors[6*i + 0];
-        float v0 = (float)vectors[6*i + 1];
-        float u1 = (float)vectors[6*i + 2];
-        float v1 = (float)vectors[6*i + 3];
+//     for (size_t i = 0; i < num_vectors && i < LC_MAX; i++) {
+//         // No scaling — see select_boundary_vectors() above for why.
+//         float u0 = (float)vectors[6*i + 0];
+//         float v0 = (float)vectors[6*i + 1];
+//         float u1 = (float)vectors[6*i + 2];
+//         float v1 = (float)vectors[6*i + 3];
 
-        float X0 = 0.0f, Y0 = 0.0f, X1 = 0.0f, Y1 = 0.0f;
-        uint8_t ok0 = pixel_to_ground(u0, v0, &X0, &Y0);
-        uint8_t ok1 = pixel_to_ground(u1, v1, &X1, &Y1);
-        if (!ok0 || !ok1) continue; // patched: skip rather than use uninitialized X/Y
+//         float X0 = 0.0f, Y0 = 0.0f, X1 = 0.0f, Y1 = 0.0f;
+//         uint8_t ok0 = pixel_to_ground(u0, v0, &X0, &Y0);
+//         uint8_t ok1 = pixel_to_ground(u1, v1, &X1, &Y1);
+//         if (!ok0 || !ok1) continue; // patched: skip rather than use uninitialized X/Y
 
-        v[n].x_mid = (X0 + X1) * 0.5f;
-        v[n].angle = atan2f(X1 - X0, Y1 - Y0);
-        v[n].idx   = (uint8_t)vectors[6*i + 4];
-        n++;
-    }
+//         v[n].x_mid = (X0 + X1) * 0.5f;
+//         v[n].angle = atan2f(X1 - X0, Y1 - Y0);
+//         v[n].idx   = (uint8_t)vectors[6*i + 4];
+//         n++;
+//     }
 
-    if (n == 0) return result;
+//     if (n == 0) return result;
 
-    if (n == 1) {
-        result.cte         = v[0].x_mid;
-        result.heading     = v[0].angle;
-        result.lines_found = 1;
-        return result;
-    }
+//     if (n == 1) {
+//         result.cte         = v[0].x_mid;
+//         result.heading     = v[0].angle;
+//         result.lines_found = 1;
+//         return result;
+//     }
 
-    struct {
-        uint8_t idx;
-        float   x_sum;
-        float   a_sum;
-        uint8_t cnt;
-    } grp[LC_MAX];
-    size_t ng = 0;
+//     struct {
+//         uint8_t idx;
+//         float   x_sum;
+//         float   a_sum;
+//         uint8_t cnt;
+//     } grp[LC_MAX];
+//     size_t ng = 0;
 
-    for (size_t i = 0; i < n; i++) {
-        int found = -1;
-        for (size_t g = 0; g < ng; g++) {
-            if (grp[g].idx == v[i].idx) { found = (int)g; break; }
-        }
-        if (found >= 0) {
-            grp[found].x_sum += v[i].x_mid;
-            grp[found].a_sum += v[i].angle;
-            grp[found].cnt++;
-        } else {
-            grp[ng].idx   = v[i].idx;
-            grp[ng].x_sum = v[i].x_mid;
-            grp[ng].a_sum = v[i].angle;
-            grp[ng].cnt   = 1;
-            ng++;
-        }
-    }
+//     for (size_t i = 0; i < n; i++) {
+//         int found = -1;
+//         for (size_t g = 0; g < ng; g++) {
+//             if (grp[g].idx == v[i].idx) { found = (int)g; break; }
+//         }
+//         if (found >= 0) {
+//             grp[found].x_sum += v[i].x_mid;
+//             grp[found].a_sum += v[i].angle;
+//             grp[found].cnt++;
+//         } else {
+//             grp[ng].idx   = v[i].idx;
+//             grp[ng].x_sum = v[i].x_mid;
+//             grp[ng].a_sum = v[i].angle;
+//             grp[ng].cnt   = 1;
+//             ng++;
+//         }
+//     }
 
-    if (ng >= 2) {
-        int   gl = 0, gr = 0;
-        float xl = grp[0].x_sum / grp[0].cnt;
-        float xr = xl;
+//     if (ng >= 2) {
+//         int   gl = 0, gr = 0;
+//         float xl = grp[0].x_sum / grp[0].cnt;
+//         float xr = xl;
 
-        for (size_t g = 1; g < ng; g++) {
-            float avg = grp[g].x_sum / grp[g].cnt;
-            if (avg < xl) { xl = avg; gl = (int)g; }
-            if (avg > xr) { xr = avg; gr = (int)g; }
-        }
+//         for (size_t g = 1; g < ng; g++) {
+//             float avg = grp[g].x_sum / grp[g].cnt;
+//             if (avg < xl) { xl = avg; gl = (int)g; }
+//             if (avg > xr) { xr = avg; gr = (int)g; }
+//         }
 
-        result.cte     = (xl + xr) * 0.5f;
-        result.heading = (grp[gl].a_sum / grp[gl].cnt +
-                          grp[gr].a_sum / grp[gr].cnt) * 0.5f;
-        result.lines_found = 2;
-    } else {
-        int   best   = 0;
-        float best_d = fabsf(v[0].x_mid);
-        for (size_t i = 1; i < n; i++) {
-            float d = fabsf(v[i].x_mid);
-            if (d < best_d) { best_d = d; best = (int)i; }
-        }
-        result.cte         = v[best].x_mid;
-        result.heading     = v[best].angle;
-        result.lines_found = 1;
-    }
+//         result.cte     = (xl + xr) * 0.5f;
+//         result.heading = (grp[gl].a_sum / grp[gl].cnt +
+//                           grp[gr].a_sum / grp[gr].cnt) * 0.5f;
+//         result.lines_found = 2;
+//     } else {
+//         int   best   = 0;
+//         float best_d = fabsf(v[0].x_mid);
+//         for (size_t i = 1; i < n; i++) {
+//             float d = fabsf(v[i].x_mid);
+//             if (d < best_d) { best_d = d; best = (int)i; }
+//         }
+//         result.cte         = v[best].x_mid;
+//         result.heading     = v[best].angle;
+//         result.lines_found = 1;
+//     }
 
-    return result;
-}
+//     return result;
+// }

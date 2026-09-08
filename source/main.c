@@ -34,8 +34,9 @@
    measured values. Tune against your actual track using print_frame_debug
    / live_vectors.py to see what heading your real corners produce, the
    same way everything else in this pipeline got tuned. ---- */
-#define CORNER_HEADING_THRESHOLD_DEG   20.0f
-#define CORNER_ENTER_STREAK            3   /* consecutive corner-like ticks before braking */
+
+#define CORNER_HEADING_THRESHOLD_DEG   12.0f
+#define CORNER_ENTER_STREAK            2   /* consecutive corner-like ticks before braking */
 #define CORNER_EXIT_STREAK             5   /* consecutive straight ticks before resuming -- higher than
                                                ENTER on purpose: quick to get cautious, slower to fully commit again */
 
@@ -134,6 +135,7 @@ int main(void)
 	MRT_StartTimer(MRT0, TICK_CHANNEL, MSEC_TO_COUNT(20, mrtClockHz));
 
 	uint32_t count = 0;
+    
 
     /* ---------- 6. Main loop ---------- */
     while (1) {
@@ -170,26 +172,45 @@ int main(void)
                     uint8_t confident_straight = 0;
                     float   e_cte     = 0.0f;
                     float   e_heading = 0.0f;
+                    uint8_t computed  = 0;
 
                     if (found == 2) {
                         center_line_t c = compute_center_line(&left, &right);
                         if (c.valid) {
                             e_cte     = c.cte;                       /* already cm */
                             e_heading = c.heading * HEADING_TO_DEG;  /* rad -> deg */
+                            computed  = 1;
 
                             if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
                                 confident_straight = 1;
                             }
+                        } else {
+                            // Two lines found but no Y overlap. Treat as 1 line using the longer one.
+                            float l_len = (left.Y1 - left.Y0)*(left.Y1 - left.Y0) + (left.X1 - left.X0)*(left.X1 - left.X0);
+                            float r_len = (right.Y1 - right.Y0)*(right.Y1 - right.Y0) + (right.X1 - right.X0)*(right.X1 - right.X0);
+                            center_line_t c_single = compute_center_line_single(l_len > r_len ? &left : &right);
+                            if (c_single.valid) {
+                                e_cte     = c_single.cte;
+                                e_heading = c_single.heading * HEADING_TO_DEG;
+                                computed  = 1;
+
+                                if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
+                                    confident_straight = 1;
+                                }
+                            }
                         }
-                        /* c.valid == 0 (no Y overlap between boundaries) falls
-                           through as NOT confident_straight -- this is exactly
-                           what an intersection produces, so it gets treated as
-                           corner-like/cautious rather than fed to steering. */
+                    } else if (found == 1) {
+                        center_line_t c = compute_center_line_single(&left);
+                        if (c.valid) {
+                            e_cte     = c.cte;
+                            e_heading = c.heading * HEADING_TO_DEG;
+                            computed  = 1;
+                            
+                            if (fabsf(e_heading) < CORNER_HEADING_THRESHOLD_DEG) {
+                                confident_straight = 1;
+                            }
+                        }
                     }
-                    /* found == 0 or 1: also not confident_straight. Single-line
-                       left/right classification is still deferred, per earlier
-                       discussion -- for now this case is treated the same as a
-                       corner rather than guessed at. */
 
                     if (confident_straight) {
                         straight_streak = (straight_streak < CORNER_EXIT_STREAK) ? straight_streak + 1 : straight_streak;
@@ -212,7 +233,26 @@ int main(void)
                         drive_state = DRIVE_FORWARD;
                     }
 
-                    if (drive_state == DRIVE_FORWARD) {
+                    if (computed) {
+                        /* ---- Spike rejection ----
+                         * Clamp CTE to a physically reasonable range.
+                         * The car can't be more than half a lane width from center
+                         * and still be on the track. */
+                        const float MAX_CTE_CM = LANE_WIDTH_M * 100.0f + 5.0f; /* half-width + 5 cm margin */
+                        if (e_cte >  MAX_CTE_CM) e_cte =  MAX_CTE_CM;
+                        if (e_cte < -MAX_CTE_CM) e_cte = -MAX_CTE_CM;
+
+                        /* Rate limiter: reject frame-to-frame jumps larger than
+                         * what the car can physically traverse in one tick.
+                         * At 30% duty (~1 m/s) and 20 ms tick, max displacement ~ 2 cm.
+                         * Allow 8 cm/tick to be generous with noise. */
+                        if (cte_filter_init) {
+                            const float MAX_CTE_JUMP = 8.0f;
+                            float delta = e_cte - filtered_cte;
+                            if (delta >  MAX_CTE_JUMP) e_cte = filtered_cte + MAX_CTE_JUMP;
+                            if (delta < -MAX_CTE_JUMP) e_cte = filtered_cte - MAX_CTE_JUMP;
+                        }
+
                         /* EMA filter on CTE to smooth frame-to-frame noise */
                         if (!cte_filter_init) {
                             filtered_cte    = e_cte;
@@ -226,26 +266,41 @@ int main(void)
 
                         float steer_cmd = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                        /* debug: L=boundaries found  R=raw_cte*10  F=filtered_cte*10  S=steer*10  ST=drive state */
-                        esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n",
-                                   (unsigned)found,
-                                   (int)(e_cte * 10.0f),
-                                   (int)(filtered_cte * 10.0f),
-                                   (int)(steer_cmd * 10.0f));
+                        if (drive_state == DRIVE_FORWARD) {
+                            esp_printf("L:%u R:%d F:%d S:%d ST:F\r\n",
+                                       (unsigned)found,
+                                       (int)(e_cte * 10.0f),
+                                       (int)(filtered_cte * 10.0f),
+                                       (int)(steer_cmd * 10.0f));
+                        
 
-                        Steer(steer_cmd + g_params.steering_offset);
-
-                        /* g_params.base_speed_left/right is your existing tunable
-                           drive speed -- set it to whatever value corresponds to
-                           30% in HbridgeSpeed's own units. Not hardcoding a "30"
-                           literal here since I don't know HbridgeSpeed's actual
-                           scale (could be raw PWM ticks, not a 0-100 percentage). */
-                        HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
-
-                    } else { /* DRIVE_BRAKING */
-                        esp_printf("L:%u ST:B (corner)\r\n", (unsigned)found);
-                        Steer(g_params.steering_offset);  /* wheels centered while stopped, not left at a stale angle */
-                        HbridgeBrake(&g_hbridge);
+                            Steer(steer_cmd + g_params.steering_offset);
+                            HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                        } else { /* DRIVE_BRAKING */
+                            esp_printf("L:%u R:%d F:%d S:%d ST:B (corner)\r\n", 
+                                       (unsigned)found,
+                                       (int)(e_cte * 10.0f),
+                                       (int)(filtered_cte * 10.0f),
+                                       (int)(steer_cmd * 10.0f));
+            
+                            
+                            Steer(steer_cmd + g_params.steering_offset);
+                            // Do not multiply by 0.6f as it stalls the motors (below deadband)
+                            HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                        }
+                    } else {
+                        // No valid line computed
+                        if (drive_state == DRIVE_FORWARD) {
+                            esp_printf("L:%u ST:F (blind)\r\n", (unsigned)found);
+                            Steer(g_params.steering_offset);
+                            HbridgeSpeed(&g_hbridge, (int16_t)g_params.base_speed_left, (int16_t)g_params.base_speed_right);
+                        } else {
+                            esp_printf("L:%u ST:B (corner, blind)\r\n", (unsigned)found);
+                            esp_printf("L:%u ST:B (corner, blind)\r\n", (unsigned)found);
+                            Steer(g_params.steering_offset);
+                            // Only brake if we truly see nothing
+                            HbridgeBrake(&g_hbridge);
+                        }
                     }
                 }
 

@@ -75,6 +75,7 @@ uint8_t pixel_to_ground(float u, float v, float *X, float *Y);
 uint8_t select_boundary_vectors(const uint16_t *vectors, size_t num_vectors,
                                  ground_vector_t *left, ground_vector_t *right);
 center_line_t compute_center_line(const ground_vector_t *left, const ground_vector_t *right);
+center_line_t compute_center_line_single(const ground_vector_t *line);
 void print_frame_debug(const uint16_t *vectors, size_t num_vectors);
 
 lane_result_t compute_lane_center(uint16_t *vectors, size_t num_vectors);

@@ -2,12 +2,13 @@
 #include "peripherals.h"
 #include "fsl_debug_console.h"
 #include "utils.h"
+#include "servo.h"
 #include <math.h>
 
 void Steer(float angle)
 {
-    if (angle > 100.0f)  angle = 100.0f;
-    if (angle < -100.0f) angle = -100.0f;
+    if (angle > MAX_STEER)  angle = MAX_STEER;
+    if (angle < -MAX_STEER) angle = -MAX_STEER;
 
     float duty = 5.0f + ((angle + 100.0f) / 200.0f) * 5.0f;
 
