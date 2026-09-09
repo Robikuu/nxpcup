@@ -10961,7 +10961,7 @@ END GROUP
  *(SORT_BY_ALIGNMENT(.rodata.$Flash2.*))
  *(SORT_BY_ALIGNMENT(.rodata.$PROGRAM_FLASH1.*))
 
-.text           0x00000000    0x13508
+.text           0x00000000    0x13524
  FILL mask 0xff
                 0x00000000                        __vectors_start__ = ABSOLUTE (.)
  *(SORT_BY_ALIGNMENT(.isr_vector))
@@ -10971,16 +10971,16 @@ END GROUP
                 0x000002b0                        . = ALIGN (0x4)
                 0x000002b0                        __section_table_start = .
                 0x000002b0                        __data_section_table = .
-                0x000002b0        0x4 LONG 0x13510 LOADADDR (.data)
+                0x000002b0        0x4 LONG 0x1352c LOADADDR (.data)
                 0x000002b4        0x4 LONG 0x20000000 ADDR (.data)
                 0x000002b8        0x4 LONG 0x724 SIZEOF (.data)
-                0x000002bc        0x4 LONG 0x13510 LOADADDR (.data_RAM2)
+                0x000002bc        0x4 LONG 0x1352c LOADADDR (.data_RAM2)
                 0x000002c0        0x4 LONG 0x4000000 ADDR (.data_RAM2)
                 0x000002c4        0x4 LONG 0x0 SIZEOF (.data_RAM2)
-                0x000002c8        0x4 LONG 0x13510 LOADADDR (.data_RAM3)
+                0x000002c8        0x4 LONG 0x1352c LOADADDR (.data_RAM3)
                 0x000002cc        0x4 LONG 0x20060000 ADDR (.data_RAM3)
                 0x000002d0        0x4 LONG 0x0 SIZEOF (.data_RAM3)
-                0x000002d4        0x4 LONG 0x13510 LOADADDR (.data_RAM4)
+                0x000002d4        0x4 LONG 0x1352c LOADADDR (.data_RAM4)
                 0x000002d8        0x4 LONG 0x400ba000 ADDR (.data_RAM4)
                 0x000002dc        0x4 LONG 0x0 SIZEOF (.data_RAM4)
                 0x000002e0                        __data_section_table_end = .
@@ -11390,1545 +11390,1545 @@ END GROUP
  .text.findPll1MMult
                 0x000096ac       0xac CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
  .text.params_init
-                0x00009758       0x74 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00009758       0x84 CMakeFiles/nxpcup.dir/source/wifi_config.o
                 0x00009758                params_init
  .text.parse_float
-                0x000097cc      0x154 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x000097dc      0x154 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.send_ack
-                0x00009920       0x28 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00009930       0x28 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.send_ack_dbl
-                0x00009948       0x90 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00009958       0x90 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.append_flt
-                0x000099d8       0x98 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x000099e8       0x98 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.command_execute
-                0x00009a70      0x6a4 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00009a80      0x6a4 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.command_poll
-                0x0000a114       0x88 CMakeFiles/nxpcup.dir/source/wifi_config.o
-                0x0000a114                command_poll
+                0x0000a124       0x88 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x0000a124                command_poll
  .text.esp_printf
-                0x0000a19c       0x5c CMakeFiles/nxpcup.dir/source/wifi_config.o
-                0x0000a19c                esp_printf
+                0x0000a1ac       0x5c CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x0000a1ac                esp_printf
  .text.select_boundary_vectors
-                0x0000a1f8      0x5e0 CMakeFiles/nxpcup.dir/source/vectors.o
-                0x0000a1f8                select_boundary_vectors
+                0x0000a208      0x5e0 CMakeFiles/nxpcup.dir/source/vectors.o
+                0x0000a208                select_boundary_vectors
  .text.interp_x_at_y
-                0x0000a7d8       0xc8 CMakeFiles/nxpcup.dir/source/vectors.o
+                0x0000a7e8       0xc8 CMakeFiles/nxpcup.dir/source/vectors.o
  .text.compute_center_line_single
-                0x0000a8a0      0x124 CMakeFiles/nxpcup.dir/source/vectors.o
-                0x0000a8a0                compute_center_line_single
+                0x0000a8b0      0x124 CMakeFiles/nxpcup.dir/source/vectors.o
+                0x0000a8b0                compute_center_line_single
  .text.button_pressed_edge
-                0x0000a9c4       0x40 CMakeFiles/nxpcup.dir/source/utils.o
-                0x0000a9c4                button_pressed_edge
- .text.Steer    0x0000aa04       0xc0 CMakeFiles/nxpcup.dir/source/servo.o
-                0x0000aa04                Steer
+                0x0000a9d4       0x40 CMakeFiles/nxpcup.dir/source/utils.o
+                0x0000a9d4                button_pressed_edge
+ .text.Steer    0x0000aa14       0xc0 CMakeFiles/nxpcup.dir/source/servo.o
+                0x0000aa14                Steer
  .text.pixy_edma_cb
-                0x0000aac4       0x2c CMakeFiles/nxpcup.dir/source/pixy.o
+                0x0000aad4       0x2c CMakeFiles/nxpcup.dir/source/pixy.o
  .text.pixy_init
-                0x0000aaf0       0x44 CMakeFiles/nxpcup.dir/source/pixy.o
-                0x0000aaf0                pixy_init
+                0x0000ab00       0x44 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x0000ab00                pixy_init
  .text.pixy_send
-                0x0000ab34       0x70 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x0000ab44       0x70 CMakeFiles/nxpcup.dir/source/pixy.o
  .text.pixy_recv
-                0x0000aba4       0x74 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x0000abb4       0x74 CMakeFiles/nxpcup.dir/source/pixy.o
  .text.pixy_get_vectors
-                0x0000ac18      0x1fc CMakeFiles/nxpcup.dir/source/pixy.o
-                0x0000ac18                pixy_get_vectors
+                0x0000ac28      0x1fc CMakeFiles/nxpcup.dir/source/pixy.o
+                0x0000ac28                pixy_get_vectors
  .text.__NVIC_EnableIRQ
-                0x0000ae14       0x3c CMakeFiles/nxpcup.dir/source/main.o
+                0x0000ae24       0x3c CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT_GetDefaultConfig
-                0x0000ae50       0x34 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000ae60       0x34 CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT_SetupChannelMode
-                0x0000ae84       0x64 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000ae94       0x64 CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT_EnableInterrupts
-                0x0000aee8       0x50 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000aef8       0x50 CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT_ClearStatusFlags
-                0x0000af38       0x48 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000af48       0x48 CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT_StartTimer
-                0x0000af80       0x60 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000af90       0x60 CMakeFiles/nxpcup.dir/source/main.o
  .text.MRT0_IRQHandler
-                0x0000afe0       0x20 CMakeFiles/nxpcup.dir/source/main.o
-                0x0000afe0                MRT0_IRQHandler
- .text.main     0x0000b000      0x838 CMakeFiles/nxpcup.dir/source/main.o
-                0x0000b000                main
+                0x0000aff0       0x20 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000aff0                MRT0_IRQHandler
+ .text.main     0x0000b010      0x830 CMakeFiles/nxpcup.dir/source/main.o
+                0x0000b010                main
  .text.HbridgeInit
-                0x0000b838       0x6c CMakeFiles/nxpcup.dir/source/hbridge.o
-                0x0000b838                HbridgeInit
- .text.memset   0x0000b8a4       0x54 CMakeFiles/nxpcup.dir/utilities/fsl_memset.obj
-                0x0000b8a4                memset
- .text.memcpy   0x0000b8f8       0xa0 CMakeFiles/nxpcup.dir/utilities/fsl_memcpy.obj
-                0x0000b8f8                memcpy
+                0x0000b840       0x6c CMakeFiles/nxpcup.dir/source/hbridge.o
+                0x0000b840                HbridgeInit
+ .text.memset   0x0000b8ac       0x54 CMakeFiles/nxpcup.dir/utilities/fsl_memset.obj
+                0x0000b8ac                memset
+ .text.memcpy   0x0000b900       0xa0 CMakeFiles/nxpcup.dir/utilities/fsl_memcpy.obj
+                0x0000b900                memcpy
  .text.__assert_func
-                0x0000b998       0x40 CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
-                0x0000b998                __assert_func
- .text          0x0000b9d8      0x378 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_addsubdf3.o)
-                0x0000b9d8                __aeabi_drsub
-                0x0000b9e0                __aeabi_dsub
-                0x0000b9e0                __subdf3
-                0x0000b9e4                __aeabi_dadd
-                0x0000b9e4                __adddf3
-                0x0000bc5c                __floatunsidf
-                0x0000bc5c                __aeabi_ui2d
-                0x0000bc7c                __floatsidf
-                0x0000bc7c                __aeabi_i2d
-                0x0000bca0                __aeabi_f2d
-                0x0000bca0                __extendsfdf2
-                0x0000bce4                __floatundidf
-                0x0000bce4                __aeabi_ul2d
-                0x0000bcf4                __floatdidf
-                0x0000bcf4                __aeabi_l2d
- .text          0x0000bd50      0x424 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_muldivdf3.o)
-                0x0000bd50                __aeabi_dmul
-                0x0000bd50                __muldf3
-                0x0000bfa4                __divdf3
-                0x0000bfa4                __aeabi_ddiv
- .text          0x0000c174      0x110 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_cmpdf2.o)
-                0x0000c174                __gtdf2
-                0x0000c174                __gedf2
-                0x0000c17c                __ltdf2
-                0x0000c17c                __ledf2
-                0x0000c184                __nedf2
-                0x0000c184                __eqdf2
-                0x0000c184                __cmpdf2
-                0x0000c200                __aeabi_cdrcmple
-                0x0000c210                __aeabi_cdcmpeq
-                0x0000c210                __aeabi_cdcmple
-                0x0000c220                __aeabi_dcmpeq
-                0x0000c234                __aeabi_dcmplt
-                0x0000c248                __aeabi_dcmple
-                0x0000c25c                __aeabi_dcmpge
-                0x0000c270                __aeabi_dcmpgt
- .text          0x0000c284       0x50 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_fixdfsi.o)
-                0x0000c284                __aeabi_d2iz
-                0x0000c284                __fixdfsi
- .text          0x0000c2d4       0x30 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_aeabi_uldivmod.o)
-                0x0000c2d4                __aeabi_uldivmod
+                0x0000b9a0       0x40 CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+                0x0000b9a0                __assert_func
+ .text          0x0000b9e0      0x378 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_addsubdf3.o)
+                0x0000b9e0                __aeabi_drsub
+                0x0000b9e8                __aeabi_dsub
+                0x0000b9e8                __subdf3
+                0x0000b9ec                __aeabi_dadd
+                0x0000b9ec                __adddf3
+                0x0000bc64                __floatunsidf
+                0x0000bc64                __aeabi_ui2d
+                0x0000bc84                __floatsidf
+                0x0000bc84                __aeabi_i2d
+                0x0000bca8                __aeabi_f2d
+                0x0000bca8                __extendsfdf2
+                0x0000bcec                __floatundidf
+                0x0000bcec                __aeabi_ul2d
+                0x0000bcfc                __floatdidf
+                0x0000bcfc                __aeabi_l2d
+ .text          0x0000bd58      0x424 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_muldivdf3.o)
+                0x0000bd58                __aeabi_dmul
+                0x0000bd58                __muldf3
+                0x0000bfac                __divdf3
+                0x0000bfac                __aeabi_ddiv
+ .text          0x0000c17c      0x110 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_cmpdf2.o)
+                0x0000c17c                __gtdf2
+                0x0000c17c                __gedf2
+                0x0000c184                __ltdf2
+                0x0000c184                __ledf2
+                0x0000c18c                __nedf2
+                0x0000c18c                __eqdf2
+                0x0000c18c                __cmpdf2
+                0x0000c208                __aeabi_cdrcmple
+                0x0000c218                __aeabi_cdcmpeq
+                0x0000c218                __aeabi_cdcmple
+                0x0000c228                __aeabi_dcmpeq
+                0x0000c23c                __aeabi_dcmplt
+                0x0000c250                __aeabi_dcmple
+                0x0000c264                __aeabi_dcmpge
+                0x0000c278                __aeabi_dcmpgt
+ .text          0x0000c28c       0x50 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_fixdfsi.o)
+                0x0000c28c                __aeabi_d2iz
+                0x0000c28c                __fixdfsi
+ .text          0x0000c2dc       0x30 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_aeabi_uldivmod.o)
+                0x0000c2dc                __aeabi_uldivmod
  .text.__fixunssfdi
-                0x0000c304       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_fixunssfdi.o)
-                0x0000c304                __fixunssfdi
-                0x0000c304                __aeabi_f2ulz
+                0x0000c30c       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_fixunssfdi.o)
+                0x0000c30c                __fixunssfdi
+                0x0000c30c                __aeabi_f2ulz
  .text.__udivmoddi4
-                0x0000c344      0x34c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_udivmoddi4.o)
-                0x0000c344                __udivmoddi4
- .text          0x0000c690        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_dvmd_tls.o)
-                0x0000c690                __aeabi_idiv0
-                0x0000c690                __aeabi_ldiv0
- .text          0x0000c694       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_fixunsdfsi.o)
-                0x0000c694                __aeabi_d2uiz
-                0x0000c694                __fixunsdfsi
+                0x0000c34c      0x34c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_udivmoddi4.o)
+                0x0000c34c                __udivmoddi4
+ .text          0x0000c698        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_dvmd_tls.o)
+                0x0000c698                __aeabi_idiv0
+                0x0000c698                __aeabi_ldiv0
+ .text          0x0000c69c       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_fixunsdfsi.o)
+                0x0000c69c                __aeabi_d2uiz
+                0x0000c69c                __fixunsdfsi
  .text._malloc_r
-                0x0000c6d4      0x578 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mallocr.o)
-                0x0000c6d4                _malloc_r
+                0x0000c6dc      0x578 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mallocr.o)
+                0x0000c6dc                _malloc_r
  .text.__malloc_lock
-                0x0000cc4c        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mlock.o)
-                0x0000cc4c                __malloc_lock
+                0x0000cc54        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mlock.o)
+                0x0000cc54                __malloc_lock
  .text.__malloc_unlock
-                0x0000cc58        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mlock.o)
-                0x0000cc58                __malloc_unlock
- .text.printf   0x0000cc64       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-printf.o)
-                0x0000cc64                printf
+                0x0000cc60        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mlock.o)
+                0x0000cc60                __malloc_unlock
+ .text.printf   0x0000cc6c       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-printf.o)
+                0x0000cc6c                printf
  .text.snprintf
-                0x0000cc8c       0x90 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-snprintf.o)
-                0x0000cc8c                snprintf
+                0x0000cc94       0x90 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-snprintf.o)
+                0x0000cc94                snprintf
  .text.vsnprintf
-                0x0000cd1c       0x78 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vsnprintf.o)
-                0x0000cd1c                vsnprintf
- .text.strchr   0x0000cd94       0xd0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strchr.o)
-                0x0000cd94                strchr
- .text.strncpy  0x0000ce64       0x64 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strncpy.o)
-                0x0000ce64                strncpy
- .text._sbrk_r  0x0000cec8       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sbrkr.o)
-                0x0000cec8                _sbrk_r
- .text.__errno  0x0000ceec        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-errno.o)
-                0x0000ceec                __errno
+                0x0000cd24       0x78 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vsnprintf.o)
+                0x0000cd24                vsnprintf
+ .text.strchr   0x0000cd9c       0xd0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strchr.o)
+                0x0000cd9c                strchr
+ .text.strncpy  0x0000ce6c       0x64 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strncpy.o)
+                0x0000ce6c                strncpy
+ .text._sbrk_r  0x0000ced0       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sbrkr.o)
+                0x0000ced0                _sbrk_r
+ .text.__errno  0x0000cef4        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-errno.o)
+                0x0000cef4                __errno
  .text.__retarget_lock_init_recursive
-                0x0000cef8        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
-                0x0000cef8                __retarget_lock_init_recursive
- .text.__retarget_lock_close_recursive
-                0x0000cefc        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
-                0x0000cefc                __retarget_lock_close_recursive
- .text.__retarget_lock_acquire_recursive
                 0x0000cf00        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
-                0x0000cf00                __retarget_lock_acquire_recursive
- .text.__retarget_lock_release_recursive
+                0x0000cf00                __retarget_lock_init_recursive
+ .text.__retarget_lock_close_recursive
                 0x0000cf04        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
-                0x0000cf04                __retarget_lock_release_recursive
- .text.sysconf  0x0000cf08       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sysconf.o)
-                0x0000cf08                sysconf
- .text          0x0000cf24      0x1bc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strcmp.o)
-                0x0000cf24                strcmp
- .text.strlen   0x0000d0e0       0x5c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strlen-stub.o)
-                0x0000d0e0                strlen
+                0x0000cf04                __retarget_lock_close_recursive
+ .text.__retarget_lock_acquire_recursive
+                0x0000cf08        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
+                0x0000cf08                __retarget_lock_acquire_recursive
+ .text.__retarget_lock_release_recursive
+                0x0000cf0c        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lock.o)
+                0x0000cf0c                __retarget_lock_release_recursive
+ .text.sysconf  0x0000cf10       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sysconf.o)
+                0x0000cf10                sysconf
+ .text          0x0000cf2c      0x1bc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strcmp.o)
+                0x0000cf2c                strcmp
+ .text.strlen   0x0000d0e8       0x5c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strlen-stub.o)
+                0x0000d0e8                strlen
  .text._malloc_trim_r
-                0x0000d13c       0xb8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-freer.o)
-                0x0000d13c                _malloc_trim_r
- .text._free_r  0x0000d1f4      0x1e8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-freer.o)
-                0x0000d1f4                _free_r
+                0x0000d144       0xb8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-freer.o)
+                0x0000d144                _malloc_trim_r
+ .text._free_r  0x0000d1fc      0x1e8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-freer.o)
+                0x0000d1fc                _free_r
  .text.__sbprintf
-                0x0000d3dc       0x84 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
+                0x0000d3e4       0x84 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
  .text.__sprint_r
-                0x0000d460       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sprint_r.o)
-                0x0000d460                __sprint_r
+                0x0000d468       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-sprint_r.o)
+                0x0000d468                __sprint_r
  .text.__ssprint_r
-                0x0000d480       0x58 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ssprint_r.o)
-                0x0000d480                __ssprint_r
+                0x0000d488       0x58 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ssprint_r.o)
+                0x0000d488                __ssprint_r
  .text.__sflush_r
-                0x0000d4d8      0x134 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fflush.o)
-                0x0000d4d8                __sflush_r
+                0x0000d4e0      0x134 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fflush.o)
+                0x0000d4e0                __sflush_r
  .text._fflush_r
-                0x0000d60c       0x54 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fflush.o)
-                0x0000d60c                _fflush_r
+                0x0000d614       0x54 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fflush.o)
+                0x0000d614                _fflush_r
  .text.stdio_exit_handler
-                0x0000d660       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+                0x0000d668       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
  .text.cleanup_stdio
-                0x0000d678       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+                0x0000d680       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
  .text.global_stdio_init.part.0
-                0x0000d6b8       0xf0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
- .text.__sinit  0x0000d7a8       0x3c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
-                0x0000d7a8                __sinit
+                0x0000d6c0       0xf0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+ .text.__sinit  0x0000d7b0       0x3c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+                0x0000d7b0                __sinit
  .text.__sfp_lock_acquire
-                0x0000d7e4        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
-                0x0000d7e4                __sfp_lock_acquire
+                0x0000d7ec        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+                0x0000d7ec                __sfp_lock_acquire
  .text.__sfp_lock_release
-                0x0000d7f0        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
-                0x0000d7f0                __sfp_lock_release
+                0x0000d7f8        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-findfp.o)
+                0x0000d7f8                __sfp_lock_release
  .text.__sfvwrite_r
-                0x0000d7fc      0x2e4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fvwrite.o)
-                0x0000d7fc                __sfvwrite_r
+                0x0000d804      0x2e4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fvwrite.o)
+                0x0000d804                __sfvwrite_r
  .text._fwalk_sglue
-                0x0000dae0       0x44 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fwalk.o)
-                0x0000dae0                _fwalk_sglue
- .text.__sread  0x0000db24       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
-                0x0000db24                __sread
+                0x0000dae8       0x44 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fwalk.o)
+                0x0000dae8                _fwalk_sglue
+ .text.__sread  0x0000db2c       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
+                0x0000db2c                __sread
  .text.__swrite
-                0x0000db48       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
-                0x0000db48                __swrite
- .text.__sseek  0x0000db88       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
-                0x0000db88                __sseek
+                0x0000db50       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
+                0x0000db50                __swrite
+ .text.__sseek  0x0000db90       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
+                0x0000db90                __sseek
  .text.__sclose
-                0x0000dbb0        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
-                0x0000dbb0                __sclose
+                0x0000dbb8        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-stdio.o)
+                0x0000dbb8                __sclose
  .text.__swsetup_r
-                0x0000dbb8      0x100 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wsetup.o)
-                0x0000dbb8                __swsetup_r
- .text.memmove  0x0000dcb8       0xfc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-memmove.o)
-                0x0000dcb8                memmove
+                0x0000dbc0      0x100 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wsetup.o)
+                0x0000dbc0                __swsetup_r
+ .text.memmove  0x0000dcc0       0xfc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-memmove.o)
+                0x0000dcc0                memmove
  .text.__locale_mb_cur_max
-                0x0000ddb4        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-locale.o)
-                0x0000ddb4                __locale_mb_cur_max
+                0x0000ddbc        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-locale.o)
+                0x0000ddbc                __locale_mb_cur_max
  .text._localeconv_r
-                0x0000ddc0        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-localeconv.o)
-                0x0000ddc0                _localeconv_r
+                0x0000ddc8        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-localeconv.o)
+                0x0000ddc8                _localeconv_r
  .text._close_r
-                0x0000ddc8       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-closer.o)
-                0x0000ddc8                _close_r
+                0x0000ddd0       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-closer.o)
+                0x0000ddd0                _close_r
  .text._lseek_r
-                0x0000ddec       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lseekr.o)
-                0x0000ddec                _lseek_r
- .text._read_r  0x0000de18       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-readr.o)
-                0x0000de18                _read_r
+                0x0000ddf4       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-lseekr.o)
+                0x0000ddf4                _lseek_r
+ .text._read_r  0x0000de20       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-readr.o)
+                0x0000de20                _read_r
  .text._write_r
-                0x0000de44       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-writer.o)
-                0x0000de44                _write_r
- .text.memchr   0x0000de70       0x80 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-memchr-stub.o)
-                0x0000de70                memchr
- .text.frexp    0x0000def0       0x64 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libm_a-s_frexp.o)
-                0x0000def0                frexp
- .text.quorem   0x0000df54      0x138 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-dtoa.o)
+                0x0000de4c       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-writer.o)
+                0x0000de4c                _write_r
+ .text.memchr   0x0000de78       0x80 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-memchr-stub.o)
+                0x0000de78                memchr
+ .text.frexp    0x0000def8       0x64 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libm_a-s_frexp.o)
+                0x0000def8                frexp
+ .text.quorem   0x0000df5c      0x138 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-dtoa.o)
  .text.__ascii_mbtowc
-                0x0000e08c       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mbtowc_r.o)
-                0x0000e08c                __ascii_mbtowc
- .text._Balloc  0x0000e0b8       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e0b8                _Balloc
- .text._Bfree   0x0000e104       0x14 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e104                _Bfree
+                0x0000e094       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mbtowc_r.o)
+                0x0000e094                __ascii_mbtowc
+ .text._Balloc  0x0000e0c0       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e0c0                _Balloc
+ .text._Bfree   0x0000e10c       0x14 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e10c                _Bfree
  .text.__multadd
-                0x0000e118       0xa4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e118                __multadd
+                0x0000e120       0xa4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e120                __multadd
  .text.__hi0bits
-                0x0000e1bc       0x54 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e1bc                __hi0bits
+                0x0000e1c4       0x54 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e1c4                __hi0bits
  .text.__lo0bits
-                0x0000e210       0x80 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e210                __lo0bits
- .text.__i2b    0x0000e290       0x5c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e290                __i2b
+                0x0000e218       0x80 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e218                __lo0bits
+ .text.__i2b    0x0000e298       0x5c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e298                __i2b
  .text.__multiply
-                0x0000e2ec      0x168 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e2ec                __multiply
+                0x0000e2f4      0x168 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e2f4                __multiply
  .text.__pow5mult
-                0x0000e454       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e454                __pow5mult
+                0x0000e45c       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e45c                __pow5mult
  .text.__lshift
-                0x0000e514       0xe4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e514                __lshift
- .text.__mcmp   0x0000e5f8       0x44 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e5f8                __mcmp
- .text.__mdiff  0x0000e63c      0x170 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e63c                __mdiff
- .text.__d2b    0x0000e7ac       0xbc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x0000e7ac                __d2b
+                0x0000e51c       0xe4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e51c                __lshift
+ .text.__mcmp   0x0000e600       0x44 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e600                __mcmp
+ .text.__mdiff  0x0000e644      0x170 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e644                __mdiff
+ .text.__d2b    0x0000e7b4       0xbc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x0000e7b4                __d2b
  .text._realloc_r
-                0x0000e868      0x374 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-reallocr.o)
-                0x0000e868                _realloc_r
+                0x0000e870      0x374 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-reallocr.o)
+                0x0000e870                _realloc_r
  .text.__ascii_wctomb
-                0x0000ebdc       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wctomb_r.o)
-                0x0000ebdc                __ascii_wctomb
+                0x0000ebe4       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wctomb_r.o)
+                0x0000ebe4                __ascii_wctomb
  .text._wcrtomb_r
-                0x0000ebf8       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcrtomb.o)
-                0x0000ebf8                _wcrtomb_r
+                0x0000ec00       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcrtomb.o)
+                0x0000ec00                _wcrtomb_r
  .text._wcsrtombs_r
-                0x0000ec44       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsrtombs.o)
-                0x0000ec44                _wcsrtombs_r
+                0x0000ec4c       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsrtombs.o)
+                0x0000ec4c                _wcsrtombs_r
  .text.__ssputs_r
-                0x0000ec5c       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ssputs_r.o)
-                0x0000ec5c                __ssputs_r
+                0x0000ec64       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ssputs_r.o)
+                0x0000ec64                __ssputs_r
  .text._fclose_r
-                0x0000ed1c       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fclose.o)
-                0x0000ed1c                _fclose_r
+                0x0000ed24       0xc0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fclose.o)
+                0x0000ed24                _fclose_r
  .text.__smakebuf_r
-                0x0000eddc       0xd0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-makebuf.o)
-                0x0000eddc                __smakebuf_r
+                0x0000ede4       0xd0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-makebuf.o)
+                0x0000ede4                __smakebuf_r
  .text._fstat_r
-                0x0000eeac       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fstatr.o)
-                0x0000eeac                _fstat_r
+                0x0000eeb4       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-fstatr.o)
+                0x0000eeb4                _fstat_r
  .text._isatty_r
-                0x0000eed8       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-isattyr.o)
-                0x0000eed8                _isatty_r
+                0x0000eee0       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-isattyr.o)
+                0x0000eee0                _isatty_r
  .text._calloc_r
-                0x0000eefc       0x70 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-callocr.o)
-                0x0000eefc                _calloc_r
+                0x0000ef04       0x70 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-callocr.o)
+                0x0000ef04                _calloc_r
  .text._wcsnrtombs_l
-                0x0000ef6c       0xf4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsnrtombs.o)
-                0x0000ef6c                _wcsnrtombs_l
+                0x0000ef74       0xf4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsnrtombs.o)
+                0x0000ef74                _wcsnrtombs_l
  .text._wcsnrtombs_r
-                0x0000f060       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsnrtombs.o)
-                0x0000f060                _wcsnrtombs_r
- .text.atan2f   0x0000f084        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-wf_atan2.o)
-                0x0000f084                atan2f
- .text.fabsf    0x0000f088       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fabs.o)
-                0x0000f088                fabsf
- .text.fmaxf    0x0000f098       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fmax.o)
-                0x0000f098                fmaxf
- .text.fminf    0x0000f0e4       0x50 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fmin.o)
-                0x0000f0e4                fminf
+                0x0000f068       0x24 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-wcsnrtombs.o)
+                0x0000f068                _wcsnrtombs_r
+ .text.atan2f   0x0000f08c        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-wf_atan2.o)
+                0x0000f08c                atan2f
+ .text.fabsf    0x0000f090       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fabs.o)
+                0x0000f090                fabsf
+ .text.fmaxf    0x0000f0a0       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fmax.o)
+                0x0000f0a0                fmaxf
+ .text.fminf    0x0000f0ec       0x50 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fmin.o)
+                0x0000f0ec                fminf
  .text.__fpclassifyf
-                0x0000f134       0x38 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fpclassify.o)
-                0x0000f134                __fpclassifyf
+                0x0000f13c       0x38 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_fpclassify.o)
+                0x0000f13c                __fpclassifyf
  .text.__ieee754_atan2f
-                0x0000f16c      0x154 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
-                0x0000f16c                __ieee754_atan2f
- .text.atanf    0x0000f2c0      0x1a4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
-                0x0000f2c0                atanf
- .text._sbrk    0x0000f464       0x3c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(_cr_sbrk.o)
-                0x0000f464                _sbrk
+                0x0000f174      0x154 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
+                0x0000f174                __ieee754_atan2f
+ .text.atanf    0x0000f2c8      0x1a4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
+                0x0000f2c8                atanf
+ .text._sbrk    0x0000f46c       0x3c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(_cr_sbrk.o)
+                0x0000f46c                _sbrk
  .text.initialise_monitor_handles.part.0
-                0x0000f4a0       0xa4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0000f4a8       0xa4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
  .text.findslot
-                0x0000f544       0x30 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
- .text._close   0x0000f574       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x0000f574                _close
+                0x0000f54c       0x30 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+ .text._close   0x0000f57c       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0000f57c                _close
  .text.__check_heap_overflow
-                0x0000f5c0       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(_cr_check_heap.o)
-                0x0000f5c0                __check_heap_overflow
- .text          0x0000f5d8       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_unorddf2.o)
-                0x0000f5d8                __unorddf2
-                0x0000f5d8                __aeabi_dcmpun
+                0x0000f5c8       0x18 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(_cr_check_heap.o)
+                0x0000f5c8                __check_heap_overflow
+ .text          0x0000f5e0       0x2c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_arm_unorddf2.o)
+                0x0000f5e0                __unorddf2
+                0x0000f5e0                __aeabi_dcmpun
  .text.CLOCK_EnableClock
-                0x0000f604       0x9a CMakeFiles/nxpcup.dir/board/pin_mux.o
+                0x0000f60c       0x9a CMakeFiles/nxpcup.dir/board/pin_mux.o
  .text.PORT_SetPinMux
-                0x0000f69e       0x3e CMakeFiles/nxpcup.dir/board/pin_mux.o
+                0x0000f6a6       0x3e CMakeFiles/nxpcup.dir/board/pin_mux.o
  .text.BOARD_InitBootPins
-                0x0000f6dc        0xc CMakeFiles/nxpcup.dir/board/pin_mux.o
-                0x0000f6dc                BOARD_InitBootPins
+                0x0000f6e4        0xc CMakeFiles/nxpcup.dir/board/pin_mux.o
+                0x0000f6e4                BOARD_InitBootPins
  .text.EnableIRQ
-                0x0000f6e8       0x32 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x0000f6f0       0x32 CMakeFiles/nxpcup.dir/board/peripherals.o
  .text.CTIMER_StartTimer
-                0x0000f71a       0x20 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x0000f722       0x20 CMakeFiles/nxpcup.dir/board/peripherals.o
  .text.GPIO0_init
-                0x0000f73a       0x14 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x0000f742       0x14 CMakeFiles/nxpcup.dir/board/peripherals.o
  .text.BOARD_InitPeripherals_CommonPostInit
-                0x0000f74e       0x32 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x0000f756       0x32 CMakeFiles/nxpcup.dir/board/peripherals.o
  .text.BOARD_InitBootPeripherals
-                0x0000f780        0xc CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x0000f780                BOARD_InitBootPeripherals
+                0x0000f788        0xc CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x0000f788                BOARD_InitBootPeripherals
  .text.BOARD_InitHardware
-                0x0000f78c       0x36 CMakeFiles/nxpcup.dir/board/hardware_init.o
-                0x0000f78c                BOARD_InitHardware
+                0x0000f794       0x36 CMakeFiles/nxpcup.dir/board/hardware_init.o
+                0x0000f794                BOARD_InitHardware
  .text.CLOCK_EnableClock
-                0x0000f7c2       0x9a CMakeFiles/nxpcup.dir/board/clock_config.o
+                0x0000f7ca       0x9a CMakeFiles/nxpcup.dir/board/clock_config.o
  .text.BOARD_InitBootClocks
-                0x0000f85c        0xc CMakeFiles/nxpcup.dir/board/clock_config.o
-                0x0000f85c                BOARD_InitBootClocks
+                0x0000f864        0xc CMakeFiles/nxpcup.dir/board/clock_config.o
+                0x0000f864                BOARD_InitBootClocks
  .text.DbgConsole_Error
-                0x0000f868       0x10 CMakeFiles/nxpcup.dir/board/board.o
+                0x0000f870       0x10 CMakeFiles/nxpcup.dir/board/board.o
  .text.SystemInitHook
-                0x0000f878        0xe CMakeFiles/nxpcup.dir/device/system_MCXN947_cm33_core0.o
-                0x0000f878                SystemInitHook
+                0x0000f880        0xe CMakeFiles/nxpcup.dir/device/system_MCXN947_cm33_core0.o
+                0x0000f880                SystemInitHook
  .text.SPC_GetActiveModeBandgapMode
-                0x0000f886       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f88e       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .text.SPC_GetActiveModeVoltageDetectStatus
-                0x0000f8a8       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f8b0       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .text.SPC_GetActiveModeCoreLDOVDDVoltageLevel
-                0x0000f8ca       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f8d2       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .text.SPC_GetActiveModeCoreLDODriveStrength
-                0x0000f8ec       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f8f4       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .text.SPC_SetActiveModeDCDCRegulatorVoltageLevel
-                0x0000f90e       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f916       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .text.SPC_SetActiveModeCoreLDORegulatorVoltageLevel
-                0x0000f940       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
-                0x0000f940                SPC_SetActiveModeCoreLDORegulatorVoltageLevel
+                0x0000f948       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f948                SPC_SetActiveModeCoreLDORegulatorVoltageLevel
  .text.SPC_SetActiveModeCoreLDORegulatorDriveStrength
-                0x0000f9a0       0x5e CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
-                0x0000f9a0                SPC_SetActiveModeCoreLDORegulatorDriveStrength
+                0x0000f9a8       0x5e CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000f9a8                SPC_SetActiveModeCoreLDORegulatorDriveStrength
  .text.SPC_SetActiveModeDCDCRegulatorDriveStrength
-                0x0000f9fe       0x48 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
-                0x0000f9fe                SPC_SetActiveModeDCDCRegulatorDriveStrength
+                0x0000fa06       0x48 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x0000fa06                SPC_SetActiveModeDCDCRegulatorDriveStrength
  .text.RESET_PeripheralReset
-                0x0000fa46       0x24 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
-                0x0000fa46                RESET_PeripheralReset
+                0x0000fa4e       0x24 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
+                0x0000fa4e                RESET_PeripheralReset
  .text.CLOCK_EnableClock
-                0x0000fa6a       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
+                0x0000fa72       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
  .text.LPUART_SoftwareReset
-                0x0000fb04       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x0000fb0c       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .text.EnableIRQ
-                0x0000fb30       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fb38       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterGetStatusFlags
-                0x0000fb62       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fb6a       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterClearStatusFlags
-                0x0000fb7a       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fb82       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterEnableInterrupts
-                0x0000fb96       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fb9e       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterDisableInterrupts
-                0x0000fbb8       0x24 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fbc0       0x24 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterEnableDMA
-                0x0000fbdc       0x3a CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fbe4       0x3a CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterGetTxFifoAddress
-                0x0000fc16       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fc1e       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterGetRxFifoAddress
-                0x0000fc2e       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fc36       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_GenerateCommands
-                0x0000fc46      0x164 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fc4e      0x164 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.LPI2C_MasterEDMACallback
-                0x0000fdaa       0x74 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x0000fdb2       0x74 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .text.CLOCK_EnableClock
-                0x0000fe1e       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000fe26       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterReset
-                0x0000feb8       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000fec0       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterEnable
-                0x0000fed8       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000fee0       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterGetStatusFlags
-                0x0000ff0a       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000ff12       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterClearStatusFlags
-                0x0000ff22       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000ff2a       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterSetWatermarks
-                0x0000ff3e       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000ff46       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .text.LPI2C_MasterCheckAndClearError
-                0x0000ff6a       0x80 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
-                0x0000ff6a                LPI2C_MasterCheckAndClearError
+                0x0000ff72       0x80 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000ff72                LPI2C_MasterCheckAndClearError
  .text.LPI2C_CheckForBusyBus
-                0x0000ffea       0x38 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
-                0x0000ffea                LPI2C_CheckForBusyBus
+                0x0000fff2       0x38 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x0000fff2                LPI2C_CheckForBusyBus
  .text.CLOCK_EnableClock
-                0x00010022       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x0001002a       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .text.LP_FLEXCOMM_PeripheralIsPresent
-                0x000100bc       0x52 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x000100c4       0x52 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .text.LP_FLEXCOMM0_DriverIRQHandler
-                0x0001010e        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x0001010e                LP_FLEXCOMM0_DriverIRQHandler
+                0x00010116        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010116                LP_FLEXCOMM0_DriverIRQHandler
  .text.LP_FLEXCOMM1_DriverIRQHandler
-                0x0001011c        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x0001011c                LP_FLEXCOMM1_DriverIRQHandler
+                0x00010124        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010124                LP_FLEXCOMM1_DriverIRQHandler
  .text.LP_FLEXCOMM2_DriverIRQHandler
-                0x0001012a        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x0001012a                LP_FLEXCOMM2_DriverIRQHandler
+                0x00010132        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010132                LP_FLEXCOMM2_DriverIRQHandler
  .text.LP_FLEXCOMM3_DriverIRQHandler
-                0x00010138        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x00010138                LP_FLEXCOMM3_DriverIRQHandler
+                0x00010140        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010140                LP_FLEXCOMM3_DriverIRQHandler
  .text.LP_FLEXCOMM4_DriverIRQHandler
-                0x00010146        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x00010146                LP_FLEXCOMM4_DriverIRQHandler
+                0x0001014e        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x0001014e                LP_FLEXCOMM4_DriverIRQHandler
  .text.LP_FLEXCOMM5_DriverIRQHandler
-                0x00010154        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x00010154                LP_FLEXCOMM5_DriverIRQHandler
+                0x0001015c        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x0001015c                LP_FLEXCOMM5_DriverIRQHandler
  .text.LP_FLEXCOMM6_DriverIRQHandler
-                0x00010162        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x00010162                LP_FLEXCOMM6_DriverIRQHandler
+                0x0001016a        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x0001016a                LP_FLEXCOMM6_DriverIRQHandler
  .text.LP_FLEXCOMM7_DriverIRQHandler
-                0x00010170        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x00010170                LP_FLEXCOMM7_DriverIRQHandler
+                0x00010178        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010178                LP_FLEXCOMM7_DriverIRQHandler
  .text.LP_FLEXCOMM8_DriverIRQHandler
-                0x0001017e        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x0001017e                LP_FLEXCOMM8_DriverIRQHandler
+                0x00010186        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010186                LP_FLEXCOMM8_DriverIRQHandler
  .text.LP_FLEXCOMM9_DriverIRQHandler
-                0x0001018c        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
-                0x0001018c                LP_FLEXCOMM9_DriverIRQHandler
+                0x00010194        0xe CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00010194                LP_FLEXCOMM9_DriverIRQHandler
  .text.CLOCK_EnableClock
-                0x0001019a       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x000101a2       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .text.CLOCK_DisableClock
-                0x00010234       0xbe CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x0001023c       0xbe CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .text.GPIO_PinWrite
-                0x000102f2       0x36 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x000102fa       0x36 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .text.EDMA_0_CH0_DriverIRQHandler
-                0x00010328       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010328                EDMA_0_CH0_DriverIRQHandler
+                0x00010330       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010330                EDMA_0_CH0_DriverIRQHandler
  .text.EDMA_0_CH1_DriverIRQHandler
-                0x00010338       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010338                EDMA_0_CH1_DriverIRQHandler
+                0x00010340       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010340                EDMA_0_CH1_DriverIRQHandler
  .text.EDMA_0_CH2_DriverIRQHandler
-                0x00010348       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010348                EDMA_0_CH2_DriverIRQHandler
+                0x00010350       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010350                EDMA_0_CH2_DriverIRQHandler
  .text.EDMA_0_CH3_DriverIRQHandler
-                0x00010358       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010358                EDMA_0_CH3_DriverIRQHandler
+                0x00010360       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010360                EDMA_0_CH3_DriverIRQHandler
  .text.EDMA_0_CH4_DriverIRQHandler
-                0x00010368       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010368                EDMA_0_CH4_DriverIRQHandler
+                0x00010370       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010370                EDMA_0_CH4_DriverIRQHandler
  .text.EDMA_0_CH5_DriverIRQHandler
-                0x00010378       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010378                EDMA_0_CH5_DriverIRQHandler
+                0x00010380       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010380                EDMA_0_CH5_DriverIRQHandler
  .text.EDMA_0_CH6_DriverIRQHandler
-                0x00010388       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010388                EDMA_0_CH6_DriverIRQHandler
+                0x00010390       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010390                EDMA_0_CH6_DriverIRQHandler
  .text.EDMA_0_CH7_DriverIRQHandler
-                0x00010398       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010398                EDMA_0_CH7_DriverIRQHandler
+                0x000103a0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103a0                EDMA_0_CH7_DriverIRQHandler
  .text.EDMA_0_CH8_DriverIRQHandler
-                0x000103a8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103a8                EDMA_0_CH8_DriverIRQHandler
+                0x000103b0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103b0                EDMA_0_CH8_DriverIRQHandler
  .text.EDMA_0_CH9_DriverIRQHandler
-                0x000103b8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103b8                EDMA_0_CH9_DriverIRQHandler
+                0x000103c0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103c0                EDMA_0_CH9_DriverIRQHandler
  .text.EDMA_0_CH10_DriverIRQHandler
-                0x000103c8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103c8                EDMA_0_CH10_DriverIRQHandler
+                0x000103d0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103d0                EDMA_0_CH10_DriverIRQHandler
  .text.EDMA_0_CH11_DriverIRQHandler
-                0x000103d8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103d8                EDMA_0_CH11_DriverIRQHandler
+                0x000103e0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103e0                EDMA_0_CH11_DriverIRQHandler
  .text.EDMA_0_CH12_DriverIRQHandler
-                0x000103e8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103e8                EDMA_0_CH12_DriverIRQHandler
+                0x000103f0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000103f0                EDMA_0_CH12_DriverIRQHandler
  .text.EDMA_0_CH13_DriverIRQHandler
-                0x000103f8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000103f8                EDMA_0_CH13_DriverIRQHandler
+                0x00010400       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010400                EDMA_0_CH13_DriverIRQHandler
  .text.EDMA_0_CH14_DriverIRQHandler
-                0x00010408       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010408                EDMA_0_CH14_DriverIRQHandler
+                0x00010410       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010410                EDMA_0_CH14_DriverIRQHandler
  .text.EDMA_0_CH15_DriverIRQHandler
-                0x00010418       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010418                EDMA_0_CH15_DriverIRQHandler
+                0x00010420       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010420                EDMA_0_CH15_DriverIRQHandler
  .text.EDMA_1_CH0_DriverIRQHandler
-                0x00010428       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010428                EDMA_1_CH0_DriverIRQHandler
+                0x00010430       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010430                EDMA_1_CH0_DriverIRQHandler
  .text.EDMA_1_CH1_DriverIRQHandler
-                0x00010438       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010438                EDMA_1_CH1_DriverIRQHandler
+                0x00010440       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010440                EDMA_1_CH1_DriverIRQHandler
  .text.EDMA_1_CH2_DriverIRQHandler
-                0x00010448       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010448                EDMA_1_CH2_DriverIRQHandler
+                0x00010450       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010450                EDMA_1_CH2_DriverIRQHandler
  .text.EDMA_1_CH3_DriverIRQHandler
-                0x00010458       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010458                EDMA_1_CH3_DriverIRQHandler
+                0x00010460       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010460                EDMA_1_CH3_DriverIRQHandler
  .text.EDMA_1_CH4_DriverIRQHandler
-                0x00010468       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010468                EDMA_1_CH4_DriverIRQHandler
+                0x00010470       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010470                EDMA_1_CH4_DriverIRQHandler
  .text.EDMA_1_CH5_DriverIRQHandler
-                0x00010478       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010478                EDMA_1_CH5_DriverIRQHandler
+                0x00010480       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010480                EDMA_1_CH5_DriverIRQHandler
  .text.EDMA_1_CH6_DriverIRQHandler
-                0x00010488       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010488                EDMA_1_CH6_DriverIRQHandler
+                0x00010490       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010490                EDMA_1_CH6_DriverIRQHandler
  .text.EDMA_1_CH7_DriverIRQHandler
-                0x00010498       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010498                EDMA_1_CH7_DriverIRQHandler
+                0x000104a0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104a0                EDMA_1_CH7_DriverIRQHandler
  .text.EDMA_1_CH8_DriverIRQHandler
-                0x000104a8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104a8                EDMA_1_CH8_DriverIRQHandler
+                0x000104b0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104b0                EDMA_1_CH8_DriverIRQHandler
  .text.EDMA_1_CH9_DriverIRQHandler
-                0x000104b8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104b8                EDMA_1_CH9_DriverIRQHandler
+                0x000104c0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104c0                EDMA_1_CH9_DriverIRQHandler
  .text.EDMA_1_CH10_DriverIRQHandler
-                0x000104c8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104c8                EDMA_1_CH10_DriverIRQHandler
+                0x000104d0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104d0                EDMA_1_CH10_DriverIRQHandler
  .text.EDMA_1_CH11_DriverIRQHandler
-                0x000104d8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104d8                EDMA_1_CH11_DriverIRQHandler
+                0x000104e0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104e0                EDMA_1_CH11_DriverIRQHandler
  .text.EDMA_1_CH12_DriverIRQHandler
-                0x000104e8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104e8                EDMA_1_CH12_DriverIRQHandler
+                0x000104f0       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x000104f0                EDMA_1_CH12_DriverIRQHandler
  .text.EDMA_1_CH13_DriverIRQHandler
-                0x000104f8       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x000104f8                EDMA_1_CH13_DriverIRQHandler
+                0x00010500       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010500                EDMA_1_CH13_DriverIRQHandler
  .text.EDMA_1_CH14_DriverIRQHandler
-                0x00010508       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010508                EDMA_1_CH14_DriverIRQHandler
+                0x00010510       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010510                EDMA_1_CH14_DriverIRQHandler
  .text.EDMA_1_CH15_DriverIRQHandler
-                0x00010518       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
-                0x00010518                EDMA_1_CH15_DriverIRQHandler
+                0x00010520       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma_soc.o
+                0x00010520                EDMA_1_CH15_DriverIRQHandler
  .text.CLOCK_EnableClock
-                0x00010528       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00010530       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .text.RESET_ReleasePeripheralReset
-                0x000105c2       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x000105ca       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .text.EnableIRQ
-                0x000105d8       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x000105e0       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .text.EDMA_AbortTransfer
-                0x0001060a       0x40 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
-                0x0001060a                EDMA_AbortTransfer
+                0x00010612       0x40 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00010612                EDMA_AbortTransfer
  .text.CLOCK_EnableClock
-                0x0001064a       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010652       0x9a CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .text.EnableIRQ
-                0x000106e4       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000106ec       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .text.CTIMER_GetStatusFlags
-                0x00010716       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x0001071e       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .text.CTIMER_ClearStatusFlags
-                0x0001072e       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010736       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .text.CTIMER_UpdatePwmDutycycle
-                0x0001074a       0xca CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x0001074a                CTIMER_UpdatePwmDutycycle
+                0x00010752       0xca CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010752                CTIMER_UpdatePwmDutycycle
  .text.CTIMER0_DriverIRQHandler
-                0x00010814        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x00010814                CTIMER0_DriverIRQHandler
+                0x0001081c        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x0001081c                CTIMER0_DriverIRQHandler
  .text.CTIMER1_DriverIRQHandler
-                0x00010822        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x00010822                CTIMER1_DriverIRQHandler
+                0x0001082a        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x0001082a                CTIMER1_DriverIRQHandler
  .text.CTIMER2_DriverIRQHandler
-                0x00010830        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x00010830                CTIMER2_DriverIRQHandler
+                0x00010838        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010838                CTIMER2_DriverIRQHandler
  .text.CTIMER3_DriverIRQHandler
-                0x0001083e        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x0001083e                CTIMER3_DriverIRQHandler
+                0x00010846        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010846                CTIMER3_DriverIRQHandler
  .text.CTIMER4_DriverIRQHandler
-                0x0001084c        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
-                0x0001084c                CTIMER4_DriverIRQHandler
+                0x00010854        0xe CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x00010854                CTIMER4_DriverIRQHandler
  .text.DelayLoop
-                0x0001085a       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
+                0x00010862       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .text.CLOCK_GetPll0OutFreq
-                0x0001087a       0x88 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
-                0x0001087a                CLOCK_GetPll0OutFreq
+                0x00010882       0x88 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+                0x00010882                CLOCK_GetPll0OutFreq
  .text.CLOCK_GetPll1OutFreq
-                0x00010902       0x82 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
-                0x00010902                CLOCK_GetPll1OutFreq
+                0x0001090a       0x82 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+                0x0001090a                CLOCK_GetPll1OutFreq
  .text.CLOCK_GetCoreSysClkFreq
-                0x00010984       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
-                0x00010984                CLOCK_GetCoreSysClkFreq
+                0x0001098c       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+                0x0001098c                CLOCK_GetCoreSysClkFreq
  .text.CLOCK_GetSystickClkFreq
-                0x000109b0       0x74 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+                0x000109b8       0x74 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
  .text.LPUART_ReadByte
-                0x00010a24       0x6e CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00010a2c       0x6e CMakeFiles/nxpcup.dir/source/wifi_config.o
  .text.compute_center_line
-                0x00010a92      0x232 CMakeFiles/nxpcup.dir/source/vectors.o
-                0x00010a92                compute_center_line
+                0x00010a9a      0x232 CMakeFiles/nxpcup.dir/source/vectors.o
+                0x00010a9a                compute_center_line
  .text.GPIO_PinRead
-                0x00010cc4       0x24 CMakeFiles/nxpcup.dir/source/utils.o
+                0x00010ccc       0x24 CMakeFiles/nxpcup.dir/source/utils.o
  .text.HardFault_Handler
-                0x00010ce8       0x36 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
-                0x00010ce8                HardFault_Handler
+                0x00010cf0       0x36 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
+                0x00010cf0                HardFault_Handler
  .text.pixy_set_led
-                0x00010d1e       0x68 CMakeFiles/nxpcup.dir/source/pixy.o
-                0x00010d1e                pixy_set_led
+                0x00010d26       0x68 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x00010d26                pixy_set_led
  .text.CLOCK_EnableClock
-                0x00010d86       0x9a CMakeFiles/nxpcup.dir/source/main.o
+                0x00010d8e       0x9a CMakeFiles/nxpcup.dir/source/main.o
  .text.EnableIRQ
-                0x00010e20       0x32 CMakeFiles/nxpcup.dir/source/main.o
+                0x00010e28       0x32 CMakeFiles/nxpcup.dir/source/main.o
  .text.reset_pid_state
-                0x00010e52       0x3c CMakeFiles/nxpcup.dir/source/main.o
+                0x00010e5a       0x3c CMakeFiles/nxpcup.dir/source/main.o
  .text.GPIO_PinWrite
-                0x00010e8e       0x36 CMakeFiles/nxpcup.dir/source/hbridge.o
+                0x00010e96       0x36 CMakeFiles/nxpcup.dir/source/hbridge.o
  .text.HbridgeSpeed
-                0x00010ec4       0xec CMakeFiles/nxpcup.dir/source/hbridge.o
-                0x00010ec4                HbridgeSpeed
+                0x00010ecc       0xec CMakeFiles/nxpcup.dir/source/hbridge.o
+                0x00010ecc                HbridgeSpeed
  .text.HbridgeBrake
-                0x00010fb0       0x54 CMakeFiles/nxpcup.dir/source/hbridge.o
-                0x00010fb0                HbridgeBrake
+                0x00010fb8       0x54 CMakeFiles/nxpcup.dir/source/hbridge.o
+                0x00010fb8                HbridgeBrake
  .text.pid_init
-                0x00011004       0x6e CMakeFiles/nxpcup.dir/source/control_theory.o
-                0x00011004                pid_init
+                0x0001100c       0x6e CMakeFiles/nxpcup.dir/source/control_theory.o
+                0x0001100c                pid_init
  .text.pid_update
-                0x00011072      0x1b8 CMakeFiles/nxpcup.dir/source/control_theory.o
-                0x00011072                pid_update
+                0x0001107a      0x1b8 CMakeFiles/nxpcup.dir/source/control_theory.o
+                0x0001107a                pid_update
  .text.OR_IRQHandler
-                0x0001122a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001122a                OR_IRQHandler
- .text.EDMA_0_CH0_IRQHandler
                 0x00011232        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011232                EDMA_0_CH0_IRQHandler
- .text.EDMA_0_CH1_IRQHandler
+                0x00011232                OR_IRQHandler
+ .text.EDMA_0_CH0_IRQHandler
                 0x0001123a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001123a                EDMA_0_CH1_IRQHandler
- .text.EDMA_0_CH2_IRQHandler
+                0x0001123a                EDMA_0_CH0_IRQHandler
+ .text.EDMA_0_CH1_IRQHandler
                 0x00011242        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011242                EDMA_0_CH2_IRQHandler
- .text.EDMA_0_CH3_IRQHandler
+                0x00011242                EDMA_0_CH1_IRQHandler
+ .text.EDMA_0_CH2_IRQHandler
                 0x0001124a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001124a                EDMA_0_CH3_IRQHandler
- .text.EDMA_0_CH4_IRQHandler
+                0x0001124a                EDMA_0_CH2_IRQHandler
+ .text.EDMA_0_CH3_IRQHandler
                 0x00011252        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011252                EDMA_0_CH4_IRQHandler
- .text.EDMA_0_CH5_IRQHandler
+                0x00011252                EDMA_0_CH3_IRQHandler
+ .text.EDMA_0_CH4_IRQHandler
                 0x0001125a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001125a                EDMA_0_CH5_IRQHandler
- .text.EDMA_0_CH6_IRQHandler
+                0x0001125a                EDMA_0_CH4_IRQHandler
+ .text.EDMA_0_CH5_IRQHandler
                 0x00011262        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011262                EDMA_0_CH6_IRQHandler
- .text.EDMA_0_CH7_IRQHandler
+                0x00011262                EDMA_0_CH5_IRQHandler
+ .text.EDMA_0_CH6_IRQHandler
                 0x0001126a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001126a                EDMA_0_CH7_IRQHandler
- .text.EDMA_0_CH8_IRQHandler
+                0x0001126a                EDMA_0_CH6_IRQHandler
+ .text.EDMA_0_CH7_IRQHandler
                 0x00011272        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011272                EDMA_0_CH8_IRQHandler
- .text.EDMA_0_CH9_IRQHandler
+                0x00011272                EDMA_0_CH7_IRQHandler
+ .text.EDMA_0_CH8_IRQHandler
                 0x0001127a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001127a                EDMA_0_CH9_IRQHandler
- .text.EDMA_0_CH10_IRQHandler
+                0x0001127a                EDMA_0_CH8_IRQHandler
+ .text.EDMA_0_CH9_IRQHandler
                 0x00011282        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011282                EDMA_0_CH10_IRQHandler
- .text.EDMA_0_CH11_IRQHandler
+                0x00011282                EDMA_0_CH9_IRQHandler
+ .text.EDMA_0_CH10_IRQHandler
                 0x0001128a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001128a                EDMA_0_CH11_IRQHandler
- .text.EDMA_0_CH12_IRQHandler
+                0x0001128a                EDMA_0_CH10_IRQHandler
+ .text.EDMA_0_CH11_IRQHandler
                 0x00011292        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011292                EDMA_0_CH12_IRQHandler
- .text.EDMA_0_CH13_IRQHandler
+                0x00011292                EDMA_0_CH11_IRQHandler
+ .text.EDMA_0_CH12_IRQHandler
                 0x0001129a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001129a                EDMA_0_CH13_IRQHandler
- .text.EDMA_0_CH14_IRQHandler
+                0x0001129a                EDMA_0_CH12_IRQHandler
+ .text.EDMA_0_CH13_IRQHandler
                 0x000112a2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112a2                EDMA_0_CH14_IRQHandler
- .text.EDMA_0_CH15_IRQHandler
+                0x000112a2                EDMA_0_CH13_IRQHandler
+ .text.EDMA_0_CH14_IRQHandler
                 0x000112aa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112aa                EDMA_0_CH15_IRQHandler
- .text.GPIO00_IRQHandler
+                0x000112aa                EDMA_0_CH14_IRQHandler
+ .text.EDMA_0_CH15_IRQHandler
                 0x000112b2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112b2                GPIO00_IRQHandler
- .text.GPIO01_IRQHandler
+                0x000112b2                EDMA_0_CH15_IRQHandler
+ .text.GPIO00_IRQHandler
                 0x000112ba        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112ba                GPIO01_IRQHandler
- .text.GPIO10_IRQHandler
+                0x000112ba                GPIO00_IRQHandler
+ .text.GPIO01_IRQHandler
                 0x000112c2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112c2                GPIO10_IRQHandler
- .text.GPIO11_IRQHandler
+                0x000112c2                GPIO01_IRQHandler
+ .text.GPIO10_IRQHandler
                 0x000112ca        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112ca                GPIO11_IRQHandler
- .text.GPIO20_IRQHandler
+                0x000112ca                GPIO10_IRQHandler
+ .text.GPIO11_IRQHandler
                 0x000112d2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112d2                GPIO20_IRQHandler
- .text.GPIO21_IRQHandler
+                0x000112d2                GPIO11_IRQHandler
+ .text.GPIO20_IRQHandler
                 0x000112da        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112da                GPIO21_IRQHandler
- .text.GPIO30_IRQHandler
+                0x000112da                GPIO20_IRQHandler
+ .text.GPIO21_IRQHandler
                 0x000112e2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112e2                GPIO30_IRQHandler
- .text.GPIO31_IRQHandler
+                0x000112e2                GPIO21_IRQHandler
+ .text.GPIO30_IRQHandler
                 0x000112ea        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112ea                GPIO31_IRQHandler
- .text.GPIO40_IRQHandler
+                0x000112ea                GPIO30_IRQHandler
+ .text.GPIO31_IRQHandler
                 0x000112f2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112f2                GPIO40_IRQHandler
- .text.GPIO41_IRQHandler
+                0x000112f2                GPIO31_IRQHandler
+ .text.GPIO40_IRQHandler
                 0x000112fa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000112fa                GPIO41_IRQHandler
- .text.GPIO50_IRQHandler
+                0x000112fa                GPIO40_IRQHandler
+ .text.GPIO41_IRQHandler
                 0x00011302        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011302                GPIO50_IRQHandler
- .text.GPIO51_IRQHandler
+                0x00011302                GPIO41_IRQHandler
+ .text.GPIO50_IRQHandler
                 0x0001130a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001130a                GPIO51_IRQHandler
- .text.UTICK0_IRQHandler
+                0x0001130a                GPIO50_IRQHandler
+ .text.GPIO51_IRQHandler
                 0x00011312        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011312                UTICK0_IRQHandler
- .text.CTIMER0_IRQHandler
+                0x00011312                GPIO51_IRQHandler
+ .text.UTICK0_IRQHandler
                 0x0001131a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001131a                CTIMER0_IRQHandler
- .text.CTIMER1_IRQHandler
+                0x0001131a                UTICK0_IRQHandler
+ .text.CTIMER0_IRQHandler
                 0x00011322        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011322                CTIMER1_IRQHandler
- .text.SCT0_IRQHandler
+                0x00011322                CTIMER0_IRQHandler
+ .text.CTIMER1_IRQHandler
                 0x0001132a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001132a                SCT0_IRQHandler
- .text.CTIMER2_IRQHandler
+                0x0001132a                CTIMER1_IRQHandler
+ .text.SCT0_IRQHandler
                 0x00011332        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011332                CTIMER2_IRQHandler
- .text.LP_FLEXCOMM0_IRQHandler
+                0x00011332                SCT0_IRQHandler
+ .text.CTIMER2_IRQHandler
                 0x0001133a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001133a                LP_FLEXCOMM0_IRQHandler
- .text.LP_FLEXCOMM1_IRQHandler
+                0x0001133a                CTIMER2_IRQHandler
+ .text.LP_FLEXCOMM0_IRQHandler
                 0x00011342        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011342                LP_FLEXCOMM1_IRQHandler
- .text.LP_FLEXCOMM2_IRQHandler
+                0x00011342                LP_FLEXCOMM0_IRQHandler
+ .text.LP_FLEXCOMM1_IRQHandler
                 0x0001134a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001134a                LP_FLEXCOMM2_IRQHandler
- .text.LP_FLEXCOMM3_IRQHandler
+                0x0001134a                LP_FLEXCOMM1_IRQHandler
+ .text.LP_FLEXCOMM2_IRQHandler
                 0x00011352        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011352                LP_FLEXCOMM3_IRQHandler
- .text.LP_FLEXCOMM4_IRQHandler
+                0x00011352                LP_FLEXCOMM2_IRQHandler
+ .text.LP_FLEXCOMM3_IRQHandler
                 0x0001135a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001135a                LP_FLEXCOMM4_IRQHandler
- .text.LP_FLEXCOMM5_IRQHandler
+                0x0001135a                LP_FLEXCOMM3_IRQHandler
+ .text.LP_FLEXCOMM4_IRQHandler
                 0x00011362        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011362                LP_FLEXCOMM5_IRQHandler
- .text.LP_FLEXCOMM6_IRQHandler
+                0x00011362                LP_FLEXCOMM4_IRQHandler
+ .text.LP_FLEXCOMM5_IRQHandler
                 0x0001136a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001136a                LP_FLEXCOMM6_IRQHandler
- .text.LP_FLEXCOMM7_IRQHandler
+                0x0001136a                LP_FLEXCOMM5_IRQHandler
+ .text.LP_FLEXCOMM6_IRQHandler
                 0x00011372        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011372                LP_FLEXCOMM7_IRQHandler
- .text.LP_FLEXCOMM8_IRQHandler
+                0x00011372                LP_FLEXCOMM6_IRQHandler
+ .text.LP_FLEXCOMM7_IRQHandler
                 0x0001137a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001137a                LP_FLEXCOMM8_IRQHandler
- .text.LP_FLEXCOMM9_IRQHandler
+                0x0001137a                LP_FLEXCOMM7_IRQHandler
+ .text.LP_FLEXCOMM8_IRQHandler
                 0x00011382        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011382                LP_FLEXCOMM9_IRQHandler
- .text.ADC0_IRQHandler
+                0x00011382                LP_FLEXCOMM8_IRQHandler
+ .text.LP_FLEXCOMM9_IRQHandler
                 0x0001138a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001138a                ADC0_IRQHandler
- .text.ADC1_IRQHandler
+                0x0001138a                LP_FLEXCOMM9_IRQHandler
+ .text.ADC0_IRQHandler
                 0x00011392        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011392                ADC1_IRQHandler
- .text.PINT0_IRQHandler
+                0x00011392                ADC0_IRQHandler
+ .text.ADC1_IRQHandler
                 0x0001139a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001139a                PINT0_IRQHandler
- .text.PDM_EVENT_IRQHandler
+                0x0001139a                ADC1_IRQHandler
+ .text.PINT0_IRQHandler
                 0x000113a2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113a2                PDM_EVENT_IRQHandler
- .text.Reserved65_IRQHandler
+                0x000113a2                PINT0_IRQHandler
+ .text.PDM_EVENT_IRQHandler
                 0x000113aa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113aa                Reserved65_IRQHandler
- .text.USB0_FS_IRQHandler
+                0x000113aa                PDM_EVENT_IRQHandler
+ .text.Reserved65_IRQHandler
                 0x000113b2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113b2                USB0_FS_IRQHandler
- .text.USB0_DCD_IRQHandler
+                0x000113b2                Reserved65_IRQHandler
+ .text.USB0_FS_IRQHandler
                 0x000113ba        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113ba                USB0_DCD_IRQHandler
- .text.RTC_IRQHandler
+                0x000113ba                USB0_FS_IRQHandler
+ .text.USB0_DCD_IRQHandler
                 0x000113c2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113c2                RTC_IRQHandler
- .text.SMARTDMA_IRQHandler
+                0x000113c2                USB0_DCD_IRQHandler
+ .text.RTC_IRQHandler
                 0x000113ca        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113ca                SMARTDMA_IRQHandler
- .text.MAILBOX_IRQHandler
+                0x000113ca                RTC_IRQHandler
+ .text.SMARTDMA_IRQHandler
                 0x000113d2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113d2                MAILBOX_IRQHandler
- .text.CTIMER3_IRQHandler
+                0x000113d2                SMARTDMA_IRQHandler
+ .text.MAILBOX_IRQHandler
                 0x000113da        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113da                CTIMER3_IRQHandler
- .text.CTIMER4_IRQHandler
+                0x000113da                MAILBOX_IRQHandler
+ .text.CTIMER3_IRQHandler
                 0x000113e2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113e2                CTIMER4_IRQHandler
- .text.OS_EVENT_IRQHandler
+                0x000113e2                CTIMER3_IRQHandler
+ .text.CTIMER4_IRQHandler
                 0x000113ea        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113ea                OS_EVENT_IRQHandler
- .text.FLEXSPI0_IRQHandler
+                0x000113ea                CTIMER4_IRQHandler
+ .text.OS_EVENT_IRQHandler
                 0x000113f2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113f2                FLEXSPI0_IRQHandler
- .text.SAI0_IRQHandler
+                0x000113f2                OS_EVENT_IRQHandler
+ .text.FLEXSPI0_IRQHandler
                 0x000113fa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000113fa                SAI0_IRQHandler
- .text.SAI1_IRQHandler
+                0x000113fa                FLEXSPI0_IRQHandler
+ .text.SAI0_IRQHandler
                 0x00011402        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011402                SAI1_IRQHandler
- .text.USDHC0_IRQHandler
+                0x00011402                SAI0_IRQHandler
+ .text.SAI1_IRQHandler
                 0x0001140a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001140a                USDHC0_IRQHandler
- .text.CAN0_IRQHandler
+                0x0001140a                SAI1_IRQHandler
+ .text.USDHC0_IRQHandler
                 0x00011412        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011412                CAN0_IRQHandler
- .text.CAN1_IRQHandler
+                0x00011412                USDHC0_IRQHandler
+ .text.CAN0_IRQHandler
                 0x0001141a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001141a                CAN1_IRQHandler
- .text.Reserved80_IRQHandler
+                0x0001141a                CAN0_IRQHandler
+ .text.CAN1_IRQHandler
                 0x00011422        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011422                Reserved80_IRQHandler
- .text.Reserved81_IRQHandler
+                0x00011422                CAN1_IRQHandler
+ .text.Reserved80_IRQHandler
                 0x0001142a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001142a                Reserved81_IRQHandler
- .text.USB1_HS_PHY_IRQHandler
+                0x0001142a                Reserved80_IRQHandler
+ .text.Reserved81_IRQHandler
                 0x00011432        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011432                USB1_HS_PHY_IRQHandler
- .text.USB1_HS_IRQHandler
+                0x00011432                Reserved81_IRQHandler
+ .text.USB1_HS_PHY_IRQHandler
                 0x0001143a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001143a                USB1_HS_IRQHandler
- .text.SEC_HYPERVISOR_CALL_IRQHandler
+                0x0001143a                USB1_HS_PHY_IRQHandler
+ .text.USB1_HS_IRQHandler
                 0x00011442        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011442                SEC_HYPERVISOR_CALL_IRQHandler
- .text.Reserved85_IRQHandler
+                0x00011442                USB1_HS_IRQHandler
+ .text.SEC_HYPERVISOR_CALL_IRQHandler
                 0x0001144a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001144a                Reserved85_IRQHandler
- .text.PLU_IRQHandler
+                0x0001144a                SEC_HYPERVISOR_CALL_IRQHandler
+ .text.Reserved85_IRQHandler
                 0x00011452        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011452                PLU_IRQHandler
- .text.Freqme_IRQHandler
+                0x00011452                Reserved85_IRQHandler
+ .text.PLU_IRQHandler
                 0x0001145a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001145a                Freqme_IRQHandler
- .text.SEC_VIO_IRQHandler
+                0x0001145a                PLU_IRQHandler
+ .text.Freqme_IRQHandler
                 0x00011462        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011462                SEC_VIO_IRQHandler
- .text.ELS_IRQHandler
+                0x00011462                Freqme_IRQHandler
+ .text.SEC_VIO_IRQHandler
                 0x0001146a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001146a                ELS_IRQHandler
- .text.PKC_IRQHandler
+                0x0001146a                SEC_VIO_IRQHandler
+ .text.ELS_IRQHandler
                 0x00011472        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011472                PKC_IRQHandler
- .text.PUF_IRQHandler
+                0x00011472                ELS_IRQHandler
+ .text.PKC_IRQHandler
                 0x0001147a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001147a                PUF_IRQHandler
- .text.PQ_IRQHandler
+                0x0001147a                PKC_IRQHandler
+ .text.PUF_IRQHandler
                 0x00011482        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011482                PQ_IRQHandler
- .text.EDMA_1_CH0_IRQHandler
+                0x00011482                PUF_IRQHandler
+ .text.PQ_IRQHandler
                 0x0001148a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001148a                EDMA_1_CH0_IRQHandler
- .text.EDMA_1_CH1_IRQHandler
+                0x0001148a                PQ_IRQHandler
+ .text.EDMA_1_CH0_IRQHandler
                 0x00011492        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011492                EDMA_1_CH1_IRQHandler
- .text.EDMA_1_CH2_IRQHandler
+                0x00011492                EDMA_1_CH0_IRQHandler
+ .text.EDMA_1_CH1_IRQHandler
                 0x0001149a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001149a                EDMA_1_CH2_IRQHandler
- .text.EDMA_1_CH3_IRQHandler
+                0x0001149a                EDMA_1_CH1_IRQHandler
+ .text.EDMA_1_CH2_IRQHandler
                 0x000114a2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114a2                EDMA_1_CH3_IRQHandler
- .text.EDMA_1_CH4_IRQHandler
+                0x000114a2                EDMA_1_CH2_IRQHandler
+ .text.EDMA_1_CH3_IRQHandler
                 0x000114aa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114aa                EDMA_1_CH4_IRQHandler
- .text.EDMA_1_CH5_IRQHandler
+                0x000114aa                EDMA_1_CH3_IRQHandler
+ .text.EDMA_1_CH4_IRQHandler
                 0x000114b2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114b2                EDMA_1_CH5_IRQHandler
- .text.EDMA_1_CH6_IRQHandler
+                0x000114b2                EDMA_1_CH4_IRQHandler
+ .text.EDMA_1_CH5_IRQHandler
                 0x000114ba        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114ba                EDMA_1_CH6_IRQHandler
- .text.EDMA_1_CH7_IRQHandler
+                0x000114ba                EDMA_1_CH5_IRQHandler
+ .text.EDMA_1_CH6_IRQHandler
                 0x000114c2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114c2                EDMA_1_CH7_IRQHandler
- .text.EDMA_1_CH8_IRQHandler
+                0x000114c2                EDMA_1_CH6_IRQHandler
+ .text.EDMA_1_CH7_IRQHandler
                 0x000114ca        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114ca                EDMA_1_CH8_IRQHandler
- .text.EDMA_1_CH9_IRQHandler
+                0x000114ca                EDMA_1_CH7_IRQHandler
+ .text.EDMA_1_CH8_IRQHandler
                 0x000114d2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114d2                EDMA_1_CH9_IRQHandler
- .text.EDMA_1_CH10_IRQHandler
+                0x000114d2                EDMA_1_CH8_IRQHandler
+ .text.EDMA_1_CH9_IRQHandler
                 0x000114da        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114da                EDMA_1_CH10_IRQHandler
- .text.EDMA_1_CH11_IRQHandler
+                0x000114da                EDMA_1_CH9_IRQHandler
+ .text.EDMA_1_CH10_IRQHandler
                 0x000114e2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114e2                EDMA_1_CH11_IRQHandler
- .text.EDMA_1_CH12_IRQHandler
+                0x000114e2                EDMA_1_CH10_IRQHandler
+ .text.EDMA_1_CH11_IRQHandler
                 0x000114ea        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114ea                EDMA_1_CH12_IRQHandler
- .text.EDMA_1_CH13_IRQHandler
+                0x000114ea                EDMA_1_CH11_IRQHandler
+ .text.EDMA_1_CH12_IRQHandler
                 0x000114f2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114f2                EDMA_1_CH13_IRQHandler
- .text.EDMA_1_CH14_IRQHandler
+                0x000114f2                EDMA_1_CH12_IRQHandler
+ .text.EDMA_1_CH13_IRQHandler
                 0x000114fa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000114fa                EDMA_1_CH14_IRQHandler
- .text.EDMA_1_CH15_IRQHandler
+                0x000114fa                EDMA_1_CH13_IRQHandler
+ .text.EDMA_1_CH14_IRQHandler
                 0x00011502        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011502                EDMA_1_CH15_IRQHandler
- .text.CDOG0_IRQHandler
+                0x00011502                EDMA_1_CH14_IRQHandler
+ .text.EDMA_1_CH15_IRQHandler
                 0x0001150a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001150a                CDOG0_IRQHandler
- .text.CDOG1_IRQHandler
+                0x0001150a                EDMA_1_CH15_IRQHandler
+ .text.CDOG0_IRQHandler
                 0x00011512        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011512                CDOG1_IRQHandler
- .text.I3C0_IRQHandler
+                0x00011512                CDOG0_IRQHandler
+ .text.CDOG1_IRQHandler
                 0x0001151a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001151a                I3C0_IRQHandler
- .text.I3C1_IRQHandler
+                0x0001151a                CDOG1_IRQHandler
+ .text.I3C0_IRQHandler
                 0x00011522        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011522                I3C1_IRQHandler
- .text.NPU_IRQHandler
+                0x00011522                I3C0_IRQHandler
+ .text.I3C1_IRQHandler
                 0x0001152a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001152a                NPU_IRQHandler
- .text.GDET_IRQHandler
+                0x0001152a                I3C1_IRQHandler
+ .text.NPU_IRQHandler
                 0x00011532        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011532                GDET_IRQHandler
- .text.VBAT0_IRQHandler
+                0x00011532                NPU_IRQHandler
+ .text.GDET_IRQHandler
                 0x0001153a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001153a                VBAT0_IRQHandler
- .text.EWM0_IRQHandler
+                0x0001153a                GDET_IRQHandler
+ .text.VBAT0_IRQHandler
                 0x00011542        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011542                EWM0_IRQHandler
- .text.TSI_END_OF_SCAN_IRQHandler
+                0x00011542                VBAT0_IRQHandler
+ .text.EWM0_IRQHandler
                 0x0001154a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001154a                TSI_END_OF_SCAN_IRQHandler
- .text.TSI_OUT_OF_SCAN_IRQHandler
+                0x0001154a                EWM0_IRQHandler
+ .text.TSI_END_OF_SCAN_IRQHandler
                 0x00011552        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011552                TSI_OUT_OF_SCAN_IRQHandler
- .text.EMVSIM0_IRQHandler
+                0x00011552                TSI_END_OF_SCAN_IRQHandler
+ .text.TSI_OUT_OF_SCAN_IRQHandler
                 0x0001155a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001155a                EMVSIM0_IRQHandler
- .text.EMVSIM1_IRQHandler
+                0x0001155a                TSI_OUT_OF_SCAN_IRQHandler
+ .text.EMVSIM0_IRQHandler
                 0x00011562        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011562                EMVSIM1_IRQHandler
- .text.FLEXIO_IRQHandler
+                0x00011562                EMVSIM0_IRQHandler
+ .text.EMVSIM1_IRQHandler
                 0x0001156a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001156a                FLEXIO_IRQHandler
- .text.DAC0_IRQHandler
+                0x0001156a                EMVSIM1_IRQHandler
+ .text.FLEXIO_IRQHandler
                 0x00011572        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011572                DAC0_IRQHandler
- .text.DAC1_IRQHandler
+                0x00011572                FLEXIO_IRQHandler
+ .text.DAC0_IRQHandler
                 0x0001157a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001157a                DAC1_IRQHandler
- .text.DAC2_IRQHandler
+                0x0001157a                DAC0_IRQHandler
+ .text.DAC1_IRQHandler
                 0x00011582        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011582                DAC2_IRQHandler
- .text.HSCMP0_IRQHandler
+                0x00011582                DAC1_IRQHandler
+ .text.DAC2_IRQHandler
                 0x0001158a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001158a                HSCMP0_IRQHandler
- .text.HSCMP1_IRQHandler
+                0x0001158a                DAC2_IRQHandler
+ .text.HSCMP0_IRQHandler
                 0x00011592        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011592                HSCMP1_IRQHandler
- .text.HSCMP2_IRQHandler
+                0x00011592                HSCMP0_IRQHandler
+ .text.HSCMP1_IRQHandler
                 0x0001159a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001159a                HSCMP2_IRQHandler
- .text.FLEXPWM0_RELOAD_ERROR_IRQHandler
+                0x0001159a                HSCMP1_IRQHandler
+ .text.HSCMP2_IRQHandler
                 0x000115a2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115a2                FLEXPWM0_RELOAD_ERROR_IRQHandler
- .text.FLEXPWM0_FAULT_IRQHandler
+                0x000115a2                HSCMP2_IRQHandler
+ .text.FLEXPWM0_RELOAD_ERROR_IRQHandler
                 0x000115aa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115aa                FLEXPWM0_FAULT_IRQHandler
- .text.FLEXPWM0_SUBMODULE0_IRQHandler
+                0x000115aa                FLEXPWM0_RELOAD_ERROR_IRQHandler
+ .text.FLEXPWM0_FAULT_IRQHandler
                 0x000115b2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115b2                FLEXPWM0_SUBMODULE0_IRQHandler
- .text.FLEXPWM0_SUBMODULE1_IRQHandler
+                0x000115b2                FLEXPWM0_FAULT_IRQHandler
+ .text.FLEXPWM0_SUBMODULE0_IRQHandler
                 0x000115ba        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115ba                FLEXPWM0_SUBMODULE1_IRQHandler
- .text.FLEXPWM0_SUBMODULE2_IRQHandler
+                0x000115ba                FLEXPWM0_SUBMODULE0_IRQHandler
+ .text.FLEXPWM0_SUBMODULE1_IRQHandler
                 0x000115c2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115c2                FLEXPWM0_SUBMODULE2_IRQHandler
- .text.FLEXPWM0_SUBMODULE3_IRQHandler
+                0x000115c2                FLEXPWM0_SUBMODULE1_IRQHandler
+ .text.FLEXPWM0_SUBMODULE2_IRQHandler
                 0x000115ca        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115ca                FLEXPWM0_SUBMODULE3_IRQHandler
- .text.FLEXPWM1_RELOAD_ERROR_IRQHandler
+                0x000115ca                FLEXPWM0_SUBMODULE2_IRQHandler
+ .text.FLEXPWM0_SUBMODULE3_IRQHandler
                 0x000115d2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115d2                FLEXPWM1_RELOAD_ERROR_IRQHandler
- .text.FLEXPWM1_FAULT_IRQHandler
+                0x000115d2                FLEXPWM0_SUBMODULE3_IRQHandler
+ .text.FLEXPWM1_RELOAD_ERROR_IRQHandler
                 0x000115da        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115da                FLEXPWM1_FAULT_IRQHandler
- .text.FLEXPWM1_SUBMODULE0_IRQHandler
+                0x000115da                FLEXPWM1_RELOAD_ERROR_IRQHandler
+ .text.FLEXPWM1_FAULT_IRQHandler
                 0x000115e2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115e2                FLEXPWM1_SUBMODULE0_IRQHandler
- .text.FLEXPWM1_SUBMODULE1_IRQHandler
+                0x000115e2                FLEXPWM1_FAULT_IRQHandler
+ .text.FLEXPWM1_SUBMODULE0_IRQHandler
                 0x000115ea        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115ea                FLEXPWM1_SUBMODULE1_IRQHandler
- .text.FLEXPWM1_SUBMODULE2_IRQHandler
+                0x000115ea                FLEXPWM1_SUBMODULE0_IRQHandler
+ .text.FLEXPWM1_SUBMODULE1_IRQHandler
                 0x000115f2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115f2                FLEXPWM1_SUBMODULE2_IRQHandler
- .text.FLEXPWM1_SUBMODULE3_IRQHandler
+                0x000115f2                FLEXPWM1_SUBMODULE1_IRQHandler
+ .text.FLEXPWM1_SUBMODULE2_IRQHandler
                 0x000115fa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000115fa                FLEXPWM1_SUBMODULE3_IRQHandler
- .text.QDC0_COMPARE_IRQHandler
+                0x000115fa                FLEXPWM1_SUBMODULE2_IRQHandler
+ .text.FLEXPWM1_SUBMODULE3_IRQHandler
                 0x00011602        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011602                QDC0_COMPARE_IRQHandler
- .text.QDC0_HOME_IRQHandler
+                0x00011602                FLEXPWM1_SUBMODULE3_IRQHandler
+ .text.QDC0_COMPARE_IRQHandler
                 0x0001160a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001160a                QDC0_HOME_IRQHandler
- .text.QDC0_WDG_SAB_IRQHandler
+                0x0001160a                QDC0_COMPARE_IRQHandler
+ .text.QDC0_HOME_IRQHandler
                 0x00011612        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011612                QDC0_WDG_SAB_IRQHandler
- .text.QDC0_IDX_IRQHandler
+                0x00011612                QDC0_HOME_IRQHandler
+ .text.QDC0_WDG_SAB_IRQHandler
                 0x0001161a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001161a                QDC0_IDX_IRQHandler
- .text.QDC1_COMPARE_IRQHandler
+                0x0001161a                QDC0_WDG_SAB_IRQHandler
+ .text.QDC0_IDX_IRQHandler
                 0x00011622        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011622                QDC1_COMPARE_IRQHandler
- .text.QDC1_HOME_IRQHandler
+                0x00011622                QDC0_IDX_IRQHandler
+ .text.QDC1_COMPARE_IRQHandler
                 0x0001162a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001162a                QDC1_HOME_IRQHandler
- .text.QDC1_WDG_SAB_IRQHandler
+                0x0001162a                QDC1_COMPARE_IRQHandler
+ .text.QDC1_HOME_IRQHandler
                 0x00011632        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011632                QDC1_WDG_SAB_IRQHandler
- .text.QDC1_IDX_IRQHandler
+                0x00011632                QDC1_HOME_IRQHandler
+ .text.QDC1_WDG_SAB_IRQHandler
                 0x0001163a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001163a                QDC1_IDX_IRQHandler
- .text.ITRC0_IRQHandler
+                0x0001163a                QDC1_WDG_SAB_IRQHandler
+ .text.QDC1_IDX_IRQHandler
                 0x00011642        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011642                ITRC0_IRQHandler
- .text.BSP32_IRQHandler
+                0x00011642                QDC1_IDX_IRQHandler
+ .text.ITRC0_IRQHandler
                 0x0001164a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001164a                BSP32_IRQHandler
- .text.ELS_ERR_IRQHandler
+                0x0001164a                ITRC0_IRQHandler
+ .text.BSP32_IRQHandler
                 0x00011652        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011652                ELS_ERR_IRQHandler
- .text.PKC_ERR_IRQHandler
+                0x00011652                BSP32_IRQHandler
+ .text.ELS_ERR_IRQHandler
                 0x0001165a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001165a                PKC_ERR_IRQHandler
- .text.ERM_SINGLE_BIT_ERROR_IRQHandler
+                0x0001165a                ELS_ERR_IRQHandler
+ .text.PKC_ERR_IRQHandler
                 0x00011662        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011662                ERM_SINGLE_BIT_ERROR_IRQHandler
- .text.ERM_MULTI_BIT_ERROR_IRQHandler
+                0x00011662                PKC_ERR_IRQHandler
+ .text.ERM_SINGLE_BIT_ERROR_IRQHandler
                 0x0001166a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001166a                ERM_MULTI_BIT_ERROR_IRQHandler
- .text.FMU0_IRQHandler
+                0x0001166a                ERM_SINGLE_BIT_ERROR_IRQHandler
+ .text.ERM_MULTI_BIT_ERROR_IRQHandler
                 0x00011672        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011672                FMU0_IRQHandler
- .text.ETHERNET_IRQHandler
+                0x00011672                ERM_MULTI_BIT_ERROR_IRQHandler
+ .text.FMU0_IRQHandler
                 0x0001167a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001167a                ETHERNET_IRQHandler
- .text.ETHERNET_PMT_IRQHandler
+                0x0001167a                FMU0_IRQHandler
+ .text.ETHERNET_IRQHandler
                 0x00011682        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011682                ETHERNET_PMT_IRQHandler
- .text.ETHERNET_MACLP_IRQHandler
+                0x00011682                ETHERNET_IRQHandler
+ .text.ETHERNET_PMT_IRQHandler
                 0x0001168a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001168a                ETHERNET_MACLP_IRQHandler
- .text.SINC_FILTER_IRQHandler
+                0x0001168a                ETHERNET_PMT_IRQHandler
+ .text.ETHERNET_MACLP_IRQHandler
                 0x00011692        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x00011692                SINC_FILTER_IRQHandler
- .text.LPTMR0_IRQHandler
+                0x00011692                ETHERNET_MACLP_IRQHandler
+ .text.SINC_FILTER_IRQHandler
                 0x0001169a        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x0001169a                LPTMR0_IRQHandler
- .text.LPTMR1_IRQHandler
+                0x0001169a                SINC_FILTER_IRQHandler
+ .text.LPTMR0_IRQHandler
                 0x000116a2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116a2                LPTMR1_IRQHandler
- .text.SCG_IRQHandler
+                0x000116a2                LPTMR0_IRQHandler
+ .text.LPTMR1_IRQHandler
                 0x000116aa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116aa                SCG_IRQHandler
- .text.SPC_IRQHandler
+                0x000116aa                LPTMR1_IRQHandler
+ .text.SCG_IRQHandler
                 0x000116b2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116b2                SPC_IRQHandler
- .text.WUU_IRQHandler
+                0x000116b2                SCG_IRQHandler
+ .text.SPC_IRQHandler
                 0x000116ba        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116ba                WUU_IRQHandler
- .text.PORT_EFT_IRQHandler
+                0x000116ba                SPC_IRQHandler
+ .text.WUU_IRQHandler
                 0x000116c2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116c2                PORT_EFT_IRQHandler
- .text.ETB0_IRQHandler
+                0x000116c2                WUU_IRQHandler
+ .text.PORT_EFT_IRQHandler
                 0x000116ca        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116ca                ETB0_IRQHandler
- .text.Reserved166_IRQHandler
+                0x000116ca                PORT_EFT_IRQHandler
+ .text.ETB0_IRQHandler
                 0x000116d2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116d2                Reserved166_IRQHandler
- .text.Reserved167_IRQHandler
+                0x000116d2                ETB0_IRQHandler
+ .text.Reserved166_IRQHandler
                 0x000116da        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116da                Reserved167_IRQHandler
- .text.WWDT0_IRQHandler
+                0x000116da                Reserved166_IRQHandler
+ .text.Reserved167_IRQHandler
                 0x000116e2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116e2                WWDT0_IRQHandler
- .text.WWDT1_IRQHandler
+                0x000116e2                Reserved167_IRQHandler
+ .text.WWDT0_IRQHandler
                 0x000116ea        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116ea                WWDT1_IRQHandler
- .text.CMC0_IRQHandler
+                0x000116ea                WWDT0_IRQHandler
+ .text.WWDT1_IRQHandler
                 0x000116f2        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116f2                CMC0_IRQHandler
- .text.CTI0_IRQHandler
+                0x000116f2                WWDT1_IRQHandler
+ .text.CMC0_IRQHandler
                 0x000116fa        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
-                0x000116fa                CTI0_IRQHandler
+                0x000116fa                CMC0_IRQHandler
+ .text.CTI0_IRQHandler
+                0x00011702        0x8 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
+                0x00011702                CTI0_IRQHandler
  .text.fsl_assert_hook
-                0x00011702       0x1a CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
-                0x00011702                fsl_assert_hook
- .text.error    0x0001171c       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001170a       0x1a CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+                0x0001170a                fsl_assert_hook
+ .text.error    0x00011724       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
  .text.checkerror
-                0x00011738        0xa C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x00011740        0xa C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
  .text._swiread
-                0x00011742       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011742                _swiread
- .text._read    0x00011762       0x34 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011762                _read
+                0x0001174a       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001174a                _swiread
+ .text._read    0x0001176a       0x34 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001176a                _read
  .text._swilseek
-                0x00011796       0x78 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011796                _swilseek
- .text._lseek   0x0001180e        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x0001180e                _lseek
+                0x0001179e       0x78 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001179e                _swilseek
+ .text._lseek   0x00011816        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x00011816                _lseek
  .text._swiwrite
-                0x00011812       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011812                _swiwrite
- .text._write   0x00011832       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011832                _write
+                0x0001181a       0x20 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001181a                _swiwrite
+ .text._write   0x0001183a       0x40 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001183a                _write
  .text._swiclose
-                0x00011872       0x1a C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00011872                _swiclose
+                0x0001187a       0x1a C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x0001187a                _swiclose
  .text._swistat
-                0x0001188c       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x0001188c                _swistat
- .text._fstat   0x000118ce       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x000118ce                _fstat
- .text._isatty  0x000118ea       0x2a C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x000118ea                _isatty
+                0x00011894       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x00011894                _swistat
+ .text._fstat   0x000118d6       0x1c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x000118d6                _fstat
+ .text._isatty  0x000118f2       0x2a C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x000118f2                _isatty
  *(SORT_BY_ALIGNMENT(.rodata) SORT_BY_ALIGNMENT(.rodata.*) SORT_BY_ALIGNMENT(.constdata) SORT_BY_ALIGNMENT(.constdata.*))
- *fill*         0x00011914        0x4 ff
+ *fill*         0x0001191c        0x4 ff
  .rodata.__mprec_bigtens
-                0x00011918       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x00011918                __mprec_bigtens
+                0x00011920       0x28 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x00011920                __mprec_bigtens
  .rodata.__mprec_tens
-                0x00011940       0xc8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
-                0x00011940                __mprec_tens
+                0x00011948       0xc8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x00011948                __mprec_tens
  .rodata.PORT_SetPinConfig.str1.4
-                0x00011a08     0x11e0 CMakeFiles/nxpcup.dir/board/pin_mux.o
+                0x00011a10     0x11f4 CMakeFiles/nxpcup.dir/board/pin_mux.o
                                  0x4c (size before relaxing)
  .rodata.__func__.0
-                0x00012be8       0x12 CMakeFiles/nxpcup.dir/board/pin_mux.o
+                0x00012c04       0x12 CMakeFiles/nxpcup.dir/board/pin_mux.o
  .rodata.EDMA_SetChannelMux.str1.4
-                0x00012bfa       0x7c CMakeFiles/nxpcup.dir/board/peripherals.o
- *fill*         0x00012bfa        0x2 ff
+                0x00012c16       0x7c CMakeFiles/nxpcup.dir/board/peripherals.o
+ *fill*         0x00012c16        0x2 ff
  .rodata.CTIMER0_config
-                0x00012bfc        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x00012bfc                CTIMER0_config
+                0x00012c18        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x00012c18                CTIMER0_config
  .rodata.CTIMER2_config
-                0x00012c04        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x00012c04                CTIMER2_config
+                0x00012c20        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x00012c20                CTIMER2_config
  .rodata.LP_FLEXCOMM2_masterConfig
-                0x00012c0c       0x1c CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x00012c0c                LP_FLEXCOMM2_masterConfig
+                0x00012c28       0x1c CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x00012c28                LP_FLEXCOMM2_masterConfig
  .rodata.CTIMER4_config
-                0x00012c28        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x00012c28                CTIMER4_config
+                0x00012c44        0x8 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x00012c44                CTIMER4_config
  .rodata.LP_FLEXCOMM9_config
-                0x00012c30       0x28 CMakeFiles/nxpcup.dir/board/peripherals.o
-                0x00012c30                LP_FLEXCOMM9_config
+                0x00012c4c       0x28 CMakeFiles/nxpcup.dir/board/peripherals.o
+                0x00012c4c                LP_FLEXCOMM9_config
  .rodata.__func__.0
-                0x00012c58       0x13 CMakeFiles/nxpcup.dir/board/peripherals.o
- *fill*         0x00012c6b        0x1 ff
- .rodata        0x00012c6c       0x22 CMakeFiles/nxpcup.dir/board/clock_config.o
+                0x00012c74       0x13 CMakeFiles/nxpcup.dir/board/peripherals.o
+ *fill*         0x00012c87        0x1 ff
+ .rodata        0x00012c88       0x22 CMakeFiles/nxpcup.dir/board/clock_config.o
  .rodata.SPC_GetPowerDomainLowPowerMode.str1.4
-                0x00012c8e       0x6b CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x00012caa       0x6b CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .rodata.SPC_SetLowPowerRequestConfig.str1.4
-                0x00012c8e        0xf CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x00012caa        0xf CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .rodata.SPC_SetActiveModeCoreLDORegulatorConfig.str1.4
-                0x00012c8e        0xf CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
- *fill*         0x00012c8e        0x2 ff
- .rodata.__func__.9
-                0x00012c90       0x1a CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x00012caa        0xf CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  *fill*         0x00012caa        0x2 ff
+ .rodata.__func__.9
+                0x00012cac       0x1a CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+ *fill*         0x00012cc6        0x2 ff
  .rodata.__func__.5
-                0x00012cac       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x00012cc8       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .rodata.__func__.3
-                0x00012cd4       0x25 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
+                0x00012cf0       0x25 CMakeFiles/nxpcup.dir/drivers/fsl_spc.o
  .rodata.RESET_SetPeripheralReset.str1.4
-                0x00012cf9       0x76 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
- *fill*         0x00012cf9        0x3 ff
- .rodata.__func__.1
-                0x00012cfc       0x19 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
+                0x00012d15       0x76 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
  *fill*         0x00012d15        0x3 ff
+ .rodata.__func__.1
+                0x00012d18       0x19 CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
+ *fill*         0x00012d31        0x3 ff
  .rodata.__func__.0
-                0x00012d18       0x1b CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
+                0x00012d34       0x1b CMakeFiles/nxpcup.dir/drivers/fsl_reset.o
  .rodata.MRT_GetInstance.str1.4
-                0x00012d33       0x57 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
+                0x00012d4f       0x57 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
  .rodata.MRT_Init.str1.4
-                0x00012d33        0xf CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
- *fill*         0x00012d33        0x1 ff
+                0x00012d4f        0xf CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
+ *fill*         0x00012d4f        0x1 ff
  .rodata.__func__.3
-                0x00012d34       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
+                0x00012d50       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
  .rodata.__func__.2
-                0x00012d44        0x9 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
- *fill*         0x00012d4d        0x3 ff
+                0x00012d60        0x9 CMakeFiles/nxpcup.dir/drivers/fsl_mrt.o
+ *fill*         0x00012d69        0x3 ff
  .rodata.s_lpuartBases
-                0x00012d50       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x00012d6c       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .rodata.LPUART_GetInstance.str1.4
-                0x00012d78       0x66 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x00012d94       0x66 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .rodata.LPUART_WriteNonBlocking.str1.4
-                0x00012d78        0xd CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x00012d94        0xd CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .rodata.LPUART_Init.str1.4
-                0x00012d78       0xbb CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x00012d94       0xbb CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .rodata.__func__.25
-                0x00012d78       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
- *fill*         0x00012d8b        0x1 ff
+                0x00012d94       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+ *fill*         0x00012da7        0x1 ff
  .rodata.__func__.18
-                0x00012d8c        0xc CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+                0x00012da8        0xc CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
  .rodata.__func__.13
-                0x00012d98       0x15 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
- *fill*         0x00012dad        0x3 ff
+                0x00012db4       0x15 CMakeFiles/nxpcup.dir/drivers/fsl_lpuart.o
+ *fill*         0x00012dc9        0x3 ff
  .rodata.kLpi2cBases
-                0x00012db0       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x00012dcc       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .rodata.LPI2C_MasterCreateEDMAHandle.str1.4
-                0x00012dd8       0x7c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x00012df4       0x7c CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .rodata.LPI2C_MasterTransferEDMA.str1.4
-                0x00012dd8       0x4d CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x00012df4       0x4d CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .rodata.LPI2C_MasterTransferEdmaHandleIRQ.str1.4
-                0x00012dd8       0x43 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x00012df4       0x43 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  .rodata.__func__.3
-                0x00012dd8       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
- *fill*         0x00012df5        0x3 ff
- .rodata.__func__.2
-                0x00012df8       0x19 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+                0x00012df4       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
  *fill*         0x00012e11        0x3 ff
+ .rodata.__func__.2
+                0x00012e14       0x19 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+ *fill*         0x00012e2d        0x3 ff
  .rodata.__func__.0
-                0x00012e14       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
- *fill*         0x00012e36        0x2 ff
+                0x00012e30       0x22 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c_edma.o
+ *fill*         0x00012e52        0x2 ff
  .rodata.kLpi2cBases
-                0x00012e38       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012e54       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.kLpi2cIrqs
-                0x00012e60       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
-                0x00012e60                kLpi2cIrqs
+                0x00012e7c       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012e7c                kLpi2cIrqs
  .rodata.kLpi2cClocks
-                0x00012e74       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012e90       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.LPI2C_GetInstance.str1.4
-                0x00012e88       0x61 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012ea4       0x61 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.LPI2C_GetCyclesForWidth.str1.4
-                0x00012e88       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012ea4       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.LPI2C_MasterInit.str1.4
-                0x00012e88        0x6 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012ea4        0x6 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.__func__.18
-                0x00012e88       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
- *fill*         0x00012e9a        0x2 ff
+                0x00012ea4       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+ *fill*         0x00012eb6        0x2 ff
  .rodata.__func__.17
-                0x00012e9c       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+                0x00012eb8       0x18 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
  .rodata.__func__.16
-                0x00012eb4       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
- *fill*         0x00012ec5        0x3 ff
+                0x00012ed0       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_lpi2c.o
+ *fill*         0x00012ee1        0x3 ff
  .rodata.s_lpflexcommBaseAddrs
-                0x00012ec8       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012ee4       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.s_lpflexcommBase
-                0x00012ef0       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f0c       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.s_lpflexcommClocks
-                0x00012f18       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f34       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.s_lpflexcommResets
-                0x00012f2c       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f48       0x28 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.LP_FLEXCOMM_GetInstance.str1.4
-                0x00012f54       0x72 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f70       0x72 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.LP_FLEXCOMM_SetPeriph.str1.4
-                0x00012f54       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f70       0x2c CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.LP_FLEXCOMM_Init.str1.4
-                0x00012f54       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+                0x00012f70       0x32 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
  .rodata.__func__.3
-                0x00012f54       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
- *fill*         0x00012f6a        0x2 ff
+                0x00012f70       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+ *fill*         0x00012f86        0x2 ff
  .rodata.__func__.2
-                0x00012f6c       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
- *fill*         0x00012f7d        0x3 ff
+                0x00012f88       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+ *fill*         0x00012f99        0x3 ff
  .rodata.__func__.0
-                0x00012f80       0x1a CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
- *fill*         0x00012f9a        0x2 ff
+                0x00012f9c       0x1a CMakeFiles/nxpcup.dir/drivers/fsl_lpflexcomm.o
+ *fill*         0x00012fb6        0x2 ff
  .rodata.s_gpioBases
-                0x00012f9c       0x30 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00012fb8       0x30 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.s_gpioClockName
-                0x00012fcc        0xc CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00012fe8        0xc CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.GPIO_GetInstance.str1.4
-                0x00012fd8       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00012ff4       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.GPIO_PortClockEnable.str1.4
-                0x00012fd8       0x27 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00012ff4       0x27 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.GPIO_PinInit.str1.4
-                0x00012fd8        0xf CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00012ff4        0xf CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.__func__.4
-                0x00012fd8       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
- *fill*         0x00012fe9        0x3 ff
+                0x00012ff4       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+ *fill*         0x00013005        0x3 ff
  .rodata.__func__.3
-                0x00012fec       0x15 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
- *fill*         0x00013001        0x3 ff
+                0x00013008       0x15 CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+ *fill*         0x0001301d        0x3 ff
  .rodata.__func__.2
-                0x00013004        0xd CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
+                0x00013020        0xd CMakeFiles/nxpcup.dir/drivers/fsl_gpio.o
  .rodata.EDMA_SetChannelMux.str1.4
-                0x00013011       0x7c CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013011        0x3 ff
+                0x0001302d       0x7c CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x0001302d        0x3 ff
  .rodata.s_edmaBases
-                0x00013014        0x8 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013030        0x8 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.s_edmaClockName
-                0x0001301c        0x4 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013038        0x4 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.s_edmaResets
-                0x00013020        0x8 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x0001303c        0x8 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.s_edmaIRQNumber
-                0x00013028       0x40 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013044       0x40 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_GetInstance.str1.4
-                0x00013068       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x60 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_InstallTCD.str1.4
-                0x00013068       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_Init.str1.4
-                0x00013068        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_InitChannel.str1.4
-                0x00013068       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x16 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_TcdResetExt.str1.4
-                0x00013068       0x1e CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x1e CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_ConfigChannelSoftwareTCDExt.str1.4
-                0x00013068      0x2dd CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084      0x2dd CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_TcdInit.str1.4
-                0x00013068       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_CreateHandle.str1.4
-                0x00013068        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.EDMA_HandleIRQ.str1.4
-                0x00013068       0x39 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013084       0x39 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.__func__.54
-                0x00013068       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013079        0x3 ff
+                0x00013084       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013095        0x3 ff
  .rodata.__func__.52
-                0x0001307c        0xa CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013086        0x2 ff
+                0x00013098        0xa CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000130a2        0x2 ff
  .rodata.__func__.51
-                0x00013088       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013099        0x3 ff
+                0x000130a4       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000130b5        0x3 ff
  .rodata.__func__.50
-                0x0001309c       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x000130af        0x1 ff
+                0x000130b8       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000130cb        0x1 ff
  .rodata.__func__.49
-                0x000130b0       0x26 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x000130d6        0x2 ff
+                0x000130cc       0x26 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000130f2        0x2 ff
  .rodata.__func__.48
-                0x000130d8       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x000130f5        0x3 ff
+                0x000130f4       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013111        0x3 ff
  .rodata.__func__.47
-                0x000130f8       0x1f CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013117        0x1 ff
+                0x00013114       0x1f CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013133        0x1 ff
  .rodata.__func__.45
-                0x00013118       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x0001312a        0x2 ff
+                0x00013134       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013146        0x2 ff
  .rodata.__func__.44
-                0x0001312c       0x17 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013143        0x1 ff
+                0x00013148       0x17 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x0001315f        0x1 ff
  .rodata.__func__.41
-                0x00013144       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x00013160       0x20 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.__func__.37
-                0x00013164       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013175        0x3 ff
+                0x00013180       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013191        0x3 ff
  .rodata.__func__.36
-                0x00013178       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013195        0x3 ff
+                0x00013194       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000131b1        0x3 ff
  .rodata.__func__.35
-                0x00013198       0x21 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x000131b9        0x3 ff
+                0x000131b4       0x21 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000131d5        0x3 ff
  .rodata.__func__.30
-                0x000131bc       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+                0x000131d8       0x1c CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
  .rodata.__func__.18
-                0x000131d8       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x000131f5        0x3 ff
+                0x000131f4       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013211        0x3 ff
  .rodata.__func__.15
-                0x000131f8       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013215        0x3 ff
+                0x00013214       0x1d CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013231        0x3 ff
  .rodata.__func__.14
-                0x00013218        0xd CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013225        0x3 ff
+                0x00013234        0xd CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013241        0x3 ff
  .rodata.__func__.13
-                0x00013228       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x0001323a        0x2 ff
+                0x00013244       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013256        0x2 ff
  .rodata.__func__.11
-                0x0001323c       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x0001324d        0x3 ff
+                0x00013258       0x11 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013269        0x3 ff
  .rodata.__func__.2
-                0x00013250       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013263        0x1 ff
+                0x0001326c       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x0001327f        0x1 ff
  .rodata.__func__.1
-                0x00013264       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013276        0x2 ff
+                0x00013280       0x12 CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x00013292        0x2 ff
  .rodata.__func__.0
-                0x00013278        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
- *fill*         0x00013287        0x1 ff
+                0x00013294        0xf CMakeFiles/nxpcup.dir/drivers/fsl_edma.o
+ *fill*         0x000132a3        0x1 ff
  .rodata.s_ctimerBases
-                0x00013288       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000132a4       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .rodata.s_ctimerClocks
-                0x0001329c        0xa CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
- *fill*         0x000132a6        0x2 ff
+                0x000132b8        0xa CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+ *fill*         0x000132c2        0x2 ff
  .rodata.s_ctimerResets
-                0x000132a8       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000132c4       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .rodata.s_ctimerIRQ
-                0x000132bc        0xa CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000132d8        0xa CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .rodata.CTIMER_GetInstance.str1.4
-                0x000132c6       0x5a CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000132e2       0x5a CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .rodata.CTIMER_Init.str1.4
-                0x000132c6        0xf CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
- *fill*         0x000132c6        0x2 ff
+                0x000132e2        0xf CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+ *fill*         0x000132e2        0x2 ff
  .rodata.__func__.3
-                0x000132c8       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
- *fill*         0x000132db        0x1 ff
+                0x000132e4       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+ *fill*         0x000132f7        0x1 ff
  .rodata.__func__.2
-                0x000132dc        0xc CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
+                0x000132f8        0xc CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .rodata.MSDK_EnableCpuCycleCounter.str1.4
-                0x000132e8       0x82 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
+                0x00013304       0x82 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .rodata.SDK_DelayAtLeastUs.str1.4
-                0x000132e8       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
+                0x00013304       0x14 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .rodata.__func__.0
-                0x000132e8       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
+                0x00013304       0x13 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .rodata.CLOCK_AttachClk.str1.4
-                0x000132fb       0x59 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
- *fill*         0x000132fb        0x1 ff
+                0x00013317       0x59 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+ *fill*         0x00013317        0x1 ff
  .rodata.__func__.1
-                0x000132fc       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
+                0x00013318       0x10 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
  .rodata.send_ack_dbl.str1.4
-                0x0001330c        0xf CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00013328        0xf CMakeFiles/nxpcup.dir/source/wifi_config.o
  .rodata.append_flt.str1.4
-                0x0001330c        0xc CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00013328        0xc CMakeFiles/nxpcup.dir/source/wifi_config.o
  .rodata.command_execute.str1.4
-                0x0001330c      0x344 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00013328      0x344 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .rodata.pixy_get_vectors.str1.4
-                0x0001330c        0x7 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x00013328        0x7 CMakeFiles/nxpcup.dir/source/pixy.o
  .rodata.MRT_GetDefaultConfig.str1.4
-                0x0001330c       0x4b CMakeFiles/nxpcup.dir/source/main.o
+                0x00013328       0x4b CMakeFiles/nxpcup.dir/source/main.o
  .rodata.MRT_SetupChannelMode.str1.4
-                0x0001330c       0x3f CMakeFiles/nxpcup.dir/source/main.o
+                0x00013328       0x3f CMakeFiles/nxpcup.dir/source/main.o
  .rodata.MRT_StartTimer.str1.4
-                0x0001330c       0x5e CMakeFiles/nxpcup.dir/source/main.o
+                0x00013328       0x5e CMakeFiles/nxpcup.dir/source/main.o
  .rodata.main.str1.4
-                0x0001330c      0x10a CMakeFiles/nxpcup.dir/source/main.o
+                0x00013328      0x11e CMakeFiles/nxpcup.dir/source/main.o
  .rodata.__func__.7
-                0x0001330c       0x15 CMakeFiles/nxpcup.dir/source/main.o
- *fill*         0x00013321        0x3 ff
+                0x00013328       0x15 CMakeFiles/nxpcup.dir/source/main.o
+ *fill*         0x0001333d        0x3 ff
  .rodata.__func__.3
-                0x00013324       0x15 CMakeFiles/nxpcup.dir/source/main.o
- *fill*         0x00013339        0x3 ff
+                0x00013340       0x15 CMakeFiles/nxpcup.dir/source/main.o
+ *fill*         0x00013355        0x3 ff
  .rodata.__func__.2
-                0x0001333c       0x15 CMakeFiles/nxpcup.dir/source/main.o
- *fill*         0x00013351        0x3 ff
+                0x00013358       0x15 CMakeFiles/nxpcup.dir/source/main.o
+ *fill*         0x0001336d        0x3 ff
  .rodata.__func__.1
-                0x00013354       0x15 CMakeFiles/nxpcup.dir/source/main.o
- *fill*         0x00013369        0x3 ff
+                0x00013370       0x15 CMakeFiles/nxpcup.dir/source/main.o
+ *fill*         0x00013385        0x3 ff
  .rodata.__func__.0
-                0x0001336c        0xf CMakeFiles/nxpcup.dir/source/main.o
+                0x00013388        0xf CMakeFiles/nxpcup.dir/source/main.o
  .rodata.__assert_func.str1.4
-                0x0001337b       0x3e CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
- *fill*         0x0001337b        0x1 ff
+                0x00013397       0x3e CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+ *fill*         0x00013397        0x1 ff
  .rodata._ctype_
-                0x0001337c      0x101 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ctype_.o)
-                0x0001337c                _ctype_
+                0x00013398      0x101 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-ctype_.o)
+                0x00013398                _ctype_
  .rodata._svfprintf_r.str1.4
-                0x0001347d       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
- *fill*         0x0001347d        0x3 ff
+                0x00013499       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
+ *fill*         0x00013499        0x3 ff
  .rodata.zeroes.0
-                0x00013480       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
+                0x0001349c       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
  .rodata.blanks.1
-                0x00013490       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
+                0x000134ac       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-svfprintf.o)
  .rodata._vfprintf_r.str1.4
-                0x000134a0       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
+                0x000134bc       0x42 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
  .rodata.zeroes.0
-                0x000134a0       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
+                0x000134bc       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
  .rodata.blanks.1
-                0x000134b0       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
+                0x000134cc       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-vfprintf.o)
  .rodata.str1.4
-                0x000134c0       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-locale.o)
+                0x000134dc       0x4c C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-locale.o)
  .rodata._dtoa_r.str1.4
-                0x000134c0       0x83 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-dtoa.o)
+                0x000134dc       0x83 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-dtoa.o)
  .rodata.__multadd.str1.4
-                0x000134c0       0x70 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
- .rodata.p05.0  0x000134c0        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+                0x000134dc       0x70 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
+ .rodata.p05.0  0x000134dc        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-mprec.o)
  .rodata.CSWTCH.9
-                0x000134cc        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
+                0x000134e8        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
  .rodata.CSWTCH.8
-                0x000134d8        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
+                0x000134f4        0xc C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-ef_atan2.o)
  .rodata.atanlo
-                0x000134e4       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
+                0x00013500       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
  .rodata.atanhi
-                0x000134f4       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
+                0x00013510       0x10 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libm.a(libm_a-sf_atan.o)
  .rodata.initialise_monitor_handles.part.0.str1.1
-                0x00013504        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
-                0x00013544                        . = ALIGN (0x4)
+                0x00013520        0x4 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/lib/thumb/v8-m.main+fp/hard\libcr_newlib_semihost.a(syscalls.o)
+                0x00013560                        . = ALIGN (0x4)
 
-.glue_7         0x00013508        0x0
- .glue_7        0x00013508        0x0 linker stubs
+.glue_7         0x00013524        0x0
+ .glue_7        0x00013524        0x0 linker stubs
 
-.glue_7t        0x00013508        0x0
- .glue_7t       0x00013508        0x0 linker stubs
+.glue_7t        0x00013524        0x0
+ .glue_7t       0x00013524        0x0 linker stubs
 
-.vfp11_veneer   0x00013508        0x0
- .vfp11_veneer  0x00013508        0x0 linker stubs
+.vfp11_veneer   0x00013524        0x0
+ .vfp11_veneer  0x00013524        0x0 linker stubs
 
-.v4_bx          0x00013508        0x0
- .v4_bx         0x00013508        0x0 linker stubs
+.v4_bx          0x00013524        0x0
+ .v4_bx         0x00013524        0x0 linker stubs
 
-.iplt           0x00013508        0x0
- .iplt          0x00013508        0x0 CMakeFiles/nxpcup.dir/board/pin_mux.o
+.iplt           0x00013524        0x0
+ .iplt          0x00013524        0x0 CMakeFiles/nxpcup.dir/board/pin_mux.o
 
 .ARM.extab
  *(SORT_BY_ALIGNMENT(.ARM.extab*) SORT_BY_ALIGNMENT(.gnu.linkonce.armextab.*))
 
-.ARM.exidx      0x00013508        0x8
-                0x00013508                        __exidx_start = .
+.ARM.exidx      0x00013524        0x8
+                0x00013524                        __exidx_start = .
  *(SORT_BY_ALIGNMENT(.ARM.exidx*) SORT_BY_ALIGNMENT(.gnu.linkonce.armexidx.*))
  .ARM.exidx.text.__udivmoddi4
-                0x00013508        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_udivmoddi4.o)
- .ARM.exidx     0x00013510        0x0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strcmp.o)
+                0x00013524        0x8 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libgcc.a(_udivmoddi4.o)
+ .ARM.exidx     0x0001352c        0x0 C:/NXP/MCUXpressoIDE_25.6.136/ide/tools/bin/../lib/gcc/arm-none-eabi/14.2.1/thumb/v8-m.main+fp/hard\libc.a(libc_a-strcmp.o)
                                   0x8 (size before relaxing)
-                0x00013510                        __exidx_end = .
-                0x00013510                        _etext = .
+                0x0001352c                        __exidx_end = .
+                0x0001352c                        _etext = .
 
-.rel.dyn        0x00013510        0x0
- .rel.iplt      0x00013510        0x0 CMakeFiles/nxpcup.dir/board/pin_mux.o
+.rel.dyn        0x0001352c        0x0
+ .rel.iplt      0x0001352c        0x0 CMakeFiles/nxpcup.dir/board/pin_mux.o
 
 .m_usb_data
  *(SORT_BY_ALIGNMENT(m_usb_global))
 
-.data_RAM2      0x04000000        0x0 load address 0x00013510
+.data_RAM2      0x04000000        0x0 load address 0x0001352c
  FILL mask 0xff
                 [!provide]                        PROVIDE (__start_data_RAM2 = .)
                 [!provide]                        PROVIDE (__start_data_SRAMX = .)
@@ -12942,7 +12942,7 @@ END GROUP
                 [!provide]                        PROVIDE (__end_data_RAM2 = .)
                 [!provide]                        PROVIDE (__end_data_SRAMX = .)
 
-.data_RAM3      0x20060000        0x0 load address 0x00013510
+.data_RAM3      0x20060000        0x0 load address 0x0001352c
  FILL mask 0xff
                 [!provide]                        PROVIDE (__start_data_RAM3 = .)
                 [!provide]                        PROVIDE (__start_data_SRAMH = .)
@@ -12956,7 +12956,7 @@ END GROUP
                 [!provide]                        PROVIDE (__end_data_RAM3 = .)
                 [!provide]                        PROVIDE (__end_data_SRAMH = .)
 
-.data_RAM4      0x400ba000        0x0 load address 0x00013510
+.data_RAM4      0x400ba000        0x0 load address 0x0001352c
  FILL mask 0xff
                 [!provide]                        PROVIDE (__start_data_RAM4 = .)
                 [!provide]                        PROVIDE (__start_data_USB_RAM = .)
@@ -12977,7 +12977,7 @@ END GROUP
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _end_uninit_RESERVED = .
 
-.data           0x20000000      0x724 load address 0x00013510
+.data           0x20000000      0x724 load address 0x0001352c
  FILL mask 0xff
                 0x20000000                        _data = .
                 [!provide]                        PROVIDE (__start_data_RAM = .)
@@ -13025,7 +13025,7 @@ END GROUP
                 [!provide]                        PROVIDE (__end_data_RAM = .)
                 [!provide]                        PROVIDE (__end_data_SRAM = .)
 
-.igot.plt       0x20000724        0x0 load address 0x00013c34
+.igot.plt       0x20000724        0x0 load address 0x00013c50
  .igot.plt      0x20000724        0x0 CMakeFiles/nxpcup.dir/board/pin_mux.o
 
 .bss_RAM2       0x04000000        0x0
@@ -13221,12 +13221,12 @@ END GROUP
                 0x2005f000                        . = ALIGN (0x4)
                 0x20060000                        _vStackTop = (. + _StackSize)
                 0x00000000                        _image_start = LOADADDR (.text)
-                0x00013c34                        _image_end = (LOADADDR (.data) + SIZEOF (.data))
-                0x00013c34                        _image_size = (_image_end - _image_start)
+                0x00013c50                        _image_end = (LOADADDR (.data) + SIZEOF (.data))
+                0x00013c50                        _image_size = (_image_end - _image_start)
 OUTPUT(nxpcup.axf elf32-littlearm)
 LOAD linker stubs
 
-.debug_info     0x00000000    0x31cae
+.debug_info     0x00000000    0x31cb6
  .debug_info    0x00000000     0x1a21 CMakeFiles/nxpcup.dir/board/pin_mux.o
  .debug_info    0x00001a21     0x2ba8 CMakeFiles/nxpcup.dir/board/peripherals.o
  .debug_info    0x000045c9      0xcd7 CMakeFiles/nxpcup.dir/board/hardware_init.o
@@ -13246,19 +13246,19 @@ LOAD linker stubs
  .debug_info    0x000207ac     0x2b15 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .debug_info    0x000232c1      0x3b6 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .debug_info    0x00023677     0x526d CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
- .debug_info    0x000288e4     0x10fb CMakeFiles/nxpcup.dir/source/wifi_config.o
- .debug_info    0x000299df      0x7da CMakeFiles/nxpcup.dir/source/vectors.o
- .debug_info    0x0002a1b9      0xf56 CMakeFiles/nxpcup.dir/source/utils.o
- .debug_info    0x0002b10f      0x2c3 CMakeFiles/nxpcup.dir/source/servo.o
- .debug_info    0x0002b3d2       0x3d CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
- .debug_info    0x0002b40f     0x1076 CMakeFiles/nxpcup.dir/source/pixy.o
- .debug_info    0x0002c485     0x340b CMakeFiles/nxpcup.dir/source/main.o
- .debug_info    0x0002f890      0xc14 CMakeFiles/nxpcup.dir/source/hbridge.o
- .debug_info    0x000304a4      0x247 CMakeFiles/nxpcup.dir/source/control_theory.o
- .debug_info    0x000306eb     0x13f4 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
- .debug_info    0x00031adf      0x1cf CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+ .debug_info    0x000288e4     0x10ff CMakeFiles/nxpcup.dir/source/wifi_config.o
+ .debug_info    0x000299e3      0x7da CMakeFiles/nxpcup.dir/source/vectors.o
+ .debug_info    0x0002a1bd      0xf56 CMakeFiles/nxpcup.dir/source/utils.o
+ .debug_info    0x0002b113      0x2c3 CMakeFiles/nxpcup.dir/source/servo.o
+ .debug_info    0x0002b3d6       0x3d CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
+ .debug_info    0x0002b413     0x1076 CMakeFiles/nxpcup.dir/source/pixy.o
+ .debug_info    0x0002c489     0x340f CMakeFiles/nxpcup.dir/source/main.o
+ .debug_info    0x0002f898      0xc14 CMakeFiles/nxpcup.dir/source/hbridge.o
+ .debug_info    0x000304ac      0x247 CMakeFiles/nxpcup.dir/source/control_theory.o
+ .debug_info    0x000306f3     0x13f4 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
+ .debug_info    0x00031ae7      0x1cf CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
-.debug_abbrev   0x00000000     0x4930
+.debug_abbrev   0x00000000     0x4941
  .debug_abbrev  0x00000000      0x298 CMakeFiles/nxpcup.dir/board/pin_mux.o
  .debug_abbrev  0x00000298      0x38d CMakeFiles/nxpcup.dir/board/peripherals.o
  .debug_abbrev  0x00000625       0xca CMakeFiles/nxpcup.dir/board/hardware_init.o
@@ -13278,17 +13278,17 @@ LOAD linker stubs
  .debug_abbrev  0x00002b27      0x3a7 CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .debug_abbrev  0x00002ece      0x162 CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .debug_abbrev  0x00003030      0x38f CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
- .debug_abbrev  0x000033bf      0x2f5 CMakeFiles/nxpcup.dir/source/wifi_config.o
- .debug_abbrev  0x000036b4      0x1df CMakeFiles/nxpcup.dir/source/vectors.o
- .debug_abbrev  0x00003893      0x2d3 CMakeFiles/nxpcup.dir/source/utils.o
- .debug_abbrev  0x00003b66      0x16b CMakeFiles/nxpcup.dir/source/servo.o
- .debug_abbrev  0x00003cd1       0x2f CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
- .debug_abbrev  0x00003d00      0x278 CMakeFiles/nxpcup.dir/source/pixy.o
- .debug_abbrev  0x00003f78      0x42b CMakeFiles/nxpcup.dir/source/main.o
- .debug_abbrev  0x000043a3      0x216 CMakeFiles/nxpcup.dir/source/hbridge.o
- .debug_abbrev  0x000045b9      0x103 CMakeFiles/nxpcup.dir/source/control_theory.o
- .debug_abbrev  0x000046bc      0x16a CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
- .debug_abbrev  0x00004826      0x10a CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+ .debug_abbrev  0x000033bf      0x306 CMakeFiles/nxpcup.dir/source/wifi_config.o
+ .debug_abbrev  0x000036c5      0x1df CMakeFiles/nxpcup.dir/source/vectors.o
+ .debug_abbrev  0x000038a4      0x2d3 CMakeFiles/nxpcup.dir/source/utils.o
+ .debug_abbrev  0x00003b77      0x16b CMakeFiles/nxpcup.dir/source/servo.o
+ .debug_abbrev  0x00003ce2       0x2f CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
+ .debug_abbrev  0x00003d11      0x278 CMakeFiles/nxpcup.dir/source/pixy.o
+ .debug_abbrev  0x00003f89      0x42b CMakeFiles/nxpcup.dir/source/main.o
+ .debug_abbrev  0x000043b4      0x216 CMakeFiles/nxpcup.dir/source/hbridge.o
+ .debug_abbrev  0x000045ca      0x103 CMakeFiles/nxpcup.dir/source/control_theory.o
+ .debug_abbrev  0x000046cd      0x16a CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
+ .debug_abbrev  0x00004837      0x10a CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
 .debug_aranges  0x00000000     0x18a0
  .debug_aranges
@@ -13353,7 +13353,7 @@ LOAD linker stubs
                 0x00001878       0x28 CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
 .debug_rnglists
-                0x00000000     0x12fd
+                0x00000000     0x12fe
  .debug_rnglists
                 0x00000000       0x2d CMakeFiles/nxpcup.dir/board/pin_mux.o
  .debug_rnglists
@@ -13393,27 +13393,27 @@ LOAD linker stubs
  .debug_rnglists
                 0x00000a51      0x29f CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
  .debug_rnglists
-                0x00000cf0       0x48 CMakeFiles/nxpcup.dir/source/wifi_config.o
+                0x00000cf0       0x49 CMakeFiles/nxpcup.dir/source/wifi_config.o
  .debug_rnglists
-                0x00000d38       0x43 CMakeFiles/nxpcup.dir/source/vectors.o
+                0x00000d39       0x43 CMakeFiles/nxpcup.dir/source/vectors.o
  .debug_rnglists
-                0x00000d7b       0x4e CMakeFiles/nxpcup.dir/source/utils.o
+                0x00000d7c       0x4e CMakeFiles/nxpcup.dir/source/utils.o
  .debug_rnglists
-                0x00000dc9       0x35 CMakeFiles/nxpcup.dir/source/servo.o
+                0x00000dca       0x35 CMakeFiles/nxpcup.dir/source/servo.o
  .debug_rnglists
-                0x00000dfe       0x13 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
+                0x00000dff       0x13 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
  .debug_rnglists
-                0x00000e11       0x32 CMakeFiles/nxpcup.dir/source/pixy.o
+                0x00000e12       0x32 CMakeFiles/nxpcup.dir/source/pixy.o
  .debug_rnglists
-                0x00000e43       0x51 CMakeFiles/nxpcup.dir/source/main.o
+                0x00000e44       0x51 CMakeFiles/nxpcup.dir/source/main.o
  .debug_rnglists
-                0x00000e94       0x2d CMakeFiles/nxpcup.dir/source/hbridge.o
+                0x00000e95       0x2d CMakeFiles/nxpcup.dir/source/hbridge.o
  .debug_rnglists
-                0x00000ec1       0x1a CMakeFiles/nxpcup.dir/source/control_theory.o
+                0x00000ec2       0x1a CMakeFiles/nxpcup.dir/source/control_theory.o
  .debug_rnglists
-                0x00000edb      0x409 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
+                0x00000edc      0x409 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
  .debug_rnglists
-                0x000012e4       0x19 CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+                0x000012e5       0x19 CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
 .debug_macro    0x00000000    0x45889
  .debug_macro   0x00000000      0x52b CMakeFiles/nxpcup.dir/board/pin_mux.o
@@ -13607,7 +13607,7 @@ LOAD linker stubs
  .debug_macro   0x000452fb       0x32 CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
  .debug_macro   0x0004532d      0x55c CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
-.debug_line     0x00000000    0x1d9b3
+.debug_line     0x00000000    0x1d9cb
  .debug_line    0x00000000      0xc43 CMakeFiles/nxpcup.dir/board/pin_mux.o
  .debug_line    0x00000c43      0xc92 CMakeFiles/nxpcup.dir/board/peripherals.o
  .debug_line    0x000018d5      0xa67 CMakeFiles/nxpcup.dir/board/hardware_init.o
@@ -13627,17 +13627,17 @@ LOAD linker stubs
  .debug_line    0x00010acf     0x107b CMakeFiles/nxpcup.dir/drivers/fsl_ctimer.o
  .debug_line    0x00011b4a      0xa8b CMakeFiles/nxpcup.dir/drivers/fsl_common_arm.o
  .debug_line    0x000125d5     0x3013 CMakeFiles/nxpcup.dir/drivers/fsl_clock.o
- .debug_line    0x000155e8     0x1085 CMakeFiles/nxpcup.dir/source/wifi_config.o
- .debug_line    0x0001666d      0xedc CMakeFiles/nxpcup.dir/source/vectors.o
- .debug_line    0x00017549      0xe6d CMakeFiles/nxpcup.dir/source/utils.o
- .debug_line    0x000183b6      0xc61 CMakeFiles/nxpcup.dir/source/servo.o
- .debug_line    0x00019017       0x90 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
- .debug_line    0x000190a7      0xca5 CMakeFiles/nxpcup.dir/source/pixy.o
- .debug_line    0x00019d4c     0x105e CMakeFiles/nxpcup.dir/source/main.o
- .debug_line    0x0001adaa      0xc52 CMakeFiles/nxpcup.dir/source/hbridge.o
- .debug_line    0x0001b9fc      0x37f CMakeFiles/nxpcup.dir/source/control_theory.o
- .debug_line    0x0001bd7b     0x115a CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
- .debug_line    0x0001ced5      0xade CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
+ .debug_line    0x000155e8     0x1087 CMakeFiles/nxpcup.dir/source/wifi_config.o
+ .debug_line    0x0001666f      0xedc CMakeFiles/nxpcup.dir/source/vectors.o
+ .debug_line    0x0001754b      0xe6d CMakeFiles/nxpcup.dir/source/utils.o
+ .debug_line    0x000183b8      0xc61 CMakeFiles/nxpcup.dir/source/servo.o
+ .debug_line    0x00019019       0x90 CMakeFiles/nxpcup.dir/source/semihost_hardfault.o
+ .debug_line    0x000190a9      0xca5 CMakeFiles/nxpcup.dir/source/pixy.o
+ .debug_line    0x00019d4e     0x1074 CMakeFiles/nxpcup.dir/source/main.o
+ .debug_line    0x0001adc2      0xc52 CMakeFiles/nxpcup.dir/source/hbridge.o
+ .debug_line    0x0001ba14      0x37f CMakeFiles/nxpcup.dir/source/control_theory.o
+ .debug_line    0x0001bd93     0x115a CMakeFiles/nxpcup.dir/startup/startup_mcxn947_cm33_core0.o
+ .debug_line    0x0001ceed      0xade CMakeFiles/nxpcup.dir/utilities/fsl_assert.o
 
 .debug_str      0x00000000   0x23923d
  .debug_str     0x00000000   0x23923d CMakeFiles/nxpcup.dir/board/pin_mux.o

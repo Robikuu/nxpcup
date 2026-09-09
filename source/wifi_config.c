@@ -28,8 +28,11 @@ void params_init(void)
     g_params.dt    = 0.02f;   /* CRITICAL — must be nonzero */
     g_params.alpha = 0.3f;    /* CRITICAL — must be in (0, 1] */
 
-    g_params.base_speed_left  = 30.0f;   /* replaces base_speed */
-    g_params.base_speed_right = 30.0f;
+    g_params.base_speed_left  = 33.0f;   /* replaces base_speed */
+    g_params.base_speed_right = 33.0f;
+
+    g_params.max_speed_left  = 50.0f;
+    g_params.max_speed_right = 50.0f;
 
     g_params.steering_offset = 23.0f;
     g_params.state           = STATE_IDLE;

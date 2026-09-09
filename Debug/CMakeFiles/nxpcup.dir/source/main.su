@@ -6,6 +6,6 @@ C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_mrt.h:128:20:MRT_SetupChann
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_mrt.h:157:20:MRT_EnableInterrupts	24	static
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_mrt.h:222:20:MRT_ClearStatusFlags	24	static
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_mrt.h:289:20:MRT_StartTimer	24	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:53:6:MRT0_IRQHandler	8	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:59:13:reset_pid_state	16	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:68:5:main	360	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:54:6:MRT0_IRQHandler	8	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:61:13:reset_pid_state	16	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/main.c:70:5:main	360	static
