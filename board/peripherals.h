@@ -80,17 +80,17 @@ extern "C" {
 /* Definition of peripheral ID */
 #define CTIMER2_PERIPHERAL CTIMER2
 /* Timer tick frequency in Hz (input frequency of the timer) */
-#define CTIMER2_TICK_FREQ 1171875UL
+#define CTIMER2_TICK_FREQ 150000000UL
 /* Timer tick period in ns (input period of the timer) */
-#define CTIMER2_TICK_PERIOD 853UL
+#define CTIMER2_TICK_PERIOD 7UL
 /* Definition of PWM period channel. */
 #define CTIMER2_PWM_PERIOD_CH kCTIMER_Match_0
 /* Definition of PWM period */
-#define CTIMER2_PWM_PERIOD 23436
+#define CTIMER2_PWM_PERIOD 2999999
 /* Definition of channel 2 ID */
-#define CTIMER2_PWM_3_CHANNEL kCTIMER_Match_2
+#define CTIMER2_PWM_2_CHANNEL kCTIMER_Match_2
 /* Definition of channel 2 duty */
-#define CTIMER2_PWM_3_DUTY 23387
+#define CTIMER2_PWM_2_DUTY 2775000
 /* BOARD_InitPeripherals defines for LP_FLEXCOMM2 */
 /* Definition of peripheral ID */
 #define LP_FLEXCOMM2_PERIPHERAL LPI2C2

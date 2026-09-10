@@ -10,7 +10,7 @@ product: Peripherals v15.0
 processor: MCXN947
 package_id: MCXN947VDF
 mcu_data: ksdk2_0
-processor_version: 25.06.10
+processor_version: 26.06.20
 board: FRDM-MCXN947
 functionalGroups:
 - name: BOARD_InitPeripherals
@@ -69,6 +69,7 @@ instance:
 - peripheral: 'DMA0'
 - config_sets:
   - fsl_edma:
+    - dmamux_devices: []
     - common_settings:
       - vars: []
       - enableHaltOnError: 'true'
@@ -275,7 +276,7 @@ instance:
       - mode: 'kCTIMER_TimerMode'
       - clockSource: 'FunctionClock'
       - clockSourceFreq: 'ClocksTool_DefaultInit'
-      - timerPrescaler: '128'
+      - timerPrescaler: '150mhz'
     - EnableTimerInInit: 'true'
     - pwmConfig:
       - pwmPeriodChannel: 'kCTIMER_Match_0'
@@ -283,9 +284,9 @@ instance:
       - enableInterrupt: 'false'
       - pwmChannels:
         - 0:
-          - pwmChannelPrefixId: 'PWM_3'
+          - pwmChannelPrefixId: 'PWM_2'
           - pwmChannel: 'kCTIMER_Match_2'
-          - pwmDutyValueStr: '50'
+          - pwmDutyValueStr: '225000'
           - enableInterrupt: 'false'
     - interruptCallbackConfig:
       - interrupt:
@@ -298,14 +299,14 @@ instance:
 const ctimer_config_t CTIMER2_config = {
   .mode = kCTIMER_TimerMode,
   .input = kCTIMER_Capture_0,
-  .prescale = 127
+  .prescale = 0
 };
 
 static void CTIMER2_init(void) {
   /* CTIMER2 peripheral initialization */
   CTIMER_Init(CTIMER2_PERIPHERAL, &CTIMER2_config);
   /* PWM channel 2 of CTIMER2 peripheral initialization */
-  CTIMER_SetupPwmPeriod(CTIMER2_PERIPHERAL, CTIMER2_PWM_PERIOD_CH, CTIMER2_PWM_3_CHANNEL, CTIMER2_PWM_PERIOD, CTIMER2_PWM_3_DUTY, false);
+  CTIMER_SetupPwmPeriod(CTIMER2_PERIPHERAL, CTIMER2_PWM_PERIOD_CH, CTIMER2_PWM_2_CHANNEL, CTIMER2_PWM_PERIOD, CTIMER2_PWM_2_DUTY, false);
   /* Start the timer */
   CTIMER_StartTimer(CTIMER2_PERIPHERAL);
 }
