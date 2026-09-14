@@ -16,7 +16,7 @@ static void pixy_edma_cb(LPI2C_Type *base,
     }
 }
 
-status_t pixy_init(pixy_t *cam,
+void pixy_init(pixy_t *cam,
                LPI2C_Type *inst,
                uint8_t addr,
                edma_handle_t *rxHandle,
@@ -31,7 +31,6 @@ status_t pixy_init(pixy_t *cam,
         txHandle,
         pixy_edma_cb,
         NULL);
-    return kStatus_Success;
 }
 
 static status_t pixy_send(pixy_t *cam, const uint8_t *cmd, size_t len)
@@ -101,12 +100,10 @@ status_t pixy_get_vectors(pixy_t *cam,
 
         for (uint8_t i = 0; i < nvec && count < max_vectors; i++) {
             size_t off = i * 6;
-            vectors[6*count + 0] = data[off + 0];   /* x0    */
-            vectors[6*count + 1] = data[off + 1];   /* y0    */
-            vectors[6*count + 2] = data[off + 2];   /* x1    */
-            vectors[6*count + 3] = data[off + 3];   /* y1    */
-            vectors[6*count + 4] = data[off + 4];   /* index */
-            vectors[6*count + 5] = data[off + 5];   /* flags */
+            vectors[4*count + 0] = data[off + 0];   /* x0    */
+            vectors[4*count + 1] = data[off + 1];   /* y0    */
+            vectors[4*count + 2] = data[off + 2];   /* x1    */
+            vectors[4*count + 3] = data[off + 3];   /* y1    */
             count++;
         }
         idx += 2 + featLen;

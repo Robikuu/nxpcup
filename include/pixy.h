@@ -10,6 +10,11 @@
 extern "C" {
 #endif
 
+#define PIXY_FRAME_WIDTH 79.0f
+#define PIXY_FRAME_HEIGHT 52.0f
+#define PIXY_CENTER_X      39.5f
+#define PIXY_TRACK_HALF_WIDTH  38.5f
+
 typedef struct {
     LPI2C_Type                   *instance;
     uint8_t                       address;
@@ -17,7 +22,7 @@ typedef struct {
 } pixy_t;
 
 
-status_t pixy_init(pixy_t *cam, LPI2C_Type *base, uint8_t addr,
+void pixy_init(pixy_t *cam, LPI2C_Type *base, uint8_t addr,
                    edma_handle_t *rxHandle, edma_handle_t *txHandle);
 
 
