@@ -11,9 +11,9 @@ C_SRCS += \
 ../source/pixy.c \
 ../source/semihost_hardfault.c \
 ../source/servo.c \
-../source/simple_movement.c \
 ../source/utils.c \
-../source/vectors.c 
+../source/vectors.c \
+../source/wifi_config.c 
 
 C_DEPS += \
 ./source/control_theory.d \
@@ -23,9 +23,9 @@ C_DEPS += \
 ./source/pixy.d \
 ./source/semihost_hardfault.d \
 ./source/servo.d \
-./source/simple_movement.d \
 ./source/utils.d \
-./source/vectors.d 
+./source/vectors.d \
+./source/wifi_config.d 
 
 OBJS += \
 ./source/control_theory.o \
@@ -35,16 +35,16 @@ OBJS += \
 ./source/pixy.o \
 ./source/semihost_hardfault.o \
 ./source/servo.o \
-./source/simple_movement.o \
 ./source/utils.o \
-./source/vectors.o 
+./source/vectors.o \
+./source/wifi_config.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
 source/%.o: ../source/%.c source/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: MCU C Compiler'
-	arm-none-eabi-gcc -std=gnu99 -D__REDLIB__ -DCPU_MCXN947VDF -DCPU_MCXN947VDF_cm33 -DCPU_MCXN947VDF_cm33_core0 -DMCUXPRESSO_SDK -DSDK_DEBUGCONSOLE=0 -DMCUX_META_BUILD -DMCXN947_cm33_core0_SERIES -DCR_INTEGER_PRINTF -DPRINTF_FLOAT_ENABLE=0 -D__MCUXPRESSO -D__USE_CMSIS -DDEBUG -I"D:\robotica\workspace\nxpcup\drivers" -I"D:\robotica\workspace\nxpcup\CMSIS" -I"D:\robotica\workspace\nxpcup\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup\device" -I"D:\robotica\workspace\nxpcup\device\periph" -I"D:\robotica\workspace\nxpcup\utilities" -I"D:\robotica\workspace\nxpcup\utilities\str" -I"D:\robotica\workspace\nxpcup\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup\component\uart" -I"D:\robotica\workspace\nxpcup\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup\board" -I"D:\robotica\workspace\nxpcup\source" -I"D:\robotica\workspace\nxpcup\include" -O0 -fno-common -g3 -gdwarf-4 -mcpu=cortex-m33 -c -ffunction-sections -fdata-sections -fno-builtin -imacros "D:\robotica\workspace\nxpcup\source\mcux_config.h" -fmerge-constants -fmacro-prefix-map="$(<D)/"= -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__REDLIB__ -fstack-usage -specs=redlib.specs -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	arm-none-eabi-gcc -std=gnu99 -DCPU_MCXN947VDF -DCPU_MCXN947VDF_cm33 -DCPU_MCXN947VDF_cm33_core0 -DMCUXPRESSO_SDK -DSDK_DEBUGCONSOLE=0 -DMCUX_META_BUILD -DMCXN947_cm33_core0_SERIES -DCR_INTEGER_PRINTF -DPRINTF_FLOAT_ENABLE=0 -D__MCUXPRESSO -D__USE_CMSIS -DDEBUG -DSDK_OS_BAREMETAL -D__NEWLIB__ -I"D:\robotica\workspace\nxpcup-ciorba_curata\drivers" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device\periph" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\str" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup-ciorba_curata\component\uart" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup-ciorba_curata\board" -I"D:\robotica\workspace\nxpcup-ciorba_curata\source" -I"D:\robotica\workspace\nxpcup-ciorba_curata\include" -O0 -fno-common -g3 -gdwarf-4 -mcpu=cortex-m33 -c -ffunction-sections -fdata-sections -fno-builtin -imacros "D:\robotica\workspace\nxpcup-ciorba_curata\source\mcux_config.h" -fmerge-constants -fmacro-prefix-map="$(<D)/"= -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__NEWLIB__ -fstack-usage -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
@@ -52,7 +52,7 @@ source/%.o: ../source/%.c source/subdir.mk
 clean: clean-source
 
 clean-source:
-	-$(RM) ./source/control_theory.d ./source/control_theory.o ./source/esc.d ./source/esc.o ./source/hbridge.d ./source/hbridge.o ./source/main.d ./source/main.o ./source/pixy.d ./source/pixy.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/servo.d ./source/servo.o ./source/simple_movement.d ./source/simple_movement.o ./source/utils.d ./source/utils.o ./source/vectors.d ./source/vectors.o
+	-$(RM) ./source/control_theory.d ./source/control_theory.o ./source/esc.d ./source/esc.o ./source/hbridge.d ./source/hbridge.o ./source/main.d ./source/main.o ./source/pixy.d ./source/pixy.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/servo.d ./source/servo.o ./source/utils.d ./source/utils.o ./source/vectors.d ./source/vectors.o ./source/wifi_config.d ./source/wifi_config.o
 
 .PHONY: clean-source
 

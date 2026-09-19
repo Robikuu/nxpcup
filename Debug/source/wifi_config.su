@@ -1,0 +1,9 @@
+D:\robotica\workspace\nxpcup-ciorba_curata\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
+../source/wifi_config.c:17:6:params_init	4	static
+../source/wifi_config.c:36:12:parse_float	40	static
+../source/wifi_config.c:67:13:send_ack	16	static
+../source/wifi_config.c:71:13:send_ack_dbl	88	static
+../source/wifi_config.c:81:12:append_flt	56	static
+../source/wifi_config.c:89:13:command_execute	584	static
+../source/wifi_config.c:166:6:command_poll	16	static
+../source/wifi_config.c:184:6:esp_printf	152	static

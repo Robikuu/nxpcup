@@ -280,6 +280,7 @@ outputs:
 - {id: CTIMER4_clock.outFreq, value: 150 MHz}
 - {id: FLEXCOMM0_clock.outFreq, value: 12 MHz}
 - {id: FLEXCOMM2_clock.outFreq, value: 12 MHz}
+- {id: FLEXCOMM3_clock.outFreq, value: 12 MHz}
 - {id: FLEXCOMM4_clock.outFreq, value: 12 MHz}
 - {id: FLEXCOMM9_clock.outFreq, value: 12 MHz}
 - {id: FRO_12M_clock.outFreq, value: 12 MHz}
@@ -301,6 +302,7 @@ settings:
 - {id: CTIMER4CLKDIV_HALT, value: Enable}
 - {id: FLEXCOMM0CLKDIV_HALT, value: Enable}
 - {id: FLEXCOMM2CLKDIV_HALT, value: Enable}
+- {id: FLEXCOMM3CLKDIV_HALT, value: Enable}
 - {id: FLEXCOMM4CLKDIV_HALT, value: Enable}
 - {id: FLEXCOMM9CLKDIV_HALT, value: Enable}
 - {id: SCG.PLL0M_MULT.scale, value: '50', locked: true}
@@ -314,6 +316,7 @@ settings:
 - {id: SYSCON.CTIMERCLKSEL4.sel, value: SCG.PLL0_CLK}
 - {id: SYSCON.FCCLKSEL0.sel, value: SCG.FRO_12M}
 - {id: SYSCON.FCCLKSEL2.sel, value: SCG.FRO_12M}
+- {id: SYSCON.FCCLKSEL3.sel, value: SCG.FRO_12M}
 - {id: SYSCON.FCCLKSEL4.sel, value: SCG.FRO_12M}
 - {id: SYSCON.FCCLKSEL9.sel, value: SCG.FRO_12M}
 - {id: SYSCON.FLEXSPICLKSEL.sel, value: NO_CLOCK}
@@ -378,6 +381,7 @@ void BOARD_BootClockPLL150M(void)
     CLOCK_AttachClk(kPLL0_to_CTIMER4);                 /*!< Switch CTIMER4 to PLL0 */
     CLOCK_AttachClk(kFRO12M_to_FLEXCOMM0);                 /*!< Switch FLEXCOMM0 to FRO12M */
     CLOCK_AttachClk(kFRO12M_to_FLEXCOMM2);                 /*!< Switch FLEXCOMM2 to FRO12M */
+    CLOCK_AttachClk(kFRO12M_to_FLEXCOMM3);                 /*!< Switch FLEXCOMM3 to FRO12M */
     CLOCK_AttachClk(kFRO12M_to_FLEXCOMM4);                 /*!< Switch FLEXCOMM4 to FRO12M */
     CLOCK_AttachClk(kFRO12M_to_FLEXCOMM9);                 /*!< Switch FLEXCOMM9 to FRO12M */
 
@@ -390,6 +394,7 @@ void BOARD_BootClockPLL150M(void)
     CLOCK_SetClkDiv(kCLOCK_DivCtimer4Clk, 1U);           /*!< Set CTIMER4CLKDIV divider to value 1 */
     CLOCK_SetClkDiv(kCLOCK_DivFlexcom0Clk, 1U);           /*!< Set FLEXCOMM0CLKDIV divider to value 1 */
     CLOCK_SetClkDiv(kCLOCK_DivFlexcom2Clk, 1U);           /*!< Set FLEXCOMM2CLKDIV divider to value 1 */
+    CLOCK_SetClkDiv(kCLOCK_DivFlexcom3Clk, 1U);           /*!< Set FLEXCOMM3CLKDIV divider to value 1 */
     CLOCK_SetClkDiv(kCLOCK_DivFlexcom4Clk, 1U);           /*!< Set FLEXCOMM4CLKDIV divider to value 1 */
     CLOCK_SetClkDiv(kCLOCK_DivFlexcom9Clk, 1U);           /*!< Set FLEXCOMM9CLKDIV divider to value 1 */
 

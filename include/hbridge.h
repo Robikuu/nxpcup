@@ -33,11 +33,11 @@ void HbridgeInit(Hbridge *h,
                  GPIO_Type *m1DirPort, uint32_t m1DirPin,
                  GPIO_Type *m2DirPort, uint32_t m2DirPin);
 
-void HbridgeSpeed(Hbridge *h, int16_t speed1, int16_t speed2);
+void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right);
 
 void HbridgeBrake(Hbridge *h);
 
-void compute_motor_speeds(double steering_output, double *speed_left, double *speed_right);
+void compute_motor_speeds(float steering_output, float *speed_left, float *speed_right);
 
 #ifdef __cplusplus
 }

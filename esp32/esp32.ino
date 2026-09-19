@@ -1,69 +1,57 @@
-#include <WiFi.h>
-#include <ESPmDNS.h>
+#include <Arduino.h>
+#include "ESP32_NOW_Serial.h"
+#include "MacAddress.h"
+#include "WiFi.h"
+#include "esp_wifi.h"
 
 // ---- Configuration ----
 const char* WIFI_SSID = "Robotics315";
 const char* WIFI_PASS = "helloworld";
 const char* HOSTNAME  = "nxpcup-bridge";
 
+#define ESPNOW_WIFI_CHANNEL 1
+
 #define UART_RX 25   // ESP32 RX  <- MCXN947 TX (P2_3)
 #define UART_TX 26   // ESP32 TX  -> MCXN947 RX (P2_4)
 #define UART_BAUD 115200
 
-WiFiServer tcpServer(3333);
-WiFiClient tcpClient;
+const MacAddress peer_mac({0x3C, 0x8A, 0x1F, 0x0D, 0x7E, 0x7C});
+
+ESP_NOW_Serial_Class NowSerial(peer_mac, ESPNOW_WIFI_CHANNEL, WIFI_IF_STA);
 
 void setup() {
-  Serial.begin(115200);              // USB serial, for local debugging only
+  Serial.begin(UART_BAUD);  // USB, free for debug logging on this board
   Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX, UART_TX);
 
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected!");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
-
-  if (MDNS.begin(HOSTNAME)) {
-    Serial.println("mDNS started: nxpcup-bridge.local");
-    MDNS.addService("nxpcup", "tcp", 3333);
+  WiFi.mode(WIFI_STA);
+  WiFi.setChannel(ESPNOW_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  while (!WiFi.STA.started()) {
+    delay(100);
   }
 
-  tcpServer.begin();
-  tcpServer.setNoDelay(true);
-  Serial.println("TCP command bridge ready on port 3333.");
+  Serial.print("MAC Address: ");
+  Serial.println(WiFi.macAddress());
+
+  NowSerial.begin(UART_BAUD);
+  Serial.println("Bridge ready — relaying ESP-NOW <-> UART2.");
 }
 
+
 void loop() {
-  // Listen for incoming TCP clients (e.g., a python script or Netcat terminal)
-  WiFiClient client = tcpServer.available();
-  
-  if (client) {
-    Serial.println("TCP Client connected!");
-    
-    // Keep looping as long as the client remains connected
-    while (client.connected()) {
-      
-      // 1. WiFi -> NXP: Read TCP data and transmit via UART
-      while (client.available() > 0) {
-        char c = client.read();
-        Serial2.write(c); // Sends to NXP MCX N947
-        
-        // Optional: Echo to USB serial to monitor traffic
-        Serial.write(c); 
-      }
-      
-      // 2. NXP -> WiFi: Read UART data and send back over TCP
-      while (Serial2.available() > 0) {
-        char c = Serial2.read();
-        client.write(c);
-      }
-    }
-    
-    client.stop();
-    Serial.println("TCP Client disconnected.");
+  // ESP32 #1 -> NXP board
+  while (NowSerial.available()) {
+    int c = NowSerial.read();
+    if (c < 0) break;
+    Serial2.write((uint8_t)c);
+    Serial.write((uint8_t)c);   // debug echo of the same byte
   }
+
+  // NXP board -> ESP32 #1
+  while (Serial2.available() && NowSerial.availableForWrite()) {
+    if (NowSerial.write(Serial2.read()) <= 0) {
+      Serial.println("ESP-NOW send failed");
+      break;
+    }
+  }
+  delay(1);
 }

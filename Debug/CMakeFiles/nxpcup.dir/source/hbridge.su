@@ -1,0 +1,4 @@
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_gpio.h:346:20:GPIO_PinWrite	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/hbridge.c:13:6:HbridgeInit	40	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/hbridge.c:34:6:HbridgeSpeed	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/hbridge.c:66:6:HbridgeBrake	16	static

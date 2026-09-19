@@ -5,11 +5,11 @@
 extern "C" {
 #endif
 
-void Steer(double angle);
-void TestServo();
+void Steer(float angle);
+void TestServo(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif // STEER_H_

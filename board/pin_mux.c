@@ -64,6 +64,8 @@ BOARD_InitPins:
   - {pin_num: B12, peripheral: GPIO0, signal: 'GPIO, 10', pin_signal: PIO0_10/FC0_P6/CT0_MAT0/FLEXIO0_D2/ADC0_B10, direction: OUTPUT}
   - {pin_num: K3, peripheral: LP_FLEXCOMM9, signal: LPFLEXCOMM_P0, pin_signal: PIO2_4/WUU0_IN17/FC9_P0/SDHC0_CLK/SCT0_OUT2/PWM1_A1/FLEXIO0_D12/SMARTDMA_PIO24/FLEXSPI0_B_DATA0/SINC0_MCLK1/SAI0_RXD1}
   - {pin_num: J3, peripheral: LP_FLEXCOMM9, signal: LPFLEXCOMM_P1, pin_signal: PIO2_3/FC9_P1/SDHC0_D0/SCT0_OUT1/PWM1_B2/FLEXIO0_D11/SMARTDMA_PIO23/FLEXSPI0_B_SCLK/SINC0_MBIT0/SAI0_RXD0}
+  - {pin_num: C5, peripheral: LP_FLEXCOMM3, signal: LPFLEXCOMM_P1, pin_signal: PIO1_1/TRIG_IN1/FC3_P1/FC4_P5/CT_INP5/SCT0_OUT7/FLEXIO0_D9/SAI1_TX_FS/TSI0_CH1/ADC0_A17/CMP1_IN0}
+  - {pin_num: C6, peripheral: LP_FLEXCOMM3, signal: LPFLEXCOMM_P0, pin_signal: PIO1_0/WUU0_IN6/LPTMR0_ALT3/TRIG_IN0/FC3_P0/FC4_P4/CT_INP4/SCT0_OUT6/FLEXIO0_D8/SAI1_TX_BCLK/TSI0_CH0/ADC0_A16/CMP0_IN0}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -240,6 +242,26 @@ void BOARD_InitPins(void)
 
                       /* Input Buffer Enable: Enables. */
                       | PORT_PCR_IBE(PCR_IBE_ibe1));
+
+    /* PORT1_0 (pin C6) is configured as FC3_P0 */
+    PORT_SetPinMux(PORT1, 0U, kPORT_MuxAlt2);
+
+    PORT1->PCR[0] = ((PORT1->PCR[0] &
+                      /* Mask bits to zero which are setting */
+                      (~(PORT_PCR_IBE_MASK)))
+
+                     /* Input Buffer Enable: Enables. */
+                     | PORT_PCR_IBE(PCR_IBE_ibe1));
+
+    /* PORT1_1 (pin C5) is configured as FC3_P1 */
+    PORT_SetPinMux(PORT1, 1U, kPORT_MuxAlt2);
+
+    PORT1->PCR[1] = ((PORT1->PCR[1] &
+                      /* Mask bits to zero which are setting */
+                      (~(PORT_PCR_IBE_MASK)))
+
+                     /* Input Buffer Enable: Enables. */
+                     | PORT_PCR_IBE(PCR_IBE_ibe1));
 
     /* PORT1_12 (pin D2) is configured as CT2_MAT2 */
     PORT_SetPinMux(PORT1, 12U, kPORT_MuxAlt4);

@@ -8,11 +8,11 @@ void EscInit(Esc *e, CTIMER_Type *periph, ctimer_match_t periodCh, ctimer_match_
     e->pwmPeripheral = periph;
     e->periodChannel = periodCh;
     e->pwmChannel = pwmCh;
-    e->minDuty = 5.0;
-    e->maxDuty = 10.0;
+    e->minDuty = 5.0f;
+    e->maxDuty = 10.0f;
 }
 
-void EscSetSpeed(Esc *e, double speed)
+void EscSetSpeed(Esc *e, float speed)
 {
     if(speed < 0){
     	speed = 0;
@@ -20,9 +20,9 @@ void EscSetSpeed(Esc *e, double speed)
     else if(speed > 100){
     	speed = 100;
     }
-    double duty = e->minDuty + (speed / 100.0) * (e->maxDuty - e->minDuty);
+    float duty = e->minDuty + (speed / 100.0f) * (e->maxDuty - e->minDuty);
     uint32_t periodTicks = e->pwmPeripheral->MR[e->periodChannel];
-    uint32_t pulseTicks = (uint32_t)((periodTicks * (100.0 - duty)) / 100.0);
+    uint32_t pulseTicks = (uint32_t)((periodTicks * (100.0f - duty)) / 100.0f);
     e->pwmPeripheral->MR[e->pwmChannel] = pulseTicks;
 }
 

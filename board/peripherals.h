@@ -47,6 +47,24 @@ extern "C" {
 #define INT_2_IRQ_PRIORITY 3
 /* NVIC interrupt handler identifier. */
 #define INT_2_IRQHANDLER EDMA_0_CH1_IRQHandler
+/* NVIC interrupt vector ID (number). */
+#define INT_3_IRQN EDMA_0_CH2_IRQn
+/* NVIC interrupt vector priority. */
+#define INT_3_IRQ_PRIORITY 3
+/* NVIC interrupt handler identifier. */
+#define INT_3_IRQHANDLER EDMA_0_CH2_IRQHandler
+/* NVIC interrupt vector ID (number). */
+#define INT_4_IRQN EDMA_0_CH4_IRQn
+/* NVIC interrupt vector priority. */
+#define INT_4_IRQ_PRIORITY 3
+/* NVIC interrupt handler identifier. */
+#define INT_4_IRQHANDLER EDMA_0_CH4_IRQHandler
+/* NVIC interrupt vector ID (number). */
+#define INT_5_IRQN LP_FLEXCOMM3_IRQn
+/* NVIC interrupt vector priority. */
+#define INT_5_IRQ_PRIORITY 3
+/* NVIC interrupt handler identifier. */
+#define INT_5_IRQHANDLER LP_FLEXCOMM3_IRQHandler
 /* Definition of peripheral ID */
 #define CTIMER0_PERIPHERAL CTIMER0
 /* Timer tick frequency in Hz (input frequency of the timer) */
@@ -80,17 +98,17 @@ extern "C" {
 /* Definition of peripheral ID */
 #define CTIMER2_PERIPHERAL CTIMER2
 /* Timer tick frequency in Hz (input frequency of the timer) */
-#define CTIMER2_TICK_FREQ 1171875UL
+#define CTIMER2_TICK_FREQ 150000000UL
 /* Timer tick period in ns (input period of the timer) */
-#define CTIMER2_TICK_PERIOD 853UL
+#define CTIMER2_TICK_PERIOD 7UL
 /* Definition of PWM period channel. */
 #define CTIMER2_PWM_PERIOD_CH kCTIMER_Match_0
 /* Definition of PWM period */
-#define CTIMER2_PWM_PERIOD 23436
+#define CTIMER2_PWM_PERIOD 2999999
 /* Definition of channel 2 ID */
-#define CTIMER2_PWM_3_CHANNEL kCTIMER_Match_2
+#define CTIMER2_PWM_2_CHANNEL kCTIMER_Match_2
 /* Definition of channel 2 duty */
-#define CTIMER2_PWM_3_DUTY 23387
+#define CTIMER2_PWM_2_DUTY 2775000
 /* BOARD_InitPeripherals defines for LP_FLEXCOMM2 */
 /* Definition of peripheral ID */
 #define LP_FLEXCOMM2_PERIPHERAL LPI2C2
@@ -126,6 +144,34 @@ extern "C" {
 #define LP_FLEXCOMM9_PERIPHERAL ((LPUART_Type *) LP_FLEXCOMM9)
 /* Definition of the clock source frequency */
 #define LP_FLEXCOMM9_CLOCK_SOURCE 12000000UL
+/* BOARD_InitPeripherals defines for LP_FLEXCOMM0 */
+/* Definition of peripheral ID */
+#define LP_FLEXCOMM0_PERIPHERAL LPI2C0
+/* Definition of peripheral base address */
+#define LP_FLEXCOMM0_PERIPHERAL_BASE LPI2C0_BASE
+/* Definition of the clock source frequency */
+#define LP_FLEXCOMM0_CLOCK_SOURCE 12000000UL
+/* BOARD_InitPeripherals defines for LP_FLEXCOMM3 */
+/* Definition of peripheral ID */
+#define LP_FLEXCOMM3_PERIPHERAL LPI2C3
+/* Definition of peripheral base address */
+#define LP_FLEXCOMM3_PERIPHERAL_BASE LPI2C3_BASE
+/* Definition of the clock source frequency */
+#define LP_FLEXCOMM3_CLOCK_SOURCE 12000000UL
+/* LP_FLEXCOMM3 eDMA source request. */
+#define LP_FLEXCOMM3_RX_DMA_REQUEST kDma0RequestMuxLpFlexcomm3Rx
+/* Selected eDMA channel number. */
+#define LP_FLEXCOMM3_RX_DMA_CHANNEL 2
+/* Used DMA device. */
+#define LP_FLEXCOMM3_RX_DMA_BASEADDR DMA0
+/* LP_FLEXCOMM3 eDMA source request. */
+#define LP_FLEXCOMM3_TX_DMA_REQUEST kDma0RequestMuxLpFlexcomm3Tx
+/* Selected eDMA channel number. */
+#define LP_FLEXCOMM3_TX_DMA_CHANNEL 3
+/* Used DMA device. */
+#define LP_FLEXCOMM3_TX_DMA_BASEADDR DMA0
+/* Leader transfer buffer size */
+#define LP_FLEXCOMM3_MASTER_BUFFER_SIZE 10
 
 /***********************************************************************************************************************
  * Global variables
@@ -141,6 +187,13 @@ extern uint8_t LP_FLEXCOMM2_master_buffer[LP_FLEXCOMM2_MASTER_BUFFER_SIZE];
 extern lpi2c_master_transfer_t LP_FLEXCOMM2_masterTransfer;
 extern const ctimer_config_t CTIMER4_config;
 extern const lpuart_config_t LP_FLEXCOMM9_config;
+extern const lpi2c_master_config_t LP_FLEXCOMM0_masterConfig;
+extern const lpi2c_master_config_t LP_FLEXCOMM3_masterConfig;
+extern edma_handle_t LP_FLEXCOMM3_RX_Handle;
+extern edma_handle_t LP_FLEXCOMM3_TX_Handle;
+extern lpi2c_master_edma_handle_t LP_FLEXCOMM3_master_handle;
+extern uint8_t LP_FLEXCOMM3_master_buffer[LP_FLEXCOMM3_MASTER_BUFFER_SIZE];
+extern lpi2c_master_transfer_t LP_FLEXCOMM3_masterTransfer;
 
 /***********************************************************************************************************************
  * Initialization functions

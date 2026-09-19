@@ -7,28 +7,30 @@ C_SRCS += \
 ../utilities/fsl_assert.c 
 
 S_UPPER_SRCS += \
-../utilities/fsl_memcpy.S 
+../utilities/fsl_memcpy.S \
+../utilities/fsl_memset.S 
 
 C_DEPS += \
 ./utilities/fsl_assert.d 
 
 OBJS += \
 ./utilities/fsl_assert.o \
-./utilities/fsl_memcpy.o 
+./utilities/fsl_memcpy.o \
+./utilities/fsl_memset.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
 utilities/%.o: ../utilities/%.c utilities/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: MCU C Compiler'
-	arm-none-eabi-gcc -std=gnu99 -D__REDLIB__ -DCPU_MCXN947VDF -DCPU_MCXN947VDF_cm33 -DCPU_MCXN947VDF_cm33_core0 -DMCUXPRESSO_SDK -DSDK_DEBUGCONSOLE=0 -DMCUX_META_BUILD -DMCXN947_cm33_core0_SERIES -DCR_INTEGER_PRINTF -DPRINTF_FLOAT_ENABLE=0 -D__MCUXPRESSO -D__USE_CMSIS -DDEBUG -I"D:\robotica\workspace\nxpcup\drivers" -I"D:\robotica\workspace\nxpcup\CMSIS" -I"D:\robotica\workspace\nxpcup\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup\device" -I"D:\robotica\workspace\nxpcup\device\periph" -I"D:\robotica\workspace\nxpcup\utilities" -I"D:\robotica\workspace\nxpcup\utilities\str" -I"D:\robotica\workspace\nxpcup\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup\component\uart" -I"D:\robotica\workspace\nxpcup\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup\board" -I"D:\robotica\workspace\nxpcup\source" -I"D:\robotica\workspace\nxpcup\include" -O0 -fno-common -g3 -gdwarf-4 -mcpu=cortex-m33 -c -ffunction-sections -fdata-sections -fno-builtin -imacros "D:\robotica\workspace\nxpcup\source\mcux_config.h" -fmerge-constants -fmacro-prefix-map="$(<D)/"= -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__REDLIB__ -fstack-usage -specs=redlib.specs -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	arm-none-eabi-gcc -std=gnu99 -DCPU_MCXN947VDF -DCPU_MCXN947VDF_cm33 -DCPU_MCXN947VDF_cm33_core0 -DMCUXPRESSO_SDK -DSDK_DEBUGCONSOLE=0 -DMCUX_META_BUILD -DMCXN947_cm33_core0_SERIES -DCR_INTEGER_PRINTF -DPRINTF_FLOAT_ENABLE=0 -D__MCUXPRESSO -D__USE_CMSIS -DDEBUG -DSDK_OS_BAREMETAL -D__NEWLIB__ -I"D:\robotica\workspace\nxpcup-ciorba_curata\drivers" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device\periph" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\str" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup-ciorba_curata\component\uart" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup-ciorba_curata\board" -I"D:\robotica\workspace\nxpcup-ciorba_curata\source" -I"D:\robotica\workspace\nxpcup-ciorba_curata\include" -O0 -fno-common -g3 -gdwarf-4 -mcpu=cortex-m33 -c -ffunction-sections -fdata-sections -fno-builtin -imacros "D:\robotica\workspace\nxpcup-ciorba_curata\source\mcux_config.h" -fmerge-constants -fmacro-prefix-map="$(<D)/"= -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__NEWLIB__ -fstack-usage -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
 utilities/%.o: ../utilities/%.S utilities/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: MCU Assembler'
-	arm-none-eabi-gcc -c -x assembler-with-cpp -D__REDLIB__ -I"D:\robotica\workspace\nxpcup\drivers" -I"D:\robotica\workspace\nxpcup\CMSIS" -I"D:\robotica\workspace\nxpcup\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup\device" -I"D:\robotica\workspace\nxpcup\device\periph" -I"D:\robotica\workspace\nxpcup\utilities" -I"D:\robotica\workspace\nxpcup\utilities\str" -I"D:\robotica\workspace\nxpcup\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup\component\uart" -I"D:\robotica\workspace\nxpcup\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup\board" -I"D:\robotica\workspace\nxpcup\source" -I"D:\robotica\workspace\nxpcup\include" -g3 -gdwarf-4 -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__REDLIB__ -specs=redlib.specs -o "$@" "$<"
+	arm-none-eabi-gcc -c -x assembler-with-cpp -D__NEWLIB__ -I"D:\robotica\workspace\nxpcup-ciorba_curata\drivers" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS\m-profile" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device" -I"D:\robotica\workspace\nxpcup-ciorba_curata\device\periph" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\str" -I"D:\robotica\workspace\nxpcup-ciorba_curata\utilities\debug_console_lite" -I"D:\robotica\workspace\nxpcup-ciorba_curata\component\uart" -I"D:\robotica\workspace\nxpcup-ciorba_curata\CMSIS_driver\Include" -I"D:\robotica\workspace\nxpcup-ciorba_curata\board" -I"D:\robotica\workspace\nxpcup-ciorba_curata\source" -I"D:\robotica\workspace\nxpcup-ciorba_curata\include" -g3 -gdwarf-4 -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -D__NEWLIB__ -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
@@ -36,7 +38,7 @@ utilities/%.o: ../utilities/%.S utilities/subdir.mk
 clean: clean-utilities
 
 clean-utilities:
-	-$(RM) ./utilities/fsl_assert.d ./utilities/fsl_assert.o ./utilities/fsl_memcpy.o
+	-$(RM) ./utilities/fsl_assert.d ./utilities/fsl_assert.o ./utilities/fsl_memcpy.o ./utilities/fsl_memset.o
 
 .PHONY: clean-utilities
 

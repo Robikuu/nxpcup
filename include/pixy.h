@@ -14,18 +14,16 @@ typedef struct {
     LPI2C_Type                   *instance;
     uint8_t                       address;
     lpi2c_master_edma_handle_t    edmaHandle;
+    volatile bool                 transferDone;
+    volatile status_t             transferStatus;
 } pixy_t;
 
-
-void pixy_init(pixy_t *cam,
-               LPI2C_Type *inst,
-               uint8_t addr,
-               edma_handle_t *rxHandle,
-               edma_handle_t *txHandle);
-
+void pixy_init(pixy_t *cam, LPI2C_Type *base, uint8_t addr,
+               edma_handle_t *rxHandle, edma_handle_t *txHandle);
 
 status_t pixy_set_led(pixy_t *cam, uint8_t r, uint8_t g, uint8_t b);
 
+status_t pixy_set_lamp(pixy_t *cam, uint8_t upper, uint8_t lower);
 
 status_t pixy_get_vectors(pixy_t *cam,
                           uint16_t *vectors,
@@ -36,4 +34,4 @@ status_t pixy_get_vectors(pixy_t *cam,
 }
 #endif
 
-#endif
+#endif // PIXY_H_

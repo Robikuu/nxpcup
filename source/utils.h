@@ -1,14 +1,11 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-void request_esp_ip(void);
-void esp_steer_test_loop(void);
+void receive_message();
 void buttons_init(void);
 int button_pressed_edge(void);
-void print_double(const char *label, double val);
-void putty_steer_test_loop(void);
-void handle_incoming_uart_byte(char c);
-void parse_esp_command(const char *message);
-
+void print_double(const char *label, float val);
+void TestPidSteer(void);
+void TestHBridge(void);
 
 #endif

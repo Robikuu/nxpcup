@@ -79,6 +79,8 @@ instance:
     - dma_table:
       - 0: []
       - 1: []
+      - 2: []
+      - 3: []
     - edma_channels: []
     - quick_selection: 'default'
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
@@ -116,6 +118,9 @@ instance:
       - 2: []
       - 3: []
       - 4: []
+      - 5: []
+      - 6: []
+      - 7: []
     - interrupts:
       - 0:
         - channelId: 'int_0'
@@ -137,6 +142,30 @@ instance:
         - channelId: 'int_2'
         - interrupt_t:
           - IRQn: 'EDMA_0_CH1_IRQn'
+          - enable_interrrupt: 'enabled'
+          - enable_priority: 'true'
+          - priority: '3'
+          - enable_custom_name: 'false'
+      - 3:
+        - channelId: 'int_3'
+        - interrupt_t:
+          - IRQn: 'EDMA_0_CH2_IRQn'
+          - enable_interrrupt: 'enabled'
+          - enable_priority: 'true'
+          - priority: '3'
+          - enable_custom_name: 'false'
+      - 4:
+        - channelId: 'int_4'
+        - interrupt_t:
+          - IRQn: 'EDMA_0_CH4_IRQn'
+          - enable_interrrupt: 'enabled'
+          - enable_priority: 'true'
+          - priority: '3'
+          - enable_custom_name: 'false'
+      - 5:
+        - channelId: 'int_5'
+        - interrupt_t:
+          - IRQn: 'LP_FLEXCOMM3_IRQn'
           - enable_interrrupt: 'enabled'
           - enable_priority: 'true'
           - priority: '3'
@@ -275,7 +304,7 @@ instance:
       - mode: 'kCTIMER_TimerMode'
       - clockSource: 'FunctionClock'
       - clockSourceFreq: 'ClocksTool_DefaultInit'
-      - timerPrescaler: '128'
+      - timerPrescaler: '150mhz'
     - EnableTimerInInit: 'true'
     - pwmConfig:
       - pwmPeriodChannel: 'kCTIMER_Match_0'
@@ -283,9 +312,9 @@ instance:
       - enableInterrupt: 'false'
       - pwmChannels:
         - 0:
-          - pwmChannelPrefixId: 'PWM_3'
+          - pwmChannelPrefixId: 'PWM_2'
           - pwmChannel: 'kCTIMER_Match_2'
-          - pwmDutyValueStr: '50'
+          - pwmDutyValueStr: '225000'
           - enableInterrupt: 'false'
     - interruptCallbackConfig:
       - interrupt:
@@ -298,14 +327,14 @@ instance:
 const ctimer_config_t CTIMER2_config = {
   .mode = kCTIMER_TimerMode,
   .input = kCTIMER_Capture_0,
-  .prescale = 127
+  .prescale = 0
 };
 
 static void CTIMER2_init(void) {
   /* CTIMER2 peripheral initialization */
   CTIMER_Init(CTIMER2_PERIPHERAL, &CTIMER2_config);
   /* PWM channel 2 of CTIMER2 peripheral initialization */
-  CTIMER_SetupPwmPeriod(CTIMER2_PERIPHERAL, CTIMER2_PWM_PERIOD_CH, CTIMER2_PWM_3_CHANNEL, CTIMER2_PWM_PERIOD, CTIMER2_PWM_3_DUTY, false);
+  CTIMER_SetupPwmPeriod(CTIMER2_PERIPHERAL, CTIMER2_PWM_PERIOD_CH, CTIMER2_PWM_2_CHANNEL, CTIMER2_PWM_PERIOD, CTIMER2_PWM_2_DUTY, false);
   /* Start the timer */
   CTIMER_StartTimer(CTIMER2_PERIPHERAL);
 }
@@ -379,7 +408,7 @@ instance:
       - debugEnable: 'false'
       - ignoreAck: 'false'
       - pinConfig: 'kLPI2C_2PinOpenDrain'
-      - baudRate_Hz: '100000'
+      - baudRate_Hz: '400000'
       - realBaudRateCount: []
       - busIdleTimeout_ns: '0'
       - pinLowTimeout_ns: '0'
@@ -389,7 +418,6 @@ instance:
         - enable: 'false'
         - source: 'kLPI2C_HostRequestExternalPin'
         - polarity: 'kLPI2C_HostRequestPinActiveHigh'
-    - quick_selection: 'qs_default'
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
 /* clang-format on */
 const lpi2c_master_config_t LP_FLEXCOMM2_masterConfig = {
@@ -398,7 +426,7 @@ const lpi2c_master_config_t LP_FLEXCOMM2_masterConfig = {
   .debugEnable = false,
   .ignoreAck = false,
   .pinConfig = kLPI2C_2PinOpenDrain,
-  .baudRate_Hz = 100000UL,
+  .baudRate_Hz = 400000UL,
   .busIdleTimeout_ns = 0UL,
   .pinLowTimeout_ns = 0UL,
   .sdaGlitchFilterWidth_ns = 0U,
@@ -595,6 +623,199 @@ static void LP_FLEXCOMM9_init(void) {
 }
 
 /***********************************************************************************************************************
+ * LP_FLEXCOMM0 initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'LP_FLEXCOMM0'
+- type: 'lpflexcomm_lpi2c'
+- mode: 'polling'
+- custom_name_enabled: 'false'
+- type_id: 'lpflexcomm_lpi2c_2.1.1'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'LP_FLEXCOMM0'
+- config_sets:
+  - generalCfg:
+    - lpi2c_mode: 'master'
+    - clock_configuration:
+      - clockSource: 'LPFLEXCOMMFunctionClock'
+      - clockSourceFreq: 'ClocksTool_DefaultInit'
+    - master_config:
+      - enableMaster: 'true'
+      - enableDoze: 'true'
+      - debugEnable: 'false'
+      - ignoreAck: 'false'
+      - pinConfig: 'kLPI2C_2PinOpenDrain'
+      - baudRate_Hz: '100000'
+      - realBaudRateCount: []
+      - busIdleTimeout_ns: '0'
+      - pinLowTimeout_ns: '0'
+      - sdaGlitchFilterWidth_ns: '0'
+      - sclGlitchFilterWidth_ns: '0'
+      - hostRequest:
+        - enable: 'false'
+        - source: 'kLPI2C_HostRequestExternalPin'
+        - polarity: 'kLPI2C_HostRequestPinActiveHigh'
+      - enable_dma_master: 'false'
+      - lpi2c_dma_master_struct_t:
+        - DMATxEnable: 'true'
+        - DMARxEnable: 'true'
+    - quick_selection: 'qs_default'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const lpi2c_master_config_t LP_FLEXCOMM0_masterConfig = {
+  .enableMaster = true,
+  .enableDoze = true,
+  .debugEnable = false,
+  .ignoreAck = false,
+  .pinConfig = kLPI2C_2PinOpenDrain,
+  .baudRate_Hz = 100000UL,
+  .busIdleTimeout_ns = 0UL,
+  .pinLowTimeout_ns = 0UL,
+  .sdaGlitchFilterWidth_ns = 0U,
+  .sclGlitchFilterWidth_ns = 0U,
+  .hostRequest = {
+    .enable = false,
+    .source = kLPI2C_HostRequestExternalPin,
+    .polarity = kLPI2C_HostRequestPinActiveHigh
+  }
+};
+
+static void LP_FLEXCOMM0_init(void) {
+  /* LP_FLEXCOMM0 LPI2C leader initialization */
+  LPI2C_MasterInit(LP_FLEXCOMM0_PERIPHERAL, &LP_FLEXCOMM0_masterConfig, LP_FLEXCOMM0_CLOCK_SOURCE);
+}
+
+/***********************************************************************************************************************
+ * LP_FLEXCOMM3 initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'LP_FLEXCOMM3'
+- type: 'lpflexcomm_lpi2c'
+- mode: 'edma_transfer'
+- custom_name_enabled: 'false'
+- type_id: 'lpflexcomm_lpi2c_2.1.1'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'LP_FLEXCOMM3'
+- config_sets:
+  - transferEDMACfg:
+    - master_transfer:
+      - handle: 'default'
+      - init_callback: 'false'
+      - callback:
+        - name: ''
+        - userData: ''
+      - init_transfer: 'true'
+      - transfer:
+        - flagsSet: ''
+        - slaveAddress: '0'
+        - direction: 'kLPI2C_Write'
+        - subaddress: '0'
+        - subaddressSize: '1'
+        - data: 'default'
+        - data_size_i: '10'
+    - channel_rx_init: 'true'
+    - channel_rx:
+      - uid: '1789649091577'
+      - eDMAn: '2'
+      - eDMA_source: 'kDma0RequestMuxLpFlexcomm3Rx'
+      - init_channel_priority: 'false'
+      - edma_channel_Preemption:
+        - enableChannelPreemption: 'false'
+        - enablePreemptAbility: 'false'
+        - channelPriority: '0'
+      - masterIdReplicationEnable: 'noInit'
+      - securityLevel: 'noInit'
+      - protectionLevel: 'noInit'
+      - enable_custom_name: 'false'
+    - channel_tx_init: 'true'
+    - channel_tx:
+      - uid: '1789649091579'
+      - eDMAn: '3'
+      - eDMA_source: 'kDma0RequestMuxLpFlexcomm3Tx'
+      - init_channel_priority: 'false'
+      - edma_channel_Preemption:
+        - enableChannelPreemption: 'false'
+        - enablePreemptAbility: 'false'
+        - channelPriority: '0'
+      - masterIdReplicationEnable: 'noInit'
+      - securityLevel: 'noInit'
+      - protectionLevel: 'noInit'
+      - enable_custom_name: 'false'
+  - generalCfg:
+    - lpi2c_mode: 'master'
+    - clock_configuration:
+      - clockSource: 'LPFLEXCOMMFunctionClock'
+      - clockSourceFreq: 'ClocksTool_DefaultInit'
+    - master_config:
+      - enableMaster: 'true'
+      - enableDoze: 'true'
+      - debugEnable: 'false'
+      - ignoreAck: 'false'
+      - pinConfig: 'kLPI2C_2PinOpenDrain'
+      - baudRate_Hz: '400000'
+      - realBaudRateCount: []
+      - busIdleTimeout_ns: '0'
+      - pinLowTimeout_ns: '0'
+      - sdaGlitchFilterWidth_ns: '0'
+      - sclGlitchFilterWidth_ns: '0'
+      - hostRequest:
+        - enable: 'false'
+        - source: 'kLPI2C_HostRequestExternalPin'
+        - polarity: 'kLPI2C_HostRequestPinActiveHigh'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const lpi2c_master_config_t LP_FLEXCOMM3_masterConfig = {
+  .enableMaster = true,
+  .enableDoze = true,
+  .debugEnable = false,
+  .ignoreAck = false,
+  .pinConfig = kLPI2C_2PinOpenDrain,
+  .baudRate_Hz = 400000UL,
+  .busIdleTimeout_ns = 0UL,
+  .pinLowTimeout_ns = 0UL,
+  .sdaGlitchFilterWidth_ns = 0U,
+  .sclGlitchFilterWidth_ns = 0U,
+  .hostRequest = {
+    .enable = false,
+    .source = kLPI2C_HostRequestExternalPin,
+    .polarity = kLPI2C_HostRequestPinActiveHigh
+  }
+};
+edma_handle_t LP_FLEXCOMM3_RX_Handle;
+edma_handle_t LP_FLEXCOMM3_TX_Handle;
+lpi2c_master_edma_handle_t LP_FLEXCOMM3_master_handle;
+uint8_t LP_FLEXCOMM3_master_buffer[LP_FLEXCOMM3_MASTER_BUFFER_SIZE];
+lpi2c_master_transfer_t LP_FLEXCOMM3_masterTransfer = {
+  .flags = kLPI2C_TransferDefaultFlag,
+  .slaveAddress = 0U,
+  .direction = kLPI2C_Write,
+  .subaddress = 0UL,
+  .subaddressSize = 1U,
+  .data = LP_FLEXCOMM3_master_buffer,
+  .dataSize = LP_FLEXCOMM3_MASTER_BUFFER_SIZE
+};
+
+static void LP_FLEXCOMM3_init(void) {
+  /* LP_FLEXCOMM3 LPI2C leader initialization */
+  LPI2C_MasterInit(LP_FLEXCOMM3_PERIPHERAL, &LP_FLEXCOMM3_masterConfig, LP_FLEXCOMM3_CLOCK_SOURCE);
+  /* Set the kDma0RequestMuxLpFlexcomm3Rx request */
+  EDMA_SetChannelMux(LP_FLEXCOMM3_RX_DMA_BASEADDR, LP_FLEXCOMM3_RX_DMA_CHANNEL, LP_FLEXCOMM3_RX_DMA_REQUEST);
+  /* Set the kDma0RequestMuxLpFlexcomm3Tx request */
+  EDMA_SetChannelMux(LP_FLEXCOMM3_TX_DMA_BASEADDR, LP_FLEXCOMM3_TX_DMA_CHANNEL, LP_FLEXCOMM3_TX_DMA_REQUEST);
+  /* Create the eDMA LP_FLEXCOMM3_RX_Handle handle */
+  EDMA_CreateHandle(&LP_FLEXCOMM3_RX_Handle, LP_FLEXCOMM3_RX_DMA_BASEADDR, LP_FLEXCOMM3_RX_DMA_CHANNEL);
+  /* Create the eDMA LP_FLEXCOMM3_TX_Handle handle */
+  EDMA_CreateHandle(&LP_FLEXCOMM3_TX_Handle, LP_FLEXCOMM3_TX_DMA_BASEADDR, LP_FLEXCOMM3_TX_DMA_CHANNEL);
+  /* Create eDMA leader transfer handle */
+  LPI2C_MasterCreateEDMAHandle(LP_FLEXCOMM3_PERIPHERAL, &LP_FLEXCOMM3_master_handle, &LP_FLEXCOMM3_RX_Handle, &LP_FLEXCOMM3_TX_Handle, NULL, NULL);
+
+}
+
+/***********************************************************************************************************************
  * Initialization functions
  **********************************************************************************************************************/
 static void BOARD_InitPeripherals_CommonPostInit(void)
@@ -605,12 +826,24 @@ static void BOARD_InitPeripherals_CommonPostInit(void)
   NVIC_SetPriority(INT_1_IRQN, INT_1_IRQ_PRIORITY);
   /* Interrupt vector EDMA_0_CH1_IRQn priority settings in the NVIC. */
   NVIC_SetPriority(INT_2_IRQN, INT_2_IRQ_PRIORITY);
+  /* Interrupt vector EDMA_0_CH2_IRQn priority settings in the NVIC. */
+  NVIC_SetPriority(INT_3_IRQN, INT_3_IRQ_PRIORITY);
+  /* Interrupt vector EDMA_0_CH4_IRQn priority settings in the NVIC. */
+  NVIC_SetPriority(INT_4_IRQN, INT_4_IRQ_PRIORITY);
+  /* Interrupt vector LP_FLEXCOMM3_IRQn priority settings in the NVIC. */
+  NVIC_SetPriority(INT_5_IRQN, INT_5_IRQ_PRIORITY);
   /* Enable interrupt INT_0_IRQN request in the NVIC */
   EnableIRQ(INT_0_IRQN);
   /* Enable interrupt INT_1_IRQN request in the NVIC */
   EnableIRQ(INT_1_IRQN);
   /* Enable interrupt INT_2_IRQN request in the NVIC */
   EnableIRQ(INT_2_IRQN);
+  /* Enable interrupt INT_3_IRQN request in the NVIC */
+  EnableIRQ(INT_3_IRQN);
+  /* Enable interrupt INT_4_IRQN request in the NVIC */
+  EnableIRQ(INT_4_IRQN);
+  /* Enable interrupt INT_5_IRQN request in the NVIC */
+  EnableIRQ(INT_5_IRQN);
 }
 
 void BOARD_InitPeripherals(void)
@@ -626,6 +859,8 @@ void BOARD_InitPeripherals(void)
   LP_FLEXCOMM2_init();
   CTIMER4_init();
   LP_FLEXCOMM9_init();
+  LP_FLEXCOMM0_init();
+  LP_FLEXCOMM3_init();
   /* Common post-initialization */
   BOARD_InitPeripherals_CommonPostInit();
 }
