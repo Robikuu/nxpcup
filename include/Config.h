@@ -20,9 +20,9 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         80.0f     // Fast apex outside wheel drive (%) (carries momentum through turns)
+#define SPEED_OUTSIDE_CORNER         78.0f     // Fast apex outside wheel drive (%) (carries momentum with front tire grip margin)
 #define SPEED_INSIDE_MIN             45.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 62.5%
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 61.5%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
@@ -32,7 +32,7 @@
 #define ACCEL_RAMP_STEP              12.0f     // Progressive corner exit acceleration (~120ms to 100%, maintains front tire grip)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
-#define REVERSAL_RELEASE_STEP        35.0f     // Rapidly unloads previous dragging inside wheel
+#define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
 #define REVERSAL_DECEL_STEP          18.0f     // Rapidly locks new inside wheel into pivot drag
 #define YAW_CONFLICT_DEADBAND        3.0f      // Steer angle deadband to trigger yaw conflict logic
 #define DIFFERENTIAL_DEADZONE_DEG    6.0f      // Steer angle deadzone below which zero differential drag applies

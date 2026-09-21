@@ -271,20 +271,19 @@ int main(void) {
                 /* Cross-camera straightaway sanity gate:
                  * If the top camera (ground truth for local vehicle state) confirms
                  * the car is tracking a straight (|heading| <= 6 deg AND |CTE| <= 6 px),
-                 * the front camera's lookahead_turn_factor MUST be suppressed.
-                 * This prevents phantom perspective angles from the front camera
-                 * from falsely engaging corner PID gains on straights. */
-                if (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 6.0f) {
-                    if (lookahead_turn_factor > raw_corner_urgency) {
-                        /* Undo the max() gate above — top cam overrides front cam */
-                        raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
-                    }
-                    lookahead_turn_factor = 0.0f;
+                 * do NOT let front camera preview inflate raw_corner_urgency (which schedules
+                 * high corner PID Kp). This keeps steering gains strictly at KP_STRAIGHT.
+                 * NOTE: lookahead_turn_factor is PRESERVED for longitudinal pre-braking below,
+                 * allowing the vehicle to shed sprint speed before entering the curve! */
+                bool is_confirmed_straight = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 6.0f);
+                if (is_confirmed_straight) {
+                    raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
                 }
 
                 if (raw_corner_urgency > trusted_corner_urgency) {
                     if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
                         trusted_corner_urgency = raw_corner_urgency;
+                        urgency_streak = 0;
                     }
                 } else {
                     trusted_corner_urgency = raw_corner_urgency;
@@ -303,8 +302,9 @@ int main(void) {
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 float trajectory_steer = 0.0f;
-                if (g_traj.found > 0 && (fabsf(filtered_traj_angle) > 8.0f || trusted_corner_urgency > 0.20f)) {
-                    /* On straights (urgency <= 0.20, angle <= 8 deg), trajectory_steer is gated out to eliminate weaving;
+                /* Only apply trajectory steering if not on a confirmed straight and corner urgency or angle is significant */
+                if (!is_confirmed_straight && g_traj.found > 0 && (fabsf(filtered_traj_angle) > 8.0f || trusted_corner_urgency > 0.20f)) {
+                    /* On straights, trajectory_steer is gated out to eliminate weaving;
                      * As corner urgency or trajectory angle increases, blend up to 0.70x for early turn-in preview. */
                     float traj_blend = 0.30f + trusted_corner_urgency * (0.70f - 0.30f);
                     trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
@@ -400,12 +400,21 @@ int main(void) {
                     }
                 }
 
-                /* 5. Bilateral Anti-Spin Traction Guard with Dynamic Reversal Override */
+                /* 5. Bilateral Anti-Spin Traction Guard with Dynamic Reversal Override
+                 * Chicane / S-curve reversal override:
+                 * Only trigger when target speeds actively demand an OPPOSITE turn:
+                 * - Steering right, demanding left wheel faster than right (target_left > target_right + 5%),
+                 *   while applied speeds are still configured for a left turn (applied_left < applied_right).
+                 * - Steering left, demanding right wheel faster than left (target_right > target_left + 5%),
+                 *   while applied speeds are still configured for a right turn (applied_right < applied_left).
+                 * CRITICAL: On corner exit onto a straight, target_left == target_right, so yaw_conflict
+                 * is strictly FALSE. This completely prevents dumping a +35% torque spike into the
+                 * unweighted inside rear wheel on exit (eliminates corner-exit wheelspin)! */
                 bool yaw_conflict = false;
                 if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
-                    if (steer_cmd > (float)YAW_CONFLICT_DEADBAND && applied_speed_left < applied_speed_right) {
+                    if (steer_cmd > (float)YAW_CONFLICT_DEADBAND && (target_left - target_right) > 5.0f && applied_speed_left < applied_speed_right) {
                         yaw_conflict = true;
-                    } else if (steer_cmd < -(float)YAW_CONFLICT_DEADBAND && applied_speed_right < applied_speed_left) {
+                    } else if (steer_cmd < -(float)YAW_CONFLICT_DEADBAND && (target_right - target_left) > 5.0f && applied_speed_right < applied_speed_left) {
                         yaw_conflict = true;
                     }
                 }
