@@ -400,8 +400,13 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             /* Boundaries must not cross each other at far end */
             if (fx[i] >= fx[j]) continue;
 
-            /* Left and right track boundaries must have roughly compatible headings (|h_i - h_j| <= 32 deg) */
-            if (fabsf(heading[i] - heading[j]) > 32.0f) continue;
+            /* Directional heading compatibility (matching top camera logic):
+             * On a straight road, perspective convergence causes left boundary to lean right
+             * (+18.9 deg) and right boundary to lean left (-18.9 deg), giving h_diff ~ +37.8 deg.
+             * The old fabsf() check rejected this at 32 deg. Use directional check:
+             * h_diff = heading[left] - heading[right] should be in [-10, +62] deg. */
+            float h_diff = heading[i] - heading[j];
+            if (h_diff < -10.0f || h_diff > 62.0f) continue;
 
             /* Pair score: near-camera presence, realistic separation (~46px), and vector length */
             float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 46.0f) * 1.5f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
@@ -514,8 +519,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         }
 
         /* Centerline synthesis from single boundary:
-         * The synthesized trajectory runs strictly parallel to the boundary vector.
-         * dx = xf - xn, dy = yn - yf. Zero artificial perspective tilt! */
+         * The raw dx = xf - xn contains perspective convergence that makes a straight
+         * road falsely appear as a turn. On a straight road, each boundary converges
+         * toward the vanishing point (PIXY_CENTER_X) proportionally to the depth ratio.
+         * Subtract the expected perspective dx so a straight road yields 0 deg angle. */
         float sign = is_right ? -1.0f : 1.0f;
         float mid_near_x = xn + sign * (float)PIXY_TRACK_HALF_WIDTH;
         float mid_far_x  = xf + sign * (float)PIXY_TRACK_HALF_WIDTH;
@@ -523,8 +530,15 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float dy = yn - yf;
         float dx = xf - xn;
 
+        /* Perspective tilt compensation:
+         * On a straight road, the boundary at xn converges toward center by
+         * perspective_dx = (PIXY_CENTER_X - xn) * (dy / view_depth).
+         * The view depth of the front camera is approximately 48 px (full frame height).
+         * Subtracting this expected slant removes the phantom turn angle. */
         if (dy > 1.0f) {
-            result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
+            float perspective_dx = ((float)PIXY_CENTER_X - xn) * (dy / 48.0f);
+            float corrected_dx = dx - perspective_dx;
+            result.trajectory_angle_deg = atan2f(corrected_dx, dy) * (180.0f / (float)M_PI);
         }
         result.trajectory_offset_px = mid_far_x - (float)PIXY_CENTER_X;
 

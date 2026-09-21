@@ -268,6 +268,20 @@ int main(void) {
                     raw_corner_urgency = lookahead_turn_factor;
                 }
 
+                /* Cross-camera straightaway sanity gate:
+                 * If the top camera (ground truth for local vehicle state) confirms
+                 * the car is tracking a straight (|heading| <= 6 deg AND |CTE| <= 6 px),
+                 * the front camera's lookahead_turn_factor MUST be suppressed.
+                 * This prevents phantom perspective angles from the front camera
+                 * from falsely engaging corner PID gains on straights. */
+                if (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 6.0f) {
+                    if (lookahead_turn_factor > raw_corner_urgency) {
+                        /* Undo the max() gate above — top cam overrides front cam */
+                        raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
+                    }
+                    lookahead_turn_factor = 0.0f;
+                }
+
                 if (raw_corner_urgency > trusted_corner_urgency) {
                     if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
                         trusted_corner_urgency = raw_corner_urgency;
