@@ -53,8 +53,8 @@
 #define DEFAULT_ALPHA                0.3f
 
 // ---- Error Weights ----
-#define DEFAULT_K_CTE                0.80f     // Strong CTE weight to strictly center the car and prevent running wide
-#define DEFAULT_K_HEADING            0.60f     // Balanced heading weight to prevent yaw overshoot from masking CTE
+#define DEFAULT_K_CTE                0.35f     // Calibrated CTE weight for gentle straight centering without overpowering heading
+#define DEFAULT_K_HEADING            1.00f     // Decisive heading weight to lock orientation through corners and prevent apex cancellation
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

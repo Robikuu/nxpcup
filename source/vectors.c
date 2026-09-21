@@ -535,15 +535,11 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float dy = yn - yf;
         float dx = xf - xn;
 
-        /* Perspective tilt compensation:
-         * On a straight road, the boundary at xn converges toward center by
-         * perspective_dx = (PIXY_CENTER_X - xn) * (dy / view_depth).
-         * The view depth of the front camera is approximately 48 px (full frame height).
-         * Subtracting this expected slant removes the phantom turn angle. */
-        if (dy > 1.0f) {
-            float perspective_dx = ((float)PIXY_CENTER_X - xn) * (dy / 48.0f);
-            float corrected_dx = dx - perspective_dx;
-            result.trajectory_angle_deg = atan2f(corrected_dx, dy) * (180.0f / (float)M_PI);
+        /* The lane centerline runs parallel to the single boundary vector.
+         * Angle is computed directly from the line vector (dx = xf - xn, dy = yn - yf),
+         * matching the ground-truth top camera logic and preventing false turn inversion in corners. */
+        if (dy > 0.5f) {
+            result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
         }
         result.trajectory_offset_px = mid_far_x - (float)PIXY_CENTER_X;
 

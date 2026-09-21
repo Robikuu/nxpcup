@@ -284,7 +284,15 @@ int main(void) {
                 /* 2. Dual-Camera Steering:
                  *    - Feedback PID from Flexcomm 3 Top/Homography Camera (local CTE + local heading error)
                  *    - Feedforward Trajectory Preview from Flexcomm 2 Front Camera (upcoming path angle & offset) */
-                float combined = g_params.k_cte * filtered_cte + g_params.k_heading * filtered_heading;
+                float effective_cte = filtered_cte;
+                /* Apex Protection: In a corner (|filtered_heading| > 10.0 deg),
+                 * if CTE opposes heading (filtered_cte * filtered_heading < 0), the vehicle
+                 * is clipping the inside apex. Attenuate the opposing CTE by 75% so clipping
+                 * the apex NEVER cancels heading authority or counter-steers into the outside wall! */
+                if (filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) > 10.0f) {
+                    effective_cte = filtered_cte * 0.25f;
+                }
+                float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 float trajectory_steer = 0.0f;
@@ -295,6 +303,13 @@ int main(void) {
                 if (g_traj.found > 0 && trusted_corner_urgency > 0.25f) {
                     float traj_blend = (trusted_corner_urgency - 0.25f) / 0.75f;
                     trajectory_steer = traj_blend * 0.50f * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
+
+                    /* Trajectory preview directional conflict guard:
+                     * Feedforward preview must never contradict the local pose feedback controller!
+                     * If feedback_steer is actively turning one way, preview cannot push the opposite way. */
+                    if (feedback_steer * trajectory_steer < 0.0f) {
+                        trajectory_steer = 0.0f;
+                    }
 
                     /* Trajectory preview safety clamp:
                      * If the car is already significantly off-center (|CTE| > 8px),
