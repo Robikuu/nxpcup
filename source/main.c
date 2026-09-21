@@ -334,22 +334,6 @@ int main(void) {
                 float heading_norm = dz_heading / ((float)HEADING_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                 if (heading_norm > 1.0f) heading_norm = 1.0f;
 
-                /* Sharp Turn / Hairpin Severity:
-                 * Above STEER_FULL_BRAKE_DEG (30 deg) or HEADING_FULL_BRAKE_DEG (22 deg),
-                 * standard moderate differential braking saturates. We compute a progressive
-                 * sharp_intensity (0.0 to 1.0) towards STEER_SHARP_DEG (75 deg) / HEADING_SHARP_DEG (35 deg). */
-                float s_sharp = 0.0f;
-                if (abs_steer > (float)STEER_FULL_BRAKE_DEG) {
-                    s_sharp = (abs_steer - (float)STEER_FULL_BRAKE_DEG) / ((float)STEER_SHARP_DEG - (float)STEER_FULL_BRAKE_DEG);
-                    if (s_sharp > 1.0f) s_sharp = 1.0f;
-                }
-                float h_sharp = 0.0f;
-                if (abs_heading > (float)HEADING_FULL_BRAKE_DEG) {
-                    h_sharp = (abs_heading - (float)HEADING_FULL_BRAKE_DEG) / ((float)HEADING_SHARP_DEG - (float)HEADING_FULL_BRAKE_DEG);
-                    if (h_sharp > 1.0f) h_sharp = 1.0f;
-                }
-                float sharp_intensity = (s_sharp > h_sharp) ? s_sharp : h_sharp;
-
                 /* 4. Asymmetric Target Wheel Speed Assignment
                  * A. Longitudinal Pre-Braking: slows down vehicle base speed into upcoming corners.
                  *    Both wheels decelerate symmetrically so there is ZERO yaw kick on straights.
@@ -371,9 +355,6 @@ int main(void) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
-                if (sharp_intensity > 0.0f && g_params.speed_outside_corner > g_params.speed_outside_sharp) {
-                    longitudinal_base -= sharp_intensity * (g_params.speed_outside_corner - g_params.speed_outside_sharp);
-                }
 
                 /* Continuous differential drag authority:
                  * On straights (trusted_corner_urgency <= 0.25f), differential drag is strictly 0.0f
@@ -386,16 +367,8 @@ int main(void) {
                 }
                 float active_steer_norm = steer_norm * diff_scale;
 
-                /* B. Lateral Differential Drag: strictly driven by active physical steering.
-                 * Progressive inside wheel floor: dynamically lowers from speed_inside_min (45%)
-                 * down to speed_inside_sharp (20%) during tight hairpins to establish an active
-                 * pivot anchor moment without spinning the inside tire. */
-                float inside_floor = g_params.speed_inside_min;
-                if (sharp_intensity > 0.0f && g_params.speed_inside_min > g_params.speed_inside_sharp) {
-                    inside_floor -= sharp_intensity * (g_params.speed_inside_min - g_params.speed_inside_sharp);
-                }
-
-                float diff_delta = active_steer_norm * (longitudinal_base - inside_floor);
+                /* B. Lateral Differential Drag: strictly driven by active physical steering */
+                float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
                 float target_outside = longitudinal_base;
                 float target_inside  = longitudinal_base - diff_delta;
 
