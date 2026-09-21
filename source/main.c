@@ -246,8 +246,11 @@ int main(void) {
                     filtered_cte = 0.4f * sr.cte + 0.6f * filtered_cte;
                 }
 
-                /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency (Decoupled from Wheel Drag) */
-                float heading_urgency = fabsf(filtered_heading) / (float)HEADING_FULL_BRAKE_DEG;
+                /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency (Decoupled from Wheel Drag)
+                 * Deadband of 10.0 deg on heading: normal straightaway chassis yaw flutter (<= 10 deg)
+                 * MUST NOT elevate urgency or trigger corner gains. */
+                float dz_heading_urgency = fabsf(filtered_heading) - 10.0f;
+                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 10.0f)) : 0.0f;
                 if (heading_urgency > 1.0f) heading_urgency = 1.0f;
 
                 /* Only let CTE drive corner urgency if heading is turning or CTE enters the outer lane band (>14px) */
@@ -286,10 +289,10 @@ int main(void) {
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 float trajectory_steer = 0.0f;
-                if (g_traj.found > 0 && (fabsf(filtered_traj_angle) > 5.0f || trusted_corner_urgency > 0.15f)) {
-                    /* On straights (urgency ~ 0, angle <= 5 deg), trajectory_steer is gated out to eliminate weaving;
-                     * As corner urgency or trajectory angle increases, blend up to 0.75x for early turn-in preview. */
-                    float traj_blend = 0.35f + trusted_corner_urgency * (0.75f - 0.35f);
+                if (g_traj.found > 0 && (fabsf(filtered_traj_angle) > 8.0f || trusted_corner_urgency > 0.20f)) {
+                    /* On straights (urgency <= 0.20, angle <= 8 deg), trajectory_steer is gated out to eliminate weaving;
+                     * As corner urgency or trajectory angle increases, blend up to 0.70x for early turn-in preview. */
+                    float traj_blend = 0.30f + trusted_corner_urgency * (0.70f - 0.30f);
                     trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
                 }
 
@@ -331,10 +334,14 @@ int main(void) {
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
 
                 /* Continuous differential drag authority:
-                 * On straights (urgency ~ 0), differential drag is suppressed (0.15x) for stable high-speed push;
-                 * As corner urgency rises (urgency -> 1.0), full differential authority opens up (up to 1.0x)
-                 * to pivot the vehicle sharply into the corner. */
-                float diff_scale = 0.15f + trusted_corner_urgency * 0.85f;
+                 * On straights (trusted_corner_urgency <= 0.25f), differential drag is strictly 0.0f
+                 * ensuring both rear wheels provide 100% symmetric, straight-line drive with zero yaw kicks;
+                 * Only as corner urgency rises (> 0.25f), differential drag smoothly engages (up to 1.0x)
+                 * to pivot the vehicle sharply through the turn. */
+                float diff_scale = 0.0f;
+                if (trusted_corner_urgency > 0.25f) {
+                    diff_scale = (trusted_corner_urgency - 0.25f) / 0.75f;
+                }
                 float active_steer_norm = steer_norm * diff_scale;
 
                 /* B. Lateral Differential Drag: strictly driven by active physical steering */

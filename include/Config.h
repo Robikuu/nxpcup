@@ -29,7 +29,7 @@
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              16.0f     // Rapid pre-braking ramp (~75ms from 95% to 48%)
-#define ACCEL_RAMP_STEP              22.0f     // Blistering corner exit acceleration ramp (~45ms back to 100%)
+#define ACCEL_RAMP_STEP              20.0f     // Punchy corner exit acceleration ramp (~50ms back to 100%)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        35.0f     // Rapidly unloads previous dragging inside wheel
@@ -45,16 +45,16 @@
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    3.30f     // Aggressive cornering authority to nail the apex on time
-#define KP_STRAIGHT                  0.70f     // Calm straight-line tracking authority to eliminate weaving
-#define KD_CORNER                    0.095f    // Responsive turn-in damping in corners
-#define KD_STRAIGHT                  0.200f    // Strong derivative damping to lock high-speed straightaway tracking
+#define KP_CORNER                    2.20f     // Crisp cornering authority without open-loop gain oscillation
+#define KP_STRAIGHT                  0.60f     // Calm straight-line tracking authority to eliminate weaving
+#define KD_CORNER                    0.120f    // Counter-steer damping in corners
+#define KD_STRAIGHT                  0.220f    // Strong derivative damping to lock high-speed straightaway tracking
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.3f
 
 // ---- Error Weights ----
-#define DEFAULT_K_CTE                0.60f     // Moderate weight to prevent local CTE from canceling corner turn-in
-#define DEFAULT_K_HEADING            1.00f     // Decisive preview heading to initiate corner entry on time
+#define DEFAULT_K_CTE                0.50f     // Moderate weight to prevent local CTE from canceling corner turn-in
+#define DEFAULT_K_HEADING            0.80f     // Decisive preview heading to initiate corner entry on time
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

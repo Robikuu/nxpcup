@@ -12,15 +12,19 @@
 #define MAX_FILTER_VECTORS 32
 
 /* ---- Temporal Tracking Memory ---- */
-static float s_last_left_near_x  = (PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
-static float s_last_right_near_x = (PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
-static float s_last_heading      = 0.0f;
+static float s_last_left_near_x       = (PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
+static float s_last_right_near_x      = (PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
+static float s_last_heading           = 0.0f;
+static float s_last_lookahead_left_x  = (PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
+static float s_last_lookahead_right_x = (PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
 
 void reset_steering_tracking(void)
 {
-    s_last_left_near_x  = (float)(PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
-    s_last_right_near_x = (float)(PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
-    s_last_heading      = 0.0f;
+    s_last_left_near_x       = (float)(PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
+    s_last_right_near_x      = (float)(PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
+    s_last_heading           = 0.0f;
+    s_last_lookahead_left_x  = (float)(PIXY_CENTER_X - PIXY_TRACK_HALF_WIDTH);
+    s_last_lookahead_right_x = (float)(PIXY_CENTER_X + PIXY_TRACK_HALF_WIDTH);
 }
 
 /* ------------------------------------------------------------------ */
@@ -351,10 +355,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     if (num_vectors == 0) return result;
 
-    /* Orient each vector from near (yn >= yf) to far (yf) */
+    /* Orient each vector from near (yn >= yf, higher y is closer to bumper) to far (yf, horizon) */
     size_t count = (num_vectors > (size_t)MAX_FILTER_VECTORS) ? (size_t)MAX_FILTER_VECTORS : num_vectors;
     float nx[MAX_FILTER_VECTORS], ny[MAX_FILTER_VECTORS], fx[MAX_FILTER_VECTORS], fy[MAX_FILTER_VECTORS];
-    float len_sq[MAX_FILTER_VECTORS];
+    float vdx[MAX_FILTER_VECTORS], vdy[MAX_FILTER_VECTORS], len_sq[MAX_FILTER_VECTORS], heading[MAX_FILTER_VECTORS];
 
     for (size_t i = 0; i < count; i++) {
         float x0 = (float)vectors[4 * i];
@@ -367,9 +371,12 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         } else {
             nx[i] = x1;  ny[i] = y1;  fx[i] = x0;  fy[i] = y0;
         }
-        float vdx = fx[i] - nx[i];
-        float vdy = ny[i] - fy[i];
-        len_sq[i] = vdx * vdx + vdy * vdy;
+        float dx = fx[i] - nx[i];
+        float dy = ny[i] - fy[i];
+        vdx[i] = dx;
+        vdy[i] = dy;
+        len_sq[i] = dx * dx + dy * dy;
+        heading[i] = (dy > 1.0f) ? (atan2f(dx, dy) * (180.0f / (float)M_PI)) : 0.0f;
     }
 
     /* 1. Search for a valid Left + Right boundary pair */
@@ -378,20 +385,28 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     float best_pair_score = -99999.0f;
 
     for (size_t i = 0; i < count; i++) {
+        /* Vector must point forward (dy >= 6px) to reject horizontal/crossing artifacts */
+        if (vdy[i] < 6.0f) continue;
+
         for (size_t j = 0; j < count; j++) {
             if (i == j) continue;
-            /* i must be strictly left of j */
+            if (vdy[j] < 6.0f) continue;
+
+            /* i must be strictly left of j at near end */
             if (nx[i] >= nx[j]) continue;
 
             float sep = nx[j] - nx[i];
             /* Separation must be physically plausible for track width in lookahead view */
-            if (sep < 20.0f || sep > 68.0f) continue;
+            if (sep < 18.0f || sep > 65.0f) continue;
 
-            /* Reject candidate pairs where both vectors are on the same side of center */
-            if (nx[i] > ((float)PIXY_CENTER_X + 4.0f) && nx[j] > ((float)PIXY_CENTER_X + 4.0f)) continue;
-            if (nx[i] < ((float)PIXY_CENTER_X - 4.0f) && nx[j] < ((float)PIXY_CENTER_X - 4.0f)) continue;
+            /* Boundaries must not cross each other at far end */
+            if (fx[i] >= fx[j]) continue;
 
-            float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 50.0f) * 2.0f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
+            /* Left and right track boundaries must have roughly compatible headings (|h_i - h_j| <= 32 deg) */
+            if (fabsf(heading[i] - heading[j]) > 32.0f) continue;
+
+            /* Pair score: near-camera presence, realistic separation (~46px), and vector length */
+            float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 46.0f) * 1.5f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
             if (score > best_pair_score) {
                 best_pair_score = score;
                 best_l = (int)i;
@@ -406,6 +421,16 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float lx_far  = fx[best_l];  float ly_far  = fy[best_l];
         float rx_near = nx[best_r];  float ry_near = ny[best_r];
         float rx_far  = fx[best_r];  float ry_far  = fy[best_r];
+
+        /* Update temporal memory */
+        s_last_lookahead_left_x  = lx_near;
+        s_last_lookahead_right_x = rx_near;
+        if (s_last_lookahead_left_x > ((float)PIXY_CENTER_X - 5.0f)) {
+            s_last_lookahead_left_x = (float)PIXY_CENTER_X - 5.0f;
+        }
+        if (s_last_lookahead_right_x < ((float)PIXY_CENTER_X + 5.0f)) {
+            s_last_lookahead_right_x = (float)PIXY_CENTER_X + 5.0f;
+        }
 
         /* Centerline trajectory midpoints */
         float mid_near_x = (lx_near + rx_near) * 0.5f;
@@ -439,10 +464,11 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
         result.found = 2;
     } else {
-        /* Single boundary visible: pick the best single vector (longest & closest to camera) */
-        int best_single = 0;
+        /* Single boundary visible: pick the best single forward vector */
+        int best_single = -1;
         float best_single_score = -99999.0f;
         for (size_t i = 0; i < count; i++) {
+            if (vdy[i] < 6.0f) continue; /* Reject cross-lines / horizontal artifacts */
             float s = ny[i] * 2.0f + sqrtf(len_sq[i]);
             if (s > best_single_score) {
                 best_single_score = s;
@@ -450,23 +476,54 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             }
         }
 
+        if (best_single < 0) {
+            return result;
+        }
+
         float xn = nx[best_single];
         float yn = ny[best_single];
         float xf = fx[best_single];
         float yf = fy[best_single];
 
-        bool is_right = (xn >= (float)PIXY_CENTER_X);
+        /* Side classification with deadband and temporal memory:
+         * 1. Clearly right of center -> right boundary
+         * 2. Clearly left of center  -> left boundary
+         * 3. Transition zone [36.5, 42.5] -> use temporal memory */
+        bool is_right;
+        if (xn >= ((float)PIXY_CENTER_X + 3.0f)) {
+            is_right = true;
+        } else if (xn <= ((float)PIXY_CENTER_X - 3.0f)) {
+            is_right = false;
+        } else {
+            float dist_to_left  = fabsf(xn - s_last_lookahead_left_x);
+            float dist_to_right = fabsf(xn - s_last_lookahead_right_x);
+            is_right = (dist_to_right < dist_to_left);
+        }
+
+        /* Update temporal memory */
+        if (is_right) {
+            s_last_lookahead_right_x = xn;
+            s_last_lookahead_left_x  = xn - (2.0f * (float)PIXY_TRACK_HALF_WIDTH);
+        } else {
+            s_last_lookahead_left_x  = xn;
+            s_last_lookahead_right_x = xn + (2.0f * (float)PIXY_TRACK_HALF_WIDTH);
+        }
+        if (s_last_lookahead_left_x > ((float)PIXY_CENTER_X - 5.0f)) {
+            s_last_lookahead_left_x = (float)PIXY_CENTER_X - 5.0f;
+        }
+        if (s_last_lookahead_right_x < ((float)PIXY_CENTER_X + 5.0f)) {
+            s_last_lookahead_right_x = (float)PIXY_CENTER_X + 5.0f;
+        }
+
+        /* Centerline synthesis from single boundary:
+         * The synthesized trajectory runs strictly parallel to the boundary vector.
+         * dx = xf - xn, dy = yn - yf. Zero artificial perspective tilt! */
         float sign = is_right ? -1.0f : 1.0f;
-
-        /* Forward perspective narrowing towards horizon */
-        float track_width_near = (float)PIXY_TRACK_HALF_WIDTH;
-        float track_width_far  = (float)PIXY_TRACK_HALF_WIDTH * (0.6f + 0.4f * (yf / (float)PIXY_FRAME_HEIGHT));
-
-        float mid_near_x = xn + sign * track_width_near;
-        float mid_far_x  = xf + sign * track_width_far;
+        float mid_near_x = xn + sign * (float)PIXY_TRACK_HALF_WIDTH;
+        float mid_far_x  = xf + sign * (float)PIXY_TRACK_HALF_WIDTH;
 
         float dy = yn - yf;
-        float dx = mid_far_x - mid_near_x;
+        float dx = xf - xn;
 
         if (dy > 1.0f) {
             result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
