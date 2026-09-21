@@ -186,12 +186,10 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
         float h_dev = fabsf(heading[i] - s_last_heading);
         float heading_penalty = (h_dev > 18.0f) ? ((h_dev - 18.0f) * 6.0f) : 0.0f;
 
-        /* 3. Outer boundary prior: on this CCW circuit, the right boundary is the continuous
-         * outer perimeter of the track. Prioritizes continuing straight over inner branch lines. */
-        float right_bonus = (near_x[i] > (uint16_t)PIXY_CENTER_X) ? 15.0f : 0.0f;
-
+        /* 3. Unbiased continuity scoring: evaluate proximity to bumper, length,
+         * continuity with previous lateral boundaries, and heading smoothness. */
         float score = (float)near_y[i] * 5.0f + sqrtf((float)len_sq[i]) * 2.0f
-                      + right_bonus - lateral_penalty - heading_penalty;
+                      - lateral_penalty - heading_penalty;
 
         if (score > best_single_score) {
             best_single_score = score;

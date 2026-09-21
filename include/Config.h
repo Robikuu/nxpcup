@@ -12,11 +12,11 @@
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         87.0f     // Physical servo right mechanical limit
 #define STEERING_LIMIT_LEFT         -70.0f     // Physical servo left mechanical limit
-#define STEERING_OFFSET              14.0f     // Straight-line trim offset (+17.0 deg)
+#define STEERING_OFFSET              12.5f     // Straight-line trim offset (trimmed to eliminate rightward lane drift)
 
 // Relative command limits (steer_cmd relative to center trim)
-#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +70.0f
-#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -87.0f
+#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +74.5f
+#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -82.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
@@ -29,7 +29,7 @@
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              16.0f     // Rapid pre-braking ramp (~75ms from 95% to 48%)
-#define ACCEL_RAMP_STEP              20.0f     // Punchy corner exit acceleration ramp (~50ms back to 100%)
+#define ACCEL_RAMP_STEP              12.0f     // Progressive corner exit acceleration (~120ms to 100%, maintains front tire grip)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        35.0f     // Rapidly unloads previous dragging inside wheel
@@ -45,16 +45,16 @@
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    2.20f     // Crisp cornering authority without open-loop gain oscillation
+#define KP_CORNER                    2.10f     // Crisp cornering authority without open-loop gain oscillation
 #define KP_STRAIGHT                  0.60f     // Calm straight-line tracking authority to eliminate weaving
-#define KD_CORNER                    0.120f    // Counter-steer damping in corners
+#define KD_CORNER                    0.160f    // Strong counter-steer damping in corners to prevent exit yaw overshoot
 #define KD_STRAIGHT                  0.220f    // Strong derivative damping to lock high-speed straightaway tracking
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.3f
 
 // ---- Error Weights ----
-#define DEFAULT_K_CTE                0.50f     // Moderate weight to prevent local CTE from canceling corner turn-in
-#define DEFAULT_K_HEADING            0.80f     // Decisive preview heading to initiate corner entry on time
+#define DEFAULT_K_CTE                0.80f     // Strong CTE weight to strictly center the car and prevent running wide
+#define DEFAULT_K_HEADING            0.60f     // Balanced heading weight to prevent yaw overshoot from masking CTE
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

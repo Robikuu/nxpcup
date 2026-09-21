@@ -294,6 +294,16 @@ int main(void) {
                      * As corner urgency or trajectory angle increases, blend up to 0.70x for early turn-in preview. */
                     float traj_blend = 0.30f + trusted_corner_urgency * (0.70f - 0.30f);
                     trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
+
+                    /* Trajectory preview safety clamp:
+                     * If the car is already significantly off-center (|CTE| > 8px),
+                     * never allow trajectory preview to steer further in the direction of the error!
+                     * (e.g. if CTE < -8px [wide to the right], trajectory_steer must not push right > 0) */
+                    if (filtered_cte < -8.0f && trajectory_steer > 0.0f) {
+                        trajectory_steer = 0.0f;
+                    } else if (filtered_cte > 8.0f && trajectory_steer < 0.0f) {
+                        trajectory_steer = 0.0f;
+                    }
                 }
 
                 steer_cmd = feedback_steer + trajectory_steer;
@@ -326,8 +336,20 @@ int main(void) {
                 /* 4. Asymmetric Target Wheel Speed Assignment
                  * A. Longitudinal Pre-Braking: slows down vehicle base speed into upcoming corners.
                  *    Both wheels decelerate symmetrically so there is ZERO yaw kick on straights.
-                 *    Proactive braking: combines local heading angle (PID cam) with lookahead (Front cam). */
+                 *    Proactive braking: combines local heading angle, lateral displacement (CTE),
+                 *    and lookahead front camera preview.
+                 *    Crucial for corner exit: if the vehicle has swung wide (|CTE| > 8px), it HOLDS
+                 *    controlled cornering speed (80%) until centered, preventing 100% sprint wheelspin! */
+                float abs_cte = fabsf(filtered_cte);
+                float dz_cte = abs_cte - 8.0f;
+                if (dz_cte < 0.0f) dz_cte = 0.0f;
+                float cte_norm = dz_cte / (20.0f - 8.0f);
+                if (cte_norm > 1.0f) cte_norm = 1.0f;
+
                 float effective_corner_intensity = heading_norm;
+                if (cte_norm > effective_corner_intensity) {
+                    effective_corner_intensity = cte_norm;
+                }
                 if (lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
