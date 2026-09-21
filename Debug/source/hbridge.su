@@ -1,4 +1,4 @@
-D:\robotica\workspace\nxpcup-ciorba_curata\drivers/fsl_gpio.h:346:20:GPIO_PinWrite	24	static
+D:\nxpcup\drivers/fsl_gpio.h:346:20:GPIO_PinWrite	24	static
 ../source/hbridge.c:13:6:HbridgeInit	32	static
 ../source/hbridge.c:32:6:HbridgeSpeed	24	static
 ../source/hbridge.c:69:6:HbridgeBrake	16	static

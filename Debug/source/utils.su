@@ -1,5 +1,5 @@
-D:\robotica\workspace\nxpcup-ciorba_curata\drivers/fsl_gpio.h:428:24:GPIO_PinRead	16	static
-D:\robotica\workspace\nxpcup-ciorba_curata\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
+D:\nxpcup\drivers/fsl_gpio.h:428:24:GPIO_PinRead	16	static
+D:\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
 ../source/utils.c:17:6:receive_message	16	static
 ../source/utils.c:30:6:buttons_init	4	static
 ../source/utils.c:35:5:button_pressed_edge	16	static

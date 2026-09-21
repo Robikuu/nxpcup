@@ -1,4 +1,4 @@
-../source/vectors.c:19:6:reset_steering_tracking	4	static
-../source/vectors.c:29:6:vector_filtering	736	static
-../source/vectors.c:209:19:compute_steering_error	160	static
-../source/vectors.c:343:21:compute_lookahead_trajectory	208	static
+../source/vectors.c:21:6:reset_steering_tracking	4	static
+../source/vectors.c:33:6:vector_filtering	728	static
+../source/vectors.c:211:19:compute_steering_error	160	static
+../source/vectors.c:345:21:compute_lookahead_trajectory	1336	static
