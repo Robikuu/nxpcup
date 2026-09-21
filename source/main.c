@@ -164,16 +164,18 @@ int main(void) {
                     filtered_traj_angle  = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
                     filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
 
-                    /* Lookahead urgency for corner speed modulation */
+                    /* Lookahead urgency for corner speed modulation:
+                     * Fast attack (0.70x) to immediately initiate pre-braking on the straight;
+                     * Smooth decay (0.25x) to maintain stable deceleration through preview jitter. */
                     if (g_traj.lookahead_urgency > lookahead_turn_factor) {
-                        lookahead_turn_factor = 0.40f * g_traj.lookahead_urgency + 0.60f * lookahead_turn_factor;
+                        lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
                     } else {
-                        lookahead_turn_factor = 0.55f * g_traj.lookahead_urgency + 0.45f * lookahead_turn_factor;
+                        lookahead_turn_factor = 0.25f * g_traj.lookahead_urgency + 0.75f * lookahead_turn_factor;
                     }
                 } else {
                     filtered_traj_angle   *= 0.80f;
                     filtered_traj_offset  *= 0.80f;
-                    lookahead_turn_factor *= 0.45f;
+                    lookahead_turn_factor *= 0.85f;
                     g_traj.found = 0;
                 }
             }

@@ -20,15 +20,15 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         78.0f     // Fast apex outside wheel drive (%) (carries momentum with front tire grip margin)
-#define SPEED_INSIDE_MIN             45.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 61.5%
+#define SPEED_OUTSIDE_CORNER         58.0f     // Fast apex outside wheel drive (%) (carries momentum within tire friction circle)
+#define SPEED_INSIDE_MIN             30.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 44.0%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              16.0f     // Rapid pre-braking ramp (~75ms from 95% to 48%)
+#define DECEL_RAMP_STEP              20.0f     // Rapid pre-braking ramp (~50ms from 100% to 58%)
 #define ACCEL_RAMP_STEP              12.0f     // Progressive corner exit acceleration (~120ms to 100%, maintains front tire grip)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
