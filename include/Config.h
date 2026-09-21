@@ -20,8 +20,10 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         78.0f     // Fast apex outside wheel drive (%) (carries momentum with front tire grip margin)
-#define SPEED_INSIDE_MIN             45.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
+#define SPEED_OUTSIDE_CORNER         78.0f     // Fast apex outside wheel drive (%) for moderate curves
+#define SPEED_OUTSIDE_SHARP          64.0f     // Outside wheel drive (%) in sharp turns / hairpins (reduces centrifugal understeer)
+#define SPEED_INSIDE_MIN             45.0f     // Inside wheel floor (%) for moderate curves (tuneable via CLI)
+#define SPEED_INSIDE_SHARP           20.0f     // Inside wheel pivot anchor floor (%) for sharp hairpins (creates active yaw moment)
 #define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 61.5%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
@@ -40,8 +42,10 @@
 // ---- Corner Urgency & Predictive Lookahead Gating ----
 #define CTE_URGENCY_PX               24.0f     // |filtered_cte| (px) at which corner gains engage (prevents straight hunting)
 #define CORNER_URGENCY_STREAK        1         // Immediate engagement on rising corner urgency
-#define STEER_FULL_BRAKE_DEG         30.0f     // Steer angle (deg) for 100% pivot drag (decisive bite at apex)
-#define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full corner intensity scaling
+#define STEER_FULL_BRAKE_DEG         30.0f     // Steer angle (deg) for 100% moderate pivot drag (decisive bite at apex)
+#define STEER_SHARP_DEG              75.0f     // Steer angle (deg) for maximum sharp corner differential braking
+#define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full moderate corner intensity scaling
+#define HEADING_SHARP_DEG            35.0f     // Heading angle (deg) for maximum sharp corner differential braking
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
@@ -85,6 +89,8 @@ typedef struct {
     float speed_straight;
     float speed_outside_corner;
     float speed_inside_min;
+    float speed_outside_sharp;
+    float speed_inside_sharp;
     float alpha;
     float steering_offset;
     float k_cte;

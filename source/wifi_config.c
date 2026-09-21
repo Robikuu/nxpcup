@@ -23,6 +23,8 @@ void params_init(void) {
     g_params.speed_straight       = SPEED_STRAIGHT;
     g_params.speed_outside_corner = SPEED_OUTSIDE_CORNER;
     g_params.speed_inside_min     = SPEED_INSIDE_MIN;
+    g_params.speed_outside_sharp  = SPEED_OUTSIDE_SHARP;
+    g_params.speed_inside_sharp   = SPEED_INSIDE_SHARP;
     g_params.k_cte               = DEFAULT_K_CTE;
     g_params.k_heading           = DEFAULT_K_HEADING;
     g_params.dt                  = DEFAULT_DT;
@@ -120,6 +122,8 @@ static void command_execute(char *cmd) {
     else if (!strcmp(keyword, "speed_straight") && has_val) { g_params.speed_straight = val; send_ack_dbl("speed_straight=", val); }
     else if ((!strcmp(keyword, "speed_outside") || !strcmp(keyword, "speed_out")) && has_val) { g_params.speed_outside_corner = val; send_ack_dbl("speed_outside=", val); }
     else if ((!strcmp(keyword, "speed_inside") || !strcmp(keyword, "speed_in") || !strcmp(keyword, "speed_corner")) && has_val) { g_params.speed_inside_min = val; send_ack_dbl("speed_inside=", val); }
+    else if ((!strcmp(keyword, "speed_out_sharp") || !strcmp(keyword, "speed_outside_sharp")) && has_val) { g_params.speed_outside_sharp = val; send_ack_dbl("speed_out_sharp=", val); }
+    else if ((!strcmp(keyword, "speed_in_sharp") || !strcmp(keyword, "speed_inside_sharp")) && has_val) { g_params.speed_inside_sharp = val; send_ack_dbl("speed_in_sharp=", val); }
     else if (!strcmp(keyword, "alpha") && has_val) { g_params.alpha = val; send_ack_dbl("alpha=", val); }
     else if (!strcmp(keyword, "k_cte") && has_val) { g_params.k_cte = val; send_ack_dbl("k_cte=", val); }
     else if (!strcmp(keyword, "k_heading") && has_val) { g_params.k_heading = val; send_ack_dbl("k_heading=", val); }
@@ -145,6 +149,8 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "spd_s=", g_params.speed_straight);
         n = append_flt(buf, n, sizeof(buf), "spd_out=", g_params.speed_outside_corner);
         n = append_flt(buf, n, sizeof(buf), "spd_in=", g_params.speed_inside_min);
+        n = append_flt(buf, n, sizeof(buf), "spd_out_sh=", g_params.speed_outside_sharp);
+        n = append_flt(buf, n, sizeof(buf), "spd_in_sh=", g_params.speed_inside_sharp);
         n = append_flt(buf, n, sizeof(buf), "offset=", g_params.steering_offset);
         n = append_flt(buf, n, sizeof(buf), "k_cte=", g_params.k_cte);
         n = append_flt(buf, n, sizeof(buf), "k_head=", g_params.k_heading);
@@ -156,7 +162,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, accel_ramp, decel_ramp, status\r\n");
+        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, speed_out_sharp, speed_in_sharp, k_cte, k_heading, alpha, steer, accel_ramp, decel_ramp, status\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");
