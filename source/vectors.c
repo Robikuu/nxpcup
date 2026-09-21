@@ -394,8 +394,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             if (nx[i] >= nx[j]) continue;
 
             float sep = nx[j] - nx[i];
-            /* Separation must be physically plausible for track width in lookahead view */
-            if (sep < 18.0f || sep > 65.0f) continue;
+            /* Separation must be physically plausible for full track width in lookahead view.
+             * Full track width is ~46-52px. The center dashed line to an outer boundary is ~24px.
+             * Reject any pair with sep < 34.0px to strictly prevent pairing with the center line! */
+            if (sep < 34.0f || sep > 65.0f) continue;
 
             /* Boundaries must not cross each other at far end */
             if (fx[i] >= fx[j]) continue;
@@ -472,6 +474,9 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float best_single_score = -99999.0f;
         for (size_t i = 0; i < count; i++) {
             if (vdy[i] < 6.0f) continue; /* Reject cross-lines / horizontal artifacts */
+            /* Reject center dashed line fragments (near camera center x ~ 39.5).
+             * Outer track boundaries are at x ~ 15 (left) or x ~ 64 (right). */
+            if (fabsf(nx[i] - (float)PIXY_CENTER_X) < 8.0f) continue;
             float s = ny[i] * 2.0f + sqrtf(len_sq[i]);
             if (s > best_single_score) {
                 best_single_score = s;

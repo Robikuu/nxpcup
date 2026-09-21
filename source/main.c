@@ -260,24 +260,10 @@ int main(void) {
 
                 float raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
 
-                /* Predictive gain pre-engagement from front camera:
-                 * If the front camera sees a corner coming (high lookahead_urgency),
-                 * pre-ramp PID gains BEFORE the top camera detects heading change.
-                 * max() gate: front cam can only RAISE urgency, never lower it. */
-                if (lookahead_turn_factor > raw_corner_urgency) {
+                /* Front camera predictive urgency pre-engagement:
+                 * Only allow lookahead to elevate urgency if a genuine upcoming turn is detected (> 0.25f) */
+                if (lookahead_turn_factor > 0.25f && lookahead_turn_factor > raw_corner_urgency) {
                     raw_corner_urgency = lookahead_turn_factor;
-                }
-
-                /* Cross-camera straightaway sanity gate:
-                 * If the top camera (ground truth for local vehicle state) confirms
-                 * the car is tracking a straight (|heading| <= 6 deg AND |CTE| <= 6 px),
-                 * do NOT let front camera preview inflate raw_corner_urgency (which schedules
-                 * high corner PID Kp). This keeps steering gains strictly at KP_STRAIGHT.
-                 * NOTE: lookahead_turn_factor is PRESERVED for longitudinal pre-braking below,
-                 * allowing the vehicle to shed sprint speed before entering the curve! */
-                bool is_confirmed_straight = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 6.0f);
-                if (is_confirmed_straight) {
-                    raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
                 }
 
                 if (raw_corner_urgency > trusted_corner_urgency) {
@@ -302,12 +288,13 @@ int main(void) {
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 float trajectory_steer = 0.0f;
-                /* Only apply trajectory steering if not on a confirmed straight and corner urgency or angle is significant */
-                if (!is_confirmed_straight && g_traj.found > 0 && (fabsf(filtered_traj_angle) > 8.0f || trusted_corner_urgency > 0.20f)) {
-                    /* On straights, trajectory_steer is gated out to eliminate weaving;
-                     * As corner urgency or trajectory angle increases, blend up to 0.70x for early turn-in preview. */
-                    float traj_blend = 0.30f + trusted_corner_urgency * (0.70f - 0.30f);
-                    trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
+                /* Continuous trajectory steer authority:
+                 * On straights (trusted_corner_urgency <= 0.25f), trajectory_steer is strictly 0.0f,
+                 * completely eliminating any front-camera steering disturbances on straights!
+                 * As corner urgency rises (> 0.25f), trajectory_steer smoothly blends in. */
+                if (g_traj.found > 0 && trusted_corner_urgency > 0.25f) {
+                    float traj_blend = (trusted_corner_urgency - 0.25f) / 0.75f;
+                    trajectory_steer = traj_blend * 0.50f * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
 
                     /* Trajectory preview safety clamp:
                      * If the car is already significantly off-center (|CTE| > 8px),
