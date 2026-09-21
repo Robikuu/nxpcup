@@ -163,12 +163,12 @@ int main(void) {
                     if (g_traj.lookahead_urgency > lookahead_turn_factor) {
                         lookahead_turn_factor = 0.40f * g_traj.lookahead_urgency + 0.60f * lookahead_turn_factor;
                     } else {
-                        lookahead_turn_factor = 0.35f * g_traj.lookahead_urgency + 0.65f * lookahead_turn_factor;
+                        lookahead_turn_factor = 0.55f * g_traj.lookahead_urgency + 0.45f * lookahead_turn_factor;
                     }
                 } else {
                     filtered_traj_angle   *= 0.80f;
                     filtered_traj_offset  *= 0.80f;
-                    lookahead_turn_factor *= 0.65f;
+                    lookahead_turn_factor *= 0.45f;
                     g_traj.found = 0;
                 }
             }
@@ -286,9 +286,9 @@ int main(void) {
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 float trajectory_steer = 0.0f;
-                if (g_traj.found > 0) {
-                    /* On straights (urgency ~ 0), blend lightly (0.35x) to maintain stable tracking without twitch;
-                     * As corner urgency increases, blend up to 0.75x for early turn-in preview. */
+                if (g_traj.found > 0 && (fabsf(filtered_traj_angle) > 5.0f || trusted_corner_urgency > 0.15f)) {
+                    /* On straights (urgency ~ 0, angle <= 5 deg), trajectory_steer is gated out to eliminate weaving;
+                     * As corner urgency or trajectory angle increases, blend up to 0.75x for early turn-in preview. */
                     float traj_blend = 0.35f + trusted_corner_urgency * (0.75f - 0.35f);
                     trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
                 }

@@ -351,26 +351,61 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     if (num_vectors == 0) return result;
 
-    /* Two or more vectors: extract upcoming lane centerline trajectory */
-    if (num_vectors >= 2) {
-        float lx_near, ly_near, lx_far, ly_far;
-        float rx_near, ry_near, rx_far, ry_far;
+    /* Orient each vector from near (yn >= yf) to far (yf) */
+    size_t count = (num_vectors > (size_t)MAX_FILTER_VECTORS) ? (size_t)MAX_FILTER_VECTORS : num_vectors;
+    float nx[MAX_FILTER_VECTORS], ny[MAX_FILTER_VECTORS], fx[MAX_FILTER_VECTORS], fy[MAX_FILTER_VECTORS];
+    float len_sq[MAX_FILTER_VECTORS];
 
-        if (vectors[1] >= vectors[3]) {
-            lx_near = (float)vectors[0];  ly_near = (float)vectors[1];
-            lx_far  = (float)vectors[2];  ly_far  = (float)vectors[3];
-        } else {
-            lx_near = (float)vectors[2];  ly_near = (float)vectors[3];
-            lx_far  = (float)vectors[0];  ly_far  = (float)vectors[1];
-        }
+    for (size_t i = 0; i < count; i++) {
+        float x0 = (float)vectors[4 * i];
+        float y0 = (float)vectors[4 * i + 1];
+        float x1 = (float)vectors[4 * i + 2];
+        float y1 = (float)vectors[4 * i + 3];
 
-        if (vectors[5] >= vectors[7]) {
-            rx_near = (float)vectors[4];  ry_near = (float)vectors[5];
-            rx_far  = (float)vectors[6];  ry_far  = (float)vectors[7];
+        if (y0 >= y1) {
+            nx[i] = x0;  ny[i] = y0;  fx[i] = x1;  fy[i] = y1;
         } else {
-            rx_near = (float)vectors[6];  ry_near = (float)vectors[7];
-            rx_far  = (float)vectors[4];  ry_far  = (float)vectors[5];
+            nx[i] = x1;  ny[i] = y1;  fx[i] = x0;  fy[i] = y0;
         }
+        float vdx = fx[i] - nx[i];
+        float vdy = ny[i] - fy[i];
+        len_sq[i] = vdx * vdx + vdy * vdy;
+    }
+
+    /* 1. Search for a valid Left + Right boundary pair */
+    int best_l = -1;
+    int best_r = -1;
+    float best_pair_score = -99999.0f;
+
+    for (size_t i = 0; i < count; i++) {
+        for (size_t j = 0; j < count; j++) {
+            if (i == j) continue;
+            /* i must be strictly left of j */
+            if (nx[i] >= nx[j]) continue;
+
+            float sep = nx[j] - nx[i];
+            /* Separation must be physically plausible for track width in lookahead view */
+            if (sep < 20.0f || sep > 68.0f) continue;
+
+            /* Reject candidate pairs where both vectors are on the same side of center */
+            if (nx[i] > ((float)PIXY_CENTER_X + 4.0f) && nx[j] > ((float)PIXY_CENTER_X + 4.0f)) continue;
+            if (nx[i] < ((float)PIXY_CENTER_X - 4.0f) && nx[j] < ((float)PIXY_CENTER_X - 4.0f)) continue;
+
+            float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 50.0f) * 2.0f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
+            if (score > best_pair_score) {
+                best_pair_score = score;
+                best_l = (int)i;
+                best_r = (int)j;
+            }
+        }
+    }
+
+    if (best_l >= 0 && best_r >= 0) {
+        /* Two valid boundaries found: Vector best_l = Left, Vector best_r = Right */
+        float lx_near = nx[best_l];  float ly_near = ny[best_l];
+        float lx_far  = fx[best_l];  float ly_far  = fy[best_l];
+        float rx_near = nx[best_r];  float ry_near = ny[best_r];
+        float rx_far  = fx[best_r];  float ry_far  = fy[best_r];
 
         /* Centerline trajectory midpoints */
         float mid_near_x = (lx_near + rx_near) * 0.5f;
@@ -382,12 +417,11 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float dx = mid_far_x  - mid_near_x;
 
         /* Apex-cut bias: shift far target toward inside of corner.
-         * dx > 0 means path curves right -> inside is right -> shift mid_far_x positive (toward right boundary)
-         * dx < 0 means path curves left  -> inside is left  -> shift mid_far_x negative (toward left boundary)
-         * On straights (|dx| <= 1.5f), no bias applied. */
-        if (fabsf(dx) > 1.5f && dy > 1.0f) {
+         * On straights (|dx| <= 2.5f), no bias applied. */
+        if (fabsf(dx) > 2.5f && dy > 1.0f) {
             float lane_half = (rx_far - lx_far) * 0.5f;
-            if (lane_half < 5.0f) lane_half = 5.0f;  /* Safety floor */
+            if (lane_half < 5.0f)  lane_half = 5.0f;
+            if (lane_half > 25.0f) lane_half = 25.0f;
             float apex_shift = (dx > 0.0f ? 1.0f : -1.0f) * lane_half * (float)APEX_CUT_RATIO;
             mid_far_x += apex_shift;
             dx = mid_far_x - mid_near_x;
@@ -405,18 +439,21 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
         result.found = 2;
     } else {
-        /* Single boundary visible in lookahead */
-        float x0 = (float)vectors[0];
-        float y0 = (float)vectors[1];
-        float x1 = (float)vectors[2];
-        float y1 = (float)vectors[3];
-
-        float xn, yn, xf, yf;
-        if (y0 >= y1) {
-            xn = x0;  yn = y0;  xf = x1;  yf = y1;
-        } else {
-            xn = x1;  yn = y1;  xf = x0;  yf = y0;
+        /* Single boundary visible: pick the best single vector (longest & closest to camera) */
+        int best_single = 0;
+        float best_single_score = -99999.0f;
+        for (size_t i = 0; i < count; i++) {
+            float s = ny[i] * 2.0f + sqrtf(len_sq[i]);
+            if (s > best_single_score) {
+                best_single_score = s;
+                best_single = (int)i;
+            }
         }
+
+        float xn = nx[best_single];
+        float yn = ny[best_single];
+        float xf = fx[best_single];
+        float yf = fy[best_single];
 
         bool is_right = (xn >= (float)PIXY_CENTER_X);
         float sign = is_right ? -1.0f : 1.0f;
@@ -449,19 +486,19 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     if (result.trajectory_angle_deg < -35.0f) result.trajectory_angle_deg = -35.0f;
 
     /* Compute normalized lookahead urgency (0.0 to 1.0) with deadbands to prevent straight pre-braking:
-     * - Ignore trajectory angles <= 5.0 deg (straightaway horizon jitter/alignment)
-     * - Ignore lateral offset <= 14.0 px (matches CTE straight deadband) */
+     * - Ignore trajectory angles <= 6.0 deg (straightaway horizon jitter/alignment)
+     * - Ignore lateral offset <= 15.0 px (matches CTE straight deadband) */
     float abs_angle = fabsf(result.trajectory_angle_deg);
     float angle_urgency = 0.0f;
-    if (abs_angle > 5.0f) {
-        angle_urgency = (abs_angle - 5.0f) / ((float)HEADING_FULL_BRAKE_DEG - 5.0f);
+    if (abs_angle > 6.0f) {
+        angle_urgency = (abs_angle - 6.0f) / ((float)HEADING_FULL_BRAKE_DEG - 6.0f);
         if (angle_urgency > 1.0f) angle_urgency = 1.0f;
     }
 
     float abs_offset = fabsf(result.trajectory_offset_px);
     float offset_urgency = 0.0f;
-    if (abs_offset > 14.0f) {
-        offset_urgency = (abs_offset - 14.0f) / ((float)PIXY_CENTER_X - 14.0f);
+    if (abs_offset > 15.0f) {
+        offset_urgency = (abs_offset - 15.0f) / ((float)PIXY_CENTER_X - 15.0f);
         if (offset_urgency > 1.0f) offset_urgency = 1.0f;
     }
 

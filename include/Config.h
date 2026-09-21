@@ -20,16 +20,16 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         70.0f     // Fast apex outside wheel drive (%) (carries momentum through turns)
-#define SPEED_INSIDE_MIN             35.0f     // Inside wheel pivot anchor duty (%) (crisp rotation and effective pivot drag)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 52.5%
+#define SPEED_OUTSIDE_CORNER         80.0f     // Fast apex outside wheel drive (%) (carries momentum through turns)
+#define SPEED_INSIDE_MIN             45.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 62.5%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              16.0f     // Rapid pre-braking ramp (~75ms from 95% to 48%)
-#define ACCEL_RAMP_STEP              8.5f      // Punchy corner exit acceleration ramp (~90ms back to 95%)
+#define ACCEL_RAMP_STEP              22.0f     // Blistering corner exit acceleration ramp (~45ms back to 100%)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        35.0f     // Rapidly unloads previous dragging inside wheel
@@ -45,10 +45,10 @@
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    2.30f     // Crisp cornering authority to nail the apex on time
+#define KP_CORNER                    3.30f     // Aggressive cornering authority to nail the apex on time
 #define KP_STRAIGHT                  0.70f     // Calm straight-line tracking authority to eliminate weaving
-#define KD_CORNER                    0.130f    // Counter-steer damping in corners
-#define KD_STRAIGHT                  0.160f    // Strong derivative damping to suppress high-speed straightaway yaw
+#define KD_CORNER                    0.095f    // Responsive turn-in damping in corners
+#define KD_STRAIGHT                  0.200f    // Strong derivative damping to lock high-speed straightaway tracking
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.3f
 
