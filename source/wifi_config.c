@@ -33,6 +33,39 @@ void params_init(void) {
     g_params.state               = STATE_IDLE;
 }
 
+static volatile uint32_t s_motor_test_ticks = 0;
+static volatile int16_t  s_motor_test_left  = 0;
+static volatile int16_t  s_motor_test_right = 0;
+
+void motor_test_start(int16_t speed_l, int16_t speed_r, uint32_t ticks) {
+    s_motor_test_left  = speed_l;
+    s_motor_test_right = speed_r;
+    s_motor_test_ticks = ticks;
+    HbridgeSpeed(&g_hbridge, speed_l, speed_r);
+}
+
+void motor_test_stop(void) {
+    s_motor_test_ticks = 0;
+    s_motor_test_left  = 0;
+    s_motor_test_right = 0;
+    HbridgeBrake(&g_hbridge);
+}
+
+bool motor_test_is_active(void) {
+    return (s_motor_test_ticks > 0);
+}
+
+void motor_test_tick(void) {
+    if (s_motor_test_ticks > 0) {
+        if (--s_motor_test_ticks == 0) {
+            motor_test_stop();
+            esp_printf("OK motor test complete\r\n");
+        } else {
+            HbridgeSpeed(&g_hbridge, s_motor_test_left, s_motor_test_right);
+        }
+    }
+}
+
 static int parse_float(const char *s, float *out) {
     while (*s == ' ' || *s == '\t') s++;
     int sign = 1;
@@ -104,10 +137,12 @@ static void command_execute(char *cmd) {
     }
 
     if (!strcmp(keyword, "start")) {
+        motor_test_stop();
         g_params.state = STATE_RUNNING;
         send_ack("OK state=RUNNING\r\n");
     }
     else if (!strcmp(keyword, "stop") || !strcmp(keyword, "brake")) {
+        motor_test_stop();
         g_params.state = STATE_IDLE;
         HbridgeBrake(&g_hbridge);
         send_ack("OK state=IDLE\r\n");
@@ -134,6 +169,28 @@ static void command_execute(char *cmd) {
             send_ack_dbl("steer=", val);
         }
     }
+    else if (!strcmp(keyword, "motor_left")) {
+        if (g_params.state == STATE_RUNNING) {
+            send_ack("ERR motor only in IDLE. Send 'stop;' first.\r\n");
+        } else {
+            float spd = has_val ? val : 30.0f;
+            if (spd > 100.0f) spd = 100.0f;
+            if (spd < -100.0f) spd = -100.0f;
+            motor_test_start((int16_t)spd, 0, 200); /* 200 ticks @ 50Hz = 4.0 seconds */
+            send_ack_dbl("OK motor_left 4s speed=", spd);
+        }
+    }
+    else if (!strcmp(keyword, "motor_right")) {
+        if (g_params.state == STATE_RUNNING) {
+            send_ack("ERR motor only in IDLE. Send 'stop;' first.\r\n");
+        } else {
+            float spd = has_val ? val : 30.0f;
+            if (spd > 100.0f) spd = 100.0f;
+            if (spd < -100.0f) spd = -100.0f;
+            motor_test_start(0, (int16_t)spd, 200); /* 200 ticks @ 50Hz = 4.0 seconds */
+            send_ack_dbl("OK motor_right 4s speed=", spd);
+        }
+    }
     else if (!strcmp(keyword, "status")) {
         char buf[512];
         int n = 0;
@@ -156,7 +213,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, accel_ramp, decel_ramp, status\r\n");
+        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, status\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

@@ -115,6 +115,7 @@ int main(void) {
 
             /* Hardware push button toggle */
             if (button_pressed_edge()) {
+                motor_test_stop();
                 if (g_params.state == STATE_IDLE) {
                     g_params.state = STATE_RUNNING;
                     PRINTF("Button: STARTED\r\n");
@@ -145,7 +146,11 @@ int main(void) {
                 state_streak              = 0;
                 urgency_streak            = 0;
                 trusted_corner_urgency    = 0.0f;
-                HbridgeBrake(&g_hbridge);
+                if (motor_test_is_active()) {
+                    motor_test_tick();
+                } else {
+                    HbridgeBrake(&g_hbridge);
+                }
                 continue;
             }
 
