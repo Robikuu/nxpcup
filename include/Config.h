@@ -20,9 +20,9 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         88.0f     // Fast apex outside wheel drive (%) (carries momentum through turns)
-#define SPEED_INSIDE_MIN             62.0f     // Inside wheel pivot anchor duty (%) (crisp rotation without bogging down)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 75.0%
+#define SPEED_OUTSIDE_CORNER         70.0f     // Fast apex outside wheel drive (%) (carries momentum through turns)
+#define SPEED_INSIDE_MIN             35.0f     // Inside wheel pivot anchor duty (%) (crisp rotation and effective pivot drag)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 52.5%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT

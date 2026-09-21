@@ -207,7 +207,7 @@ int main(void) {
             if (sr.found == 0) {
                 desired_state = DRIVE_BRAKING;
             } else {
-                desired_state = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG) ? DRIVE_TURNING : DRIVE_FORWARD;
+                desired_state = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.45f) ? DRIVE_TURNING : DRIVE_FORWARD;
             }
 
             if (desired_state != drive_state) {
@@ -287,9 +287,9 @@ int main(void) {
 
                 float trajectory_steer = 0.0f;
                 if (g_traj.found > 0) {
-                    /* On straights, blend lightly (0.35x) to maintain stable tracking without twitch;
-                     * In turns or approaching curves, allow decisive preview turn-in (0.70x). */
-                    float traj_blend = (drive_state == DRIVE_FORWARD) ? 0.35f : 0.70f;
+                    /* On straights (urgency ~ 0), blend lightly (0.35x) to maintain stable tracking without twitch;
+                     * As corner urgency increases, blend up to 0.75x for early turn-in preview. */
+                    float traj_blend = 0.35f + trusted_corner_urgency * (0.75f - 0.35f);
                     trajectory_steer = traj_blend * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
                 }
 
@@ -330,9 +330,12 @@ int main(void) {
                 }
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
 
-                /* In DRIVE_FORWARD (straightaway lane tracking), heavily damp differential pivot drag
-                 * to keep both rear wheels pushing symmetrically at 95% without yaw shock */
-                float active_steer_norm = (drive_state == DRIVE_FORWARD) ? (steer_norm * 0.15f) : steer_norm;
+                /* Continuous differential drag authority:
+                 * On straights (urgency ~ 0), differential drag is suppressed (0.15x) for stable high-speed push;
+                 * As corner urgency rises (urgency -> 1.0), full differential authority opens up (up to 1.0x)
+                 * to pivot the vehicle sharply into the corner. */
+                float diff_scale = 0.15f + trusted_corner_urgency * 0.85f;
+                float active_steer_norm = steer_norm * diff_scale;
 
                 /* B. Lateral Differential Drag: strictly driven by active physical steering */
                 float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
