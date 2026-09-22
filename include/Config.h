@@ -74,20 +74,20 @@
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
 
 // ---- State Machine Thresholds ----
-#define CORNER_HEADING_THRESHOLD_DEG 12.0f     // Fast corner detection threshold (lowered from 18.0f for early corner entry)
+#define CORNER_HEADING_THRESHOLD_DEG 15.0f     // Calibrated corner entry heading threshold (prevents straightaway twitch)
 #define STATE_ENTER_STREAK           1         // Immediate transition into DRIVE_TURNING (20ms response)
 #define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              5
 
 // ---- Intersection Detection & Dead-Reckoning Navigation ----
 #define INTERSECTION_MIN_VECTORS     3         // Vector count threshold for multi-branch check
-#define INTERSECTION_WIDTH_PX        70.0f     // Near-X spread indicating wide fork / branch (px)
+#define INTERSECTION_WIDTH_PX        68.0f     // Near-X spread indicating wide fork / branch (px)
 #define INTERSECTION_HOLD_TICKS      10U       // 200ms dead-reckoning window @ 50Hz (ticks)
 #define INTERSECTION_COOLDOWN_TICKS  25U       // 500ms re-trigger guard after exit @ 50Hz (ticks)
 #define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
 
 // ---- Geometric Boundary Validation ----
-#define MIN_LANE_WIDTH_PX            40.0f     // Minimum lane width (rejects adjacent parallel lines / chicane waves)
+#define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width (rejects center-dash at 25px, preserves tight curves at 34px)
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
 #define CONNECT_DIST_PX              15.0f     // Endpoint distance threshold to reject split curve fragments
 

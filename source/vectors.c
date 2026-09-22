@@ -36,9 +36,9 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
     if (n == 0) return;
 
     /* ---- Pass 1: Chassis exclusion zone filter (Top Camera)
-     * Rejects any vectors originating or terminating on the car's own chassis/wheels/bumper.
-     * Mapped from PixyMon (640x400) X in [200, 450], Y in [360, max]
-     * to Pixy2 frame (79x52) X in [24, 56], Y in [46, 51]. ---- */
+     * Rejects spurious reflections that lie entirely inside the front bumper/chassis zone:
+     * PixyMon (640x400) X in [200, 450], Y in [360, max] -> Pixy2 frame (79x52) X in [24, 56], Y in [46, 51].
+     * Legitimate road boundaries extending into the zone have their near endpoint trimmed to Y=45. ---- */
     size_t write = 0;
     for (size_t i = 0; i < n; i++) {
         uint16_t x0 = vectors[4 * i + 0];
@@ -46,17 +46,27 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
         uint16_t x1 = vectors[4 * i + 2];
         uint16_t y1 = vectors[4 * i + 3];
 
-        bool in_zone = ((x0 >= TOP_CAM_EXCLUDE_X_MIN && x0 <= TOP_CAM_EXCLUDE_X_MAX && y0 >= TOP_CAM_EXCLUDE_Y_MIN) ||
-                        (x1 >= TOP_CAM_EXCLUDE_X_MIN && x1 <= TOP_CAM_EXCLUDE_X_MAX && y1 >= TOP_CAM_EXCLUDE_Y_MIN));
+        bool pt0_in = (x0 >= TOP_CAM_EXCLUDE_X_MIN && x0 <= TOP_CAM_EXCLUDE_X_MAX && y0 >= TOP_CAM_EXCLUDE_Y_MIN);
+        bool pt1_in = (x1 >= TOP_CAM_EXCLUDE_X_MIN && x1 <= TOP_CAM_EXCLUDE_X_MAX && y1 >= TOP_CAM_EXCLUDE_Y_MIN);
 
-        if (!in_zone) {
-            if (write != i) {
-                for (int j = 0; j < 4; j++) {
-                    vectors[4 * write + j] = vectors[4 * i + j];
-                }
-            }
-            write++;
+        /* Spurious reflection entirely on chassis/bumper: reject */
+        if (pt0_in && pt1_in) {
+            continue;
         }
+
+        /* Legitimate track boundary: trim any tip dipping into the bumper zone */
+        if (pt0_in) {
+            y0 = TOP_CAM_EXCLUDE_Y_MIN - 1;
+        }
+        if (pt1_in) {
+            y1 = TOP_CAM_EXCLUDE_Y_MIN - 1;
+        }
+
+        vectors[4 * write + 0] = x0;
+        vectors[4 * write + 1] = y0;
+        vectors[4 * write + 2] = x1;
+        vectors[4 * write + 3] = y1;
+        write++;
     }
     n = write;
     *num_vectors = n;
@@ -691,15 +701,12 @@ intersection_result_t detect_intersection(const uint16_t *raw_vectors, size_t ra
     result.reason          = 0;
     result.raw_count       = raw_num_vectors;
 
-    if (raw_num_vectors == 0) {
+    /* An intersection requires at least 2 vectors (a single vector can never be an intersection) */
+    if (raw_num_vectors < 2) {
         return result;
     }
 
-    if (raw_num_vectors >= (size_t)INTERSECTION_MIN_VECTORS) {
-        result.reason |= INTERSECTION_REASON_COUNT;
-    }
-
-    /* 1. Geometric segment crossing check */
+    /* 1. Geometric segment crossing check (X-crossings and crossing lines) */
     for (size_t i = 0; i < raw_num_vectors && !(result.reason & INTERSECTION_REASON_CROSSING); i++) {
         float ax0 = (float)raw_vectors[4 * i + 0], ay0 = (float)raw_vectors[4 * i + 1];
         float ax1 = (float)raw_vectors[4 * i + 2], ay1 = (float)raw_vectors[4 * i + 3];
@@ -715,44 +722,58 @@ intersection_result_t detect_intersection(const uint16_t *raw_vectors, size_t ra
         }
     }
 
-    /* 2. Wide aperture near-x spread check & Horizontal crossbar check */
-    float min_near_x =  1e9f;
-    float max_near_x = -1e9f;
-
+    /* 2. Horizontal crossbar check:
+     * A perpendicular track crossing line runs horizontally across the lane:
+     * - |dy| <= 8 px (nearly horizontal)
+     * - |dx| >= 30 px (spans at least 30 px across the 50px lane)
+     * - Spans across track center (min_x <= 32 and max_x >= 48) */
     for (size_t i = 0; i < raw_num_vectors; i++) {
         int dx = (int)raw_vectors[4 * i + 2] - (int)raw_vectors[4 * i + 0];
         int dy = (int)raw_vectors[4 * i + 3] - (int)raw_vectors[4 * i + 1];
         int adx = (dx < 0) ? -dx : dx;
         int ady = (dy < 0) ? -dy : dy;
-        int len_sq = dx * dx + dy * dy;
 
-        /* Check for horizontal crossbar (|dx| >= 1.2 * |dy| and len >= 25 px) */
-        if (adx * 10 >= ady * 12 && len_sq >= (25 * 25)) {
+        int min_x = (raw_vectors[4 * i + 0] < raw_vectors[4 * i + 2]) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2];
+        int max_x = (raw_vectors[4 * i + 0] > raw_vectors[4 * i + 2]) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2];
+
+        if (ady <= 8 && adx >= 30 && min_x <= 32 && max_x >= 48) {
             result.reason |= INTERSECTION_REASON_HORIZONTAL;
+            break;
         }
-
-        /* Ignore predominantly horizontal lines when computing longitudinal track width */
-        if (ady == 0 || adx > 2 * ady) {
-            continue;
-        }
-
-        uint16_t y0 = raw_vectors[4 * i + 1];
-        uint16_t y1 = raw_vectors[4 * i + 3];
-        float near_x = (float)((y0 >= y1) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2]);
-
-        if (near_x < min_near_x) min_near_x = near_x;
-        if (near_x > max_near_x) max_near_x = near_x;
     }
 
-    if (max_near_x > min_near_x && (max_near_x - min_near_x) > (float)INTERSECTION_WIDTH_PX) {
-        result.reason |= INTERSECTION_REASON_WIDTH;
+    /* 3. Wide aperture branch check (Y-junctions / diverging splits):
+     * Requires at least 3 vectors, aperture spread > 68 px, AND at least one branch peeling laterally (angle >= 18 deg) */
+    if (raw_num_vectors >= 3) {
+        float min_near_x =  1e9f;
+        float max_near_x = -1e9f;
+        bool has_lateral_peel = false;
+
+        for (size_t i = 0; i < raw_num_vectors; i++) {
+            int dx = (int)raw_vectors[4 * i + 2] - (int)raw_vectors[4 * i + 0];
+            int dy = (int)raw_vectors[4 * i + 3] - (int)raw_vectors[4 * i + 1];
+            int adx = (dx < 0) ? -dx : dx;
+            int ady = (dy < 0) ? -dy : dy;
+
+            if (adx * 3 >= ady && adx >= 10) {
+                has_lateral_peel = true;
+            }
+
+            uint16_t y0 = raw_vectors[4 * i + 1];
+            uint16_t y1 = raw_vectors[4 * i + 3];
+            float near_x = (float)((y0 >= y1) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2]);
+
+            if (near_x < min_near_x) min_near_x = near_x;
+            if (near_x > max_near_x) max_near_x = near_x;
+        }
+
+        if (has_lateral_peel && max_near_x > min_near_x && (max_near_x - min_near_x) > 68.0f) {
+            result.reason |= INTERSECTION_REASON_WIDTH;
+        }
     }
 
-    /* Safe gating:
-     * - Crossing segments, wide aperture, or horizontal crossbar trigger intersection.
-     * - Raw count alone requires >= 4 vectors to prevent 3-vector center dashed lines from false triggering. */
-    if ((result.reason & (INTERSECTION_REASON_CROSSING | INTERSECTION_REASON_WIDTH | INTERSECTION_REASON_HORIZONTAL)) ||
-        (raw_num_vectors >= 4)) {
+    /* An intersection is triggered ONLY if physical crossing, perpendicular crossbar, or diverging branch is confirmed */
+    if (result.reason & (INTERSECTION_REASON_CROSSING | INTERSECTION_REASON_HORIZONTAL | INTERSECTION_REASON_WIDTH)) {
         result.is_intersection = 1;
     }
 

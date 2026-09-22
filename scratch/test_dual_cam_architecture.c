@@ -87,7 +87,7 @@ int main(void)
     assert(fabsf(DEFAULT_K_CTE - 0.50f) < 0.01f);
     assert(fabsf(DEFAULT_K_HEADING - 0.85f) < 0.01f);
     assert(fabsf(DIFFERENTIAL_DEADZONE_DEG - 3.5f) < 0.01f);
-    assert(fabsf(CORNER_HEADING_THRESHOLD_DEG - 12.0f) < 0.01f);
+    assert(fabsf(CORNER_HEADING_THRESHOLD_DEG - 15.0f) < 0.01f);
 
     /* Straightaway response on 5px error:
      * combined = 0.50 * 5.0 = 2.50

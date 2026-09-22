@@ -306,9 +306,9 @@ int main(void) {
             if (sr.found == 0) {
                 desired_state = DRIVE_BRAKING;
             } else {
-                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.50f);
+                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG);
                 if (drive_state == DRIVE_TURNING) {
-                    bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f && lookahead_turn_factor < 0.30f);
+                    bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f);
                     desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
                 } else {
                     desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
@@ -363,13 +363,10 @@ int main(void) {
                 float cte_urgency = (cte_excess > 0.0f) ? (cte_excess / ((float)CTE_URGENCY_PX - 14.0f)) : 0.0f;
                 if (cte_urgency > 1.0f) cte_urgency = 1.0f;
 
+                /* Local Top Camera drives PID urgency:
+                 * Gain scheduling strictly reflects the vehicle's immediate heading & lateral error.
+                 * Front Camera lookahead_turn_factor is reserved for longitudinal speed pre-braking. */
                 float raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
-
-                /* Front camera predictive urgency pre-engagement:
-                 * Allow lookahead to elevate urgency whenever an upcoming turn is previewed (> 0.20f) */
-                if (lookahead_turn_factor > 0.20f && lookahead_turn_factor > raw_corner_urgency) {
-                    raw_corner_urgency = lookahead_turn_factor;
-                }
 
                 if (raw_corner_urgency > trusted_corner_urgency) {
                     if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
@@ -389,15 +386,13 @@ int main(void) {
 
                 /* 2. Decoupled Steering Authority:
                  * Steering servo is 100% driven by Top Camera local PID feedback.
-                 * Flexcomm 2 Front Camera operates strictly for predictive speed profiling & state transitions. */
+                 * Flexcomm 2 Front Camera operates strictly for predictive speed profiling & pre-braking. */
                 float effective_cte = filtered_cte;
                 /* Decisive Turn-In & Apex Protection:
-                 * When the vehicle is negotiating a turn (|filtered_heading| >= 3.5 deg)
-                 * and CTE opposes heading (filtered_cte * filtered_heading < 0), the car is
-                 * approaching the turn from the outside or clipping the inside apex.
-                 * Suppress the opposing CTE (effective_cte = 0.0f) so heading error immediately
-                 * commands authoritative steering into the curve without being cancelled out! */
-                if (filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) >= 3.5f) {
+                 * Only engage when the vehicle is ACTUALLY in a turn (DRIVE_TURNING and |filtered_heading| >= 8.0 deg)
+                 * and CTE opposes heading (filtered_cte * filtered_heading < 0).
+                 * On straightaways, effective_cte is ALWAYS preserved to firmly center the vehicle! */
+                if (drive_state == DRIVE_TURNING && filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) >= 8.0f) {
                     effective_cte = 0.0f;
                 }
                 float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;

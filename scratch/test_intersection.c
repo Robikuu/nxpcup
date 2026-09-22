@@ -52,16 +52,17 @@ int main(void) {
     assert(r4.is_intersection == 1);
     assert(r4.reason & INTERSECTION_REASON_WIDTH);
 
-    /* Case 5: 4+ vectors in intersection zone */
-    uint16_t lane_complex[16] = {
-        10, 50, 10, 10,
-        30, 50, 30, 10,
-        50, 50, 50, 10,
-        70, 50, 70, 10
+    /* Case 5: 4 vectors with crossing (4-way intersection) */
+    uint16_t lane_cross_4way[16] = {
+        14, 50, 14, 10,
+        64, 50, 64, 10,
+        10, 30, 70, 30,
+        10, 20, 70, 20
     };
-    intersection_result_t r5 = detect_intersection(lane_complex, 4);
-    printf("  Case 5 (4+ vectors): is_intersection=%u (reason=0x%02x)\n", r5.is_intersection, r5.reason);
+    intersection_result_t r5 = detect_intersection(lane_cross_4way, 4);
+    printf("  Case 5 (4-way crossing): is_intersection=%u (reason=0x%02x)\n", r5.is_intersection, r5.reason);
     assert(r5.is_intersection == 1);
+    assert(r5.reason & INTERSECTION_REASON_CROSSING);
 
     /* Case 6: Perpendicular horizontal crossing line (T-junction / + cross) */
     // Left boundary (14, 50)-(14, 10), Right boundary (64, 50)-(64, 10), Horizontal bar (15, 25)-(65, 25)
@@ -84,6 +85,17 @@ int main(void) {
     intersection_result_t r7 = detect_intersection(lane_corner, 2);
     printf("  Case 7 (Normal sharp corner): is_intersection=%u (reason=0x%02x)\n", r7.is_intersection, r7.reason);
     assert(r7.is_intersection == 0);
+
+    /* Case 8: Normal sharp corner with 4 piecewise segments (2 left, 2 right, NO crossing) */
+    uint16_t lane_corner_4seg[16] = {
+        15, 50, 25, 30,   // Left lower
+        25, 30, 40, 10,   // Left upper
+        65, 50, 70, 30,   // Right lower
+        70, 30, 78, 10    // Right upper
+    };
+    intersection_result_t r8 = detect_intersection(lane_corner_4seg, 4);
+    printf("  Case 8 (4-segment normal corner): is_intersection=%u (reason=0x%02x)\n", r8.is_intersection, r8.reason);
+    assert(r8.is_intersection == 0); // MUST NEVER FALSE TRIGGER ON 4-SEGMENT CURVE!
 
     printf("  [PASS] All intersection test cases passed!\n");
     return 0;
