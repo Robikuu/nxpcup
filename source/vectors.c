@@ -33,11 +33,39 @@ void reset_steering_tracking(void)
 void vector_filtering(uint16_t *vectors, size_t *num_vectors)
 {
     size_t n = *num_vectors;
-    if (n <= 1) return;
+    if (n == 0) return;
 
-    /* ---- Pre-pass: reject near-horizontal vectors (|dx| > 0.90*|dy|, angle > 42.0 deg)
-     * Rejects 4-way intersection crossing lines and sharp perpendicular branches ---- */
+    /* ---- Pass 1: Chassis exclusion zone filter (Top Camera)
+     * Rejects any vectors originating or terminating on the car's own chassis/wheels/bumper.
+     * Mapped from PixyMon (640x400) X in [200, 450], Y in [360, max]
+     * to Pixy2 frame (79x52) X in [24, 56], Y in [46, 51]. ---- */
     size_t write = 0;
+    for (size_t i = 0; i < n; i++) {
+        uint16_t x0 = vectors[4 * i + 0];
+        uint16_t y0 = vectors[4 * i + 1];
+        uint16_t x1 = vectors[4 * i + 2];
+        uint16_t y1 = vectors[4 * i + 3];
+
+        bool in_zone = ((x0 >= TOP_CAM_EXCLUDE_X_MIN && x0 <= TOP_CAM_EXCLUDE_X_MAX && y0 >= TOP_CAM_EXCLUDE_Y_MIN) ||
+                        (x1 >= TOP_CAM_EXCLUDE_X_MIN && x1 <= TOP_CAM_EXCLUDE_X_MAX && y1 >= TOP_CAM_EXCLUDE_Y_MIN));
+
+        if (!in_zone) {
+            if (write != i) {
+                for (int j = 0; j < 4; j++) {
+                    vectors[4 * write + j] = vectors[4 * i + j];
+                }
+            }
+            write++;
+        }
+    }
+    n = write;
+    *num_vectors = n;
+
+    if (n == 0) return;
+
+    /* ---- Pass 2: reject near-horizontal vectors (|dx| > 0.90*|dy|, angle > 42.0 deg)
+     * Rejects 4-way intersection crossing lines and sharp perpendicular branches ---- */
+    write = 0;
     for (size_t i = 0; i < n; i++) {
         int dx = (int)vectors[4 * i + 2] - (int)vectors[4 * i + 0];
         int dy = (int)vectors[4 * i + 3] - (int)vectors[4 * i + 1];
