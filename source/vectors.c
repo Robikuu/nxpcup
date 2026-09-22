@@ -73,7 +73,7 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
 
     if (n == 0) return;
 
-    /* ---- Pass 2: reject near-horizontal vectors (|dx| > 0.90*|dy|, angle > 42.0 deg)
+    /* ---- Pass 2: reject near-horizontal vectors (|dx| > 0.85*|dy|, angle > 40.3 deg)
      * Rejects 4-way intersection crossing lines and sharp perpendicular branches ---- */
     write = 0;
     for (size_t i = 0; i < n; i++) {
@@ -82,7 +82,7 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
 
-        if (dy > 0 && (dx * 10 <= dy * 9)) {
+        if (dy > 0 && (dx * 20 <= dy * 17)) {
             if (write != i) {
                 for (int j = 0; j < 4; j++) {
                     vectors[4 * write + j] = vectors[4 * i + j];
@@ -668,113 +668,6 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
      * Full 1.0x urgency requires dual-boundary geometric confirmation (found == 2). */
     if (result.found == 1) {
         result.lookahead_urgency *= 0.70f;
-    }
-
-    return result;
-}
-
-/* ------------------------------------------------------------------ */
-/* Intersection Detection & Analysis                                  */
-/* ------------------------------------------------------------------ */
-
-static float cross2(float ox, float oy, float ax, float ay, float bx, float by)
-{
-    return (ax - ox) * (by - oy) - (ay - oy) * (bx - ox);
-}
-
-static bool segments_intersect(float ax0, float ay0, float ax1, float ay1,
-                               float bx0, float by0, float bx1, float by1)
-{
-    float d1 = cross2(bx0, by0, bx1, by1, ax0, ay0);
-    float d2 = cross2(bx0, by0, bx1, by1, ax1, ay1);
-    float d3 = cross2(ax0, ay0, ax1, ay1, bx0, by0);
-    float d4 = cross2(ax0, ay0, ax1, ay1, bx1, by1);
-
-    return (((d1 > 0.0f && d2 < 0.0f) || (d1 < 0.0f && d2 > 0.0f)) &&
-            ((d3 > 0.0f && d4 < 0.0f) || (d3 < 0.0f && d4 > 0.0f)));
-}
-
-intersection_result_t detect_intersection(const uint16_t *raw_vectors, size_t raw_num_vectors)
-{
-    intersection_result_t result;
-    result.is_intersection = 0;
-    result.reason          = 0;
-    result.raw_count       = raw_num_vectors;
-
-    /* An intersection requires at least 2 vectors (a single vector can never be an intersection) */
-    if (raw_num_vectors < 2) {
-        return result;
-    }
-
-    /* 1. Geometric segment crossing check (X-crossings and crossing lines) */
-    for (size_t i = 0; i < raw_num_vectors && !(result.reason & INTERSECTION_REASON_CROSSING); i++) {
-        float ax0 = (float)raw_vectors[4 * i + 0], ay0 = (float)raw_vectors[4 * i + 1];
-        float ax1 = (float)raw_vectors[4 * i + 2], ay1 = (float)raw_vectors[4 * i + 3];
-
-        for (size_t j = i + 1; j < raw_num_vectors; j++) {
-            float bx0 = (float)raw_vectors[4 * j + 0], by0 = (float)raw_vectors[4 * j + 1];
-            float bx1 = (float)raw_vectors[4 * j + 2], by1 = (float)raw_vectors[4 * j + 3];
-
-            if (segments_intersect(ax0, ay0, ax1, ay1, bx0, by0, bx1, by1)) {
-                result.reason |= INTERSECTION_REASON_CROSSING;
-                break;
-            }
-        }
-    }
-
-    /* 2. Horizontal crossbar check:
-     * A perpendicular track crossing line runs horizontally across the lane:
-     * - |dy| <= 8 px (nearly horizontal)
-     * - |dx| >= 30 px (spans at least 30 px across the 50px lane)
-     * - Spans across track center (min_x <= 32 and max_x >= 48) */
-    for (size_t i = 0; i < raw_num_vectors; i++) {
-        int dx = (int)raw_vectors[4 * i + 2] - (int)raw_vectors[4 * i + 0];
-        int dy = (int)raw_vectors[4 * i + 3] - (int)raw_vectors[4 * i + 1];
-        int adx = (dx < 0) ? -dx : dx;
-        int ady = (dy < 0) ? -dy : dy;
-
-        int min_x = (raw_vectors[4 * i + 0] < raw_vectors[4 * i + 2]) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2];
-        int max_x = (raw_vectors[4 * i + 0] > raw_vectors[4 * i + 2]) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2];
-
-        if (ady <= 8 && adx >= 30 && min_x <= 32 && max_x >= 48) {
-            result.reason |= INTERSECTION_REASON_HORIZONTAL;
-            break;
-        }
-    }
-
-    /* 3. Wide aperture branch check (Y-junctions / diverging splits):
-     * Requires at least 3 vectors, aperture spread > 68 px, AND at least one branch peeling laterally (angle >= 18 deg) */
-    if (raw_num_vectors >= 3) {
-        float min_near_x =  1e9f;
-        float max_near_x = -1e9f;
-        bool has_lateral_peel = false;
-
-        for (size_t i = 0; i < raw_num_vectors; i++) {
-            int dx = (int)raw_vectors[4 * i + 2] - (int)raw_vectors[4 * i + 0];
-            int dy = (int)raw_vectors[4 * i + 3] - (int)raw_vectors[4 * i + 1];
-            int adx = (dx < 0) ? -dx : dx;
-            int ady = (dy < 0) ? -dy : dy;
-
-            if (adx * 3 >= ady && adx >= 10) {
-                has_lateral_peel = true;
-            }
-
-            uint16_t y0 = raw_vectors[4 * i + 1];
-            uint16_t y1 = raw_vectors[4 * i + 3];
-            float near_x = (float)((y0 >= y1) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2]);
-
-            if (near_x < min_near_x) min_near_x = near_x;
-            if (near_x > max_near_x) max_near_x = near_x;
-        }
-
-        if (has_lateral_peel && max_near_x > min_near_x && (max_near_x - min_near_x) > 68.0f) {
-            result.reason |= INTERSECTION_REASON_WIDTH;
-        }
-    }
-
-    /* An intersection is triggered ONLY if physical crossing, perpendicular crossbar, or diverging branch is confirmed */
-    if (result.reason & (INTERSECTION_REASON_CROSSING | INTERSECTION_REASON_HORIZONTAL | INTERSECTION_REASON_WIDTH)) {
-        result.is_intersection = 1;
     }
 
     return result;

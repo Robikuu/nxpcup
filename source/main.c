@@ -29,8 +29,7 @@ robot_params_t g_params;
 typedef enum {
     DRIVE_FORWARD,
     DRIVE_TURNING,
-    DRIVE_BRAKING,
-    DRIVE_INTERSECTION
+    DRIVE_BRAKING
 } drive_state_t;
 
 void SysTick_Handler(void) {
@@ -105,8 +104,6 @@ int main(void) {
     uint32_t      state_streak            = 0;
     uint32_t      urgency_streak          = 0;
     float         trusted_corner_urgency  = 0.0f;
-    uint32_t      s_intersection_hold_ticks     = 0;
-    uint32_t      s_intersection_cooldown_ticks = 0;
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -149,8 +146,6 @@ int main(void) {
                 state_streak                  = 0;
                 urgency_streak                = 0;
                 trusted_corner_urgency        = 0.0f;
-                s_intersection_hold_ticks     = 0;
-                s_intersection_cooldown_ticks = 0;
                 if (motor_test_is_active()) {
                     motor_test_tick();
                 } else {
@@ -163,29 +158,19 @@ int main(void) {
             if ((front_cam_phase++ & 1) == 0) {
                 status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
                 if (s_front == kStatus_Success && num_vectors_front > 0) {
-                    /* Check if front camera sees an upcoming intersection */
-                    intersection_result_t ir_front = detect_intersection(vectors_front, num_vectors_front);
-                    if (ir_front.is_intersection) {
-                        /* Crossing track ahead: suppress false corner pre-braking & false heading tilt */
-                        filtered_traj_angle   *= 0.50f;
-                        filtered_traj_offset  *= 0.50f;
-                        lookahead_turn_factor = 0.0f;
-                        memset(&g_traj, 0, sizeof(g_traj));
+                    /* Calculate trajectory of the car ahead from front camera */
+                    g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
+
+                    filtered_traj_angle  = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
+                    filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
+
+                    /* Lookahead urgency for corner speed modulation:
+                     * Fast attack (0.70x) to immediately initiate pre-braking on the straight;
+                     * Smooth decay (0.25x) to maintain stable deceleration through preview jitter. */
+                    if (g_traj.lookahead_urgency > lookahead_turn_factor) {
+                        lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
                     } else {
-                        /* Calculate trajectory of the car ahead from front camera */
-                        g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
-
-                        filtered_traj_angle  = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
-                        filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
-
-                        /* Lookahead urgency for corner speed modulation:
-                         * Fast attack (0.70x) to immediately initiate pre-braking on the straight;
-                         * Smooth decay (0.25x) to maintain stable deceleration through preview jitter. */
-                        if (g_traj.lookahead_urgency > lookahead_turn_factor) {
-                            lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
-                        } else {
-                            lookahead_turn_factor = 0.25f * g_traj.lookahead_urgency + 0.75f * lookahead_turn_factor;
-                        }
+                        lookahead_turn_factor = 0.25f * g_traj.lookahead_urgency + 0.75f * lookahead_turn_factor;
                     }
                 } else {
                     filtered_traj_angle   *= 0.80f;
@@ -195,146 +180,89 @@ int main(void) {
                 }
             }
 
-            /* Active Intersection Dead-Reckoning Navigation */
-            if (drive_state == DRIVE_INTERSECTION) {
-                /* Poll PID camera to consume frame and keep hardware buffer clean */
-                pixy_get_vectors(&cam_pid, vectors_pid, MAX_VECTORS, &num_vectors_pid);
-                line_lost_counter = 0;
-
-                /* Drive straight ahead across crossing to enter upper loop instead of turning into branch */
-                Steer(g_params.steering_offset);
-                float fwd_speed = applied_speed_left > applied_speed_right ? applied_speed_left : applied_speed_right;
-                if (fwd_speed < g_params.speed_outside_corner) {
-                    fwd_speed = g_params.speed_outside_corner;
-                }
-                applied_speed_left  = fwd_speed;
-                applied_speed_right = fwd_speed;
-                steer_cmd           = 0.0f;
-                HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
-
-                /* Throttled telemetry in intersection state */
-                static uint8_t s_inter_div = 0;
-                if (++s_inter_div >= 4) {
-                    s_inter_div = 0;
-                    esp_printf("L:%u/%u R:0 F:0 H:0 TJ:0 S:0 LA:0 ST:I VL:%d VR:%d\r\n",
-                               (unsigned)num_vectors_pid, (unsigned)num_vectors_front,
-                               (int)applied_speed_left, (int)applied_speed_right);
-                }
-
-                if (s_intersection_hold_ticks > 0) {
-                    s_intersection_hold_ticks--;
-                } else {
-                    /* Intersection hold complete: re-engage normal lane tracking */
-                    drive_state                   = DRIVE_FORWARD;
-                    s_intersection_cooldown_ticks = (uint32_t)INTERSECTION_COOLDOWN_TICKS;
-                    reset_pid_state(&steer_pid);
-                    reset_steering_tracking();
-                    filtered_cte           = 0.0f;
-                    cte_filter_init        = 0;
-                    filtered_heading       = 0.0f;
-                    heading_filter_init    = 0;
-                    urgency_streak         = 0;
-                    trusted_corner_urgency = 0.0f;
-                    lookahead_turn_factor  = 0.0f;
-                    memset(&g_traj, 0, sizeof(g_traj));
-                }
-                continue;
-            }
-
             /* PID Camera line tracking (Top/Homography view) */
             status_t s = pixy_get_vectors(&cam_pid, vectors_pid, MAX_VECTORS, &num_vectors_pid);
             if (s != kStatus_Success || num_vectors_pid == 0) {
                 urgency_streak         = 0;
-                trusted_corner_urgency = 0.0f;
-                lookahead_turn_factor  = 0.0f;
-                if (++line_lost_counter > LINE_LOST_LIMIT) {
+                trusted_corner_urgency *= 0.90f;
+                lookahead_turn_factor  *= 0.90f;
+                if (++line_lost_counter <= LINE_LOST_LIMIT) {
+                    /* Dead-reckoning coast through intersection gap without braking */
+                    Steer(g_params.steering_offset);
+                    HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
+                } else {
+                    drive_state = DRIVE_BRAKING;
+                    Steer(g_params.steering_offset);
                     HbridgeBrake(&g_hbridge);
                     reset_steering_tracking();
+                    reset_pid_state(&steer_pid);
+                    static uint8_t s_brake_div = 0;
+                    if (++s_brake_div >= 5) {
+                        s_brake_div = 0;
+                        esp_printf("L:0 ST:B (braking)\r\n");
+                    }
                 }
                 continue;
             }
-            line_lost_counter = 0;
 
-            /* Decrement intersection cooldown timer if active */
-            if (s_intersection_cooldown_ticks > 0) {
-                s_intersection_cooldown_ticks--;
-            } else {
-                /* Raw intersection detection before vector filtering */
-                intersection_result_t ir = detect_intersection(vectors_pid, num_vectors_pid);
-                if (ir.is_intersection) {
-                    drive_state               = DRIVE_INTERSECTION;
-                    s_intersection_hold_ticks = (uint32_t)INTERSECTION_HOLD_TICKS;
-                    esp_printf("INTERSECTION enter reason=0x%02x count=%u\r\n", (unsigned)ir.reason, (unsigned)ir.raw_count);
-
-                    Steer(g_params.steering_offset);
-                    float fwd_speed = applied_speed_left > applied_speed_right ? applied_speed_left : applied_speed_right;
-                    if (fwd_speed < g_params.speed_outside_corner) {
-                        fwd_speed = g_params.speed_outside_corner;
-                    }
-                    applied_speed_left  = fwd_speed;
-                    applied_speed_right = fwd_speed;
-                    steer_cmd           = 0.0f;
-                    HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
-                    continue;
-                }
-            }
-
-            /* Geometric pair validation & filtering on PID camera */
+            /* Geometric pair validation & filtering on PID camera (Pass 2 rejects crossing lines) */
             vector_filtering(vectors_pid, &num_vectors_pid);
 
             /* Error computation with perspective synthesis */
             steering_result_t sr = compute_steering_error(vectors_pid, num_vectors_pid);
 
-            if (sr.found > 0) {
-                if (!heading_filter_init) {
-                    filtered_heading    = sr.heading_deg;
-                    heading_filter_init = 1;
+            if (sr.found == 0) {
+                urgency_streak         = 0;
+                trusted_corner_urgency *= 0.90f;
+                lookahead_turn_factor  *= 0.90f;
+                if (++line_lost_counter <= LINE_LOST_LIMIT) {
+                    /* Dead-reckoning coast through intersection gap without braking */
+                    Steer(g_params.steering_offset);
+                    HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
                 } else {
-                    filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
+                    drive_state = DRIVE_BRAKING;
+                    Steer(g_params.steering_offset);
+                    HbridgeBrake(&g_hbridge);
+                    reset_steering_tracking();
+                    reset_pid_state(&steer_pid);
+                    static uint8_t s_brake_div = 0;
+                    if (++s_brake_div >= 5) {
+                        s_brake_div = 0;
+                        esp_printf("L:0 ST:B (braking)\r\n");
+                    }
                 }
+                continue;
             }
 
-            /* State machine transitions with dual-camera consensus:
+            /* Valid lane lines confirmed: reset line loss tracking */
+            line_lost_counter = 0;
+
+            if (!heading_filter_init) {
+                filtered_heading    = sr.heading_deg;
+                heading_filter_init = 1;
+            } else {
+                filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
+            }
+
+            /* State machine transitions:
              * - DRIVE_TURNING (Corner):
-             *   Triggered either by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG)
-             *   OR by forward lookahead preview of upcoming turn (lookahead_turn_factor >= 0.50f).
+             *   Triggered by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG).
              * - DRIVE_FORWARD (Straight):
              *   Strictly confirmed by TOP CAMERA: local lane is centered (|filtered_heading| <= 6.0 deg
-             *   and |filtered_cte| <= 8.0 px) AND lookahead confirms no immediate curve (lookahead_turn_factor < 0.30f).
+             *   and |filtered_cte| <= 8.0 px).
              *   Hysteresis debounce of STATE_EXIT_STREAK (5 ticks = 100ms) guarantees chatter-free transitions. */
             drive_state_t desired_state;
-            if (sr.found == 0) {
-                desired_state = DRIVE_BRAKING;
+            bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG);
+            if (drive_state == DRIVE_TURNING) {
+                bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f);
+                desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
             } else {
-                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG);
-                if (drive_state == DRIVE_TURNING) {
-                    bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f);
-                    desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
-                } else {
-                    desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
-                }
+                desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
             }
 
             if (desired_state != drive_state) {
-                uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK :
-                                     ((desired_state == DRIVE_BRAKING) ? (uint32_t)LINE_LOST_BRAKE_TICKS : 1U);
+                uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : 1U;
                 if (++state_streak >= threshold) {
-                    if (desired_state == DRIVE_BRAKING) {
-                        reset_pid_state(&steer_pid);
-                        reset_steering_tracking();
-                        filtered_cte            = 0.0f;
-                        cte_filter_init         = 0;
-                        filtered_heading        = 0.0f;
-                        heading_filter_init     = 0;
-                        filtered_traj_angle     = 0.0f;
-                        filtered_traj_offset    = 0.0f;
-                        applied_speed_left      = g_params.speed_straight;
-                        applied_speed_right     = g_params.speed_straight;
-                        urgency_streak          = 0;
-                        trusted_corner_urgency  = 0.0f;
-                        lookahead_turn_factor   = 0.0f;
-                        memset(&g_traj, 0, sizeof(g_traj));
-                    }
                     drive_state  = desired_state;
                     state_streak = 0;
                 }
@@ -342,8 +270,7 @@ int main(void) {
                 state_streak = 0;
             }
 
-            if (sr.found > 0 && drive_state != DRIVE_BRAKING) {
-                /* Cross-track error low-pass filtering */
+            /* Cross-track error low-pass filtering */
                 if (!cte_filter_init) {
                     filtered_cte    = sr.cte;
                     cte_filter_init = 1;
@@ -541,22 +468,9 @@ int main(void) {
                                (int)(filtered_traj_angle * 10.0f),
                                (int)(steer_cmd * 10.0f),
                                (int)(lookahead_turn_factor * 100.0f),
-                               (drive_state == DRIVE_FORWARD) ? "F" : ((drive_state == DRIVE_TURNING) ? "T" : "I"),
+                               (drive_state == DRIVE_FORWARD) ? "F" : "T",
                                (int)applied_speed_left, (int)applied_speed_right);
                 }
-
-            } else if (drive_state == DRIVE_BRAKING) {
-                static uint8_t s_brake_div = 0;
-                if (++s_brake_div >= 5) {
-                    s_brake_div = 0;
-                    esp_printf("L:%u ST:B (braking)\r\n", (unsigned)sr.found);
-                }
-                Steer(g_params.steering_offset);
-                HbridgeBrake(&g_hbridge);
-                applied_speed_left  = g_params.speed_inside_min;
-                applied_speed_right = g_params.speed_inside_min;
-                steer_cmd           = 0.0f;
-            }
         }
     }
 }
