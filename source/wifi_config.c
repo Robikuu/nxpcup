@@ -30,6 +30,8 @@ void params_init(void) {
     g_params.steering_offset     = STEERING_OFFSET;
     g_params.accel_ramp          = ACCEL_RAMP_STEP;
     g_params.decel_ramp          = DECEL_RAMP_STEP;
+    g_params.battery_voltage      = (float)DEFAULT_BATTERY_VOLTAGE;
+    g_params.vbat_scale           = (float)CALIBRATION_BATTERY_VOLTAGE / (float)DEFAULT_BATTERY_VOLTAGE;
     g_params.state               = STATE_IDLE;
 }
 
@@ -161,6 +163,23 @@ static void command_execute(char *cmd) {
     else if (!strcmp(keyword, "steering_offset") && has_val) { g_params.steering_offset = val; send_ack_dbl("steering_offset=", val); }
     else if (!strcmp(keyword, "accel_ramp") && has_val) { g_params.accel_ramp = val; send_ack_dbl("accel_ramp=", val); }
     else if (!strcmp(keyword, "decel_ramp") && has_val) { g_params.decel_ramp = val; send_ack_dbl("decel_ramp=", val); }
+    else if ((!strcmp(keyword, "vbat") || !strcmp(keyword, "battery") || !strcmp(keyword, "voltage")) && has_val) {
+        if (val >= 9.0f && val <= 15.0f) {
+            g_params.battery_voltage = val;
+            g_params.vbat_scale      = (float)CALIBRATION_BATTERY_VOLTAGE / val;
+            if (g_params.vbat_scale > 1.25f) g_params.vbat_scale = 1.25f;
+            if (g_params.vbat_scale < 0.70f) g_params.vbat_scale = 0.70f;
+            send_ack_dbl("battery_voltage=", val);
+        } else {
+            send_ack("ERR invalid battery voltage\r\n");
+        }
+    }
+    else if (!strcmp(keyword, "vbat_scale") && has_val) {
+        if (val >= 0.50f && val <= 1.50f) {
+            g_params.vbat_scale = val;
+            send_ack_dbl("vbat_scale=", val);
+        }
+    }
     else if (!strcmp(keyword, "steer") && has_val) {
         if (g_params.state == STATE_RUNNING) {
             send_ack("ERR steer only in IDLE. Send 'stop;' first.\r\n");
@@ -209,11 +228,13 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "alpha=", g_params.alpha);
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
+        n = append_flt(buf, n, sizeof(buf), "vbat=", g_params.battery_voltage);
+        n = append_flt(buf, n, sizeof(buf), "vscale=", g_params.vbat_scale);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, status\r\n");
+        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, vbat, vbat_scale, status\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

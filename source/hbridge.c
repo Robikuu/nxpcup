@@ -31,6 +31,14 @@ void HbridgeInit(Hbridge *h,
 
 void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right)
 {
+    /* Battery Voltage Compensation:
+     * Scales commanded duty cycle so motors receive identical effective voltage
+     * regardless of whether battery is at 12.6V (fully charged) or 11.9V (nominal tuning baseline). */
+    if (g_params.vbat_scale > 0.01f && g_params.vbat_scale < 2.0f) {
+        speed_left  = (int16_t)roundf((float)speed_left  * g_params.vbat_scale);
+        speed_right = (int16_t)roundf((float)speed_right * g_params.vbat_scale);
+    }
+
     /* Clamp to -100..+100 */
     if (speed_left >  100) speed_left =  100;
     if (speed_left < -100) speed_left = -100;

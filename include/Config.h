@@ -38,6 +38,10 @@
 #define DECEL_RAMP_STEP              22.0f     // Rapid pre-braking ramp (~50ms from 100% to 78%)
 #define ACCEL_RAMP_STEP              16.0f     // Progressive corner exit acceleration (~120ms to 100%, maintains front tire grip)
 
+// ---- Battery Voltage Compensation ----
+#define CALIBRATION_BATTERY_VOLTAGE  11.9f     // Nominal tuning reference voltage (V) where car was calibrated
+#define DEFAULT_BATTERY_VOLTAGE      12.6f     // Current charged battery voltage (V)
+
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
 #define REVERSAL_DECEL_STEP          18.0f     // Rapidly locks new inside wheel into pivot drag
@@ -107,6 +111,8 @@ typedef struct {
     float dt;
     float accel_ramp;
     float decel_ramp;
+    float battery_voltage;
+    float vbat_scale;
     uint8_t state;
 } robot_params_t;
 
