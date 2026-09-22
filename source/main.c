@@ -209,12 +209,25 @@ int main(void) {
                 }
             }
 
-            /* State machine transitions with hysteresis */
+            /* State machine transitions with dual-camera consensus:
+             * - DRIVE_TURNING (Corner):
+             *   Triggered either by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG)
+             *   OR by forward lookahead preview of upcoming turn (lookahead_turn_factor >= 0.45f).
+             * - DRIVE_FORWARD (Straight):
+             *   Strictly confirmed by TOP CAMERA: local lane is centered (|filtered_heading| <= 10.0 deg
+             *   and |filtered_cte| <= 10.0 px) AND lookahead confirms no immediate curve (lookahead_turn_factor < 0.35f).
+             *   Hysteresis debounce of STATE_EXIT_STREAK (5 ticks = 100ms) guarantees chatter-free transitions. */
             drive_state_t desired_state;
             if (sr.found == 0) {
                 desired_state = DRIVE_BRAKING;
             } else {
-                desired_state = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.45f) ? DRIVE_TURNING : DRIVE_FORWARD;
+                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.45f);
+                if (drive_state == DRIVE_TURNING) {
+                    bool straight_confirmed = (fabsf(filtered_heading) <= 10.0f && fabsf(filtered_cte) <= 10.0f && lookahead_turn_factor < 0.35f);
+                    desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+                } else {
+                    desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
+                }
             }
 
             if (desired_state != drive_state) {
@@ -288,9 +301,9 @@ int main(void) {
                 steer_pid.kd    = g_params.kd_straight + trusted_corner_urgency * (g_params.kd_corner - g_params.kd_straight);
                 steer_pid.alpha = g_params.alpha;
 
-                /* 2. Dual-Camera Steering:
-                 *    - Feedback PID from Flexcomm 3 Top/Homography Camera (local CTE + local heading error)
-                 *    - Feedforward Trajectory Preview from Flexcomm 2 Front Camera (upcoming path angle & offset) */
+                /* 2. Decoupled Steering Authority:
+                 * Steering servo is 100% driven by Top Camera local PID feedback.
+                 * Flexcomm 2 Front Camera operates strictly for predictive speed profiling & state transitions. */
                 float effective_cte = filtered_cte;
                 /* Apex Protection: In a corner (|filtered_heading| > 10.0 deg),
                  * if CTE opposes heading (filtered_cte * filtered_heading < 0), the vehicle
@@ -302,34 +315,7 @@ int main(void) {
                 float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
-                float trajectory_steer = 0.0f;
-                /* Continuous trajectory steer authority:
-                 * On straights (trusted_corner_urgency <= 0.25f), trajectory_steer is strictly 0.0f,
-                 * completely eliminating any front-camera steering disturbances on straights!
-                 * As corner urgency rises (> 0.25f), trajectory_steer smoothly blends in. */
-                if (g_traj.found > 0 && trusted_corner_urgency > 0.25f) {
-                    float traj_blend = (trusted_corner_urgency - 0.25f) / 0.75f;
-                    trajectory_steer = traj_blend * 0.50f * (0.45f * filtered_traj_angle + 0.20f * filtered_traj_offset);
-
-                    /* Trajectory preview directional conflict guard:
-                     * Feedforward preview must never contradict the local pose feedback controller!
-                     * If feedback_steer is actively turning one way, preview cannot push the opposite way. */
-                    if (feedback_steer * trajectory_steer < 0.0f) {
-                        trajectory_steer = 0.0f;
-                    }
-
-                    /* Trajectory preview safety clamp:
-                     * If the car is already significantly off-center (|CTE| > 8px),
-                     * never allow trajectory preview to steer further in the direction of the error!
-                     * (e.g. if CTE < -8px [wide to the right], trajectory_steer must not push right > 0) */
-                    if (filtered_cte < -8.0f && trajectory_steer > 0.0f) {
-                        trajectory_steer = 0.0f;
-                    } else if (filtered_cte > 8.0f && trajectory_steer < 0.0f) {
-                        trajectory_steer = 0.0f;
-                    }
-                }
-
-                steer_cmd = feedback_steer + trajectory_steer;
+                steer_cmd = feedback_steer;
 
                 /* Clamp to relative command travel: [-87.0f, +70.0f] */
                 if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) {

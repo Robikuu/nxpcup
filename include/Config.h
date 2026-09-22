@@ -51,17 +51,24 @@
 #define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full corner intensity scaling
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
+// ---- Forward Camera Horizon & Track Floor Gating ----
+// Pixy2 frame height is 52px (Y=0 is top horizon/sky, Y=51 is bottom ground).
+// Discard upper quarter (Y < 13) to eliminate background ceiling/walls/room clutter.
+// Require candidate vectors to anchor on the track floor (Y_near >= 24).
+#define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view
+#define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
+
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    1.90f     // Crisp cornering authority without tire scrub / understeer
-#define KP_STRAIGHT                  0.30f     // Calm straight-line tracking authority to eliminate weaving (user verified)
-#define KD_CORNER                    0.180f    // Counter-steer damping in corners without derivative kick oscillation
-#define KD_STRAIGHT                  0.220f    // Strong derivative damping to lock high-speed straightaway tracking
+#define KP_CORNER                    1.45f     // Crisp cornering authority without tire scrub / understeer
+#define KP_STRAIGHT                  0.50f     // Firm straight-line tracking authority to eliminate wandering
+#define KD_CORNER                    0.080f    // Fast transient apex settling without counter-steer pushback
+#define KD_STRAIGHT                  0.120f    // Calibrated derivative damping for straightaways
 #define DEFAULT_KI                   0.0f
-#define DEFAULT_ALPHA                0.3f
+#define DEFAULT_ALPHA                0.35f     // Low-pass filter coefficient on derivative term
 
 // ---- Error Weights ----
-#define DEFAULT_K_CTE                0.35f     // Calibrated CTE weight for gentle straight centering without overpowering heading
-#define DEFAULT_K_HEADING            0.55f     // Calibrated heading weight for smooth, non-plowing corner tracking
+#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight for straight centering
+#define DEFAULT_K_HEADING            0.60f     // Calibrated heading weight for anticipatory turn-in
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

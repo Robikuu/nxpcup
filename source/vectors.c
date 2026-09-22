@@ -381,29 +381,69 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     if (num_vectors == 0) return result;
 
-    /* Orient each vector from near (yn >= yf, higher y is closer to bumper) to far (yf, horizon) */
-    size_t count = (num_vectors > (size_t)MAX_FILTER_VECTORS) ? (size_t)MAX_FILTER_VECTORS : num_vectors;
+    /* Orient each vector from near (yn >= yf, higher y is closer to bumper) to far (yf, horizon)
+     * and filter out room background clutter (upper quarter Y < 13 and ungrounded vectors Ynear < 24) */
+    size_t max_in = (num_vectors > (size_t)MAX_FILTER_VECTORS) ? (size_t)MAX_FILTER_VECTORS : num_vectors;
+    size_t count = 0;
     float nx[MAX_FILTER_VECTORS], ny[MAX_FILTER_VECTORS], fx[MAX_FILTER_VECTORS], fy[MAX_FILTER_VECTORS];
     float vdx[MAX_FILTER_VECTORS], vdy[MAX_FILTER_VECTORS], len_sq[MAX_FILTER_VECTORS], heading[MAX_FILTER_VECTORS];
 
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < max_in; i++) {
         float x0 = (float)vectors[4 * i];
         float y0 = (float)vectors[4 * i + 1];
         float x1 = (float)vectors[4 * i + 2];
         float y1 = (float)vectors[4 * i + 3];
 
+        float n_x, n_y, f_x, f_y;
         if (y0 >= y1) {
-            nx[i] = x0;  ny[i] = y0;  fx[i] = x1;  fy[i] = y1;
+            n_x = x0;  n_y = y0;  f_x = x1;  f_y = y1;
         } else {
-            nx[i] = x1;  ny[i] = y1;  fx[i] = x0;  fy[i] = y0;
+            n_x = x1;  n_y = y1;  f_x = x0;  f_y = y0;
         }
-        float dx = fx[i] - nx[i];
-        float dy = ny[i] - fy[i];
-        vdx[i] = dx;
-        vdy[i] = dy;
-        len_sq[i] = dx * dx + dy * dy;
-        heading[i] = (dy > 1.0f) ? (atan2f(dx, dy) * (180.0f / (float)M_PI)) : 0.0f;
+
+        /* 1. Upper quarter horizon discard:
+         * If both endpoints are in the upper quarter (y < 13), it's background walls / ceiling / chairs */
+        if (n_y < (float)FORWARD_CAM_HORIZON_Y_MIN && f_y < (float)FORWARD_CAM_HORIZON_Y_MIN) {
+            continue;
+        }
+
+        /* 2. Track floor connection gate:
+         * Candidate lookahead vectors must have their base anchored on the track floor (n_y >= 24).
+         * Rejects floating background furniture that does not connect to the track floor near the vehicle */
+        if (n_y < (float)FORWARD_CAM_FLOOR_Y_MIN) {
+            continue;
+        }
+
+        /* 3. Clip far endpoint if it extends into the upper quarter room ceiling */
+        if (f_y < (float)FORWARD_CAM_HORIZON_Y_MIN) {
+            float total_dy = n_y - f_y;
+            if (total_dy > 0.5f) {
+                float t = (n_y - (float)FORWARD_CAM_HORIZON_Y_MIN) / total_dy;
+                f_x = n_x + t * (f_x - n_x);
+            }
+            f_y = (float)FORWARD_CAM_HORIZON_Y_MIN;
+        }
+
+        float dx = f_x - n_x;
+        float dy = n_y - f_y;
+
+        /* Reject vectors pointing near-horizontal or backwards (dy < 6.0px) */
+        if (dy < 6.0f) {
+            continue;
+        }
+
+        nx[count] = n_x;
+        ny[count] = n_y;
+        fx[count] = f_x;
+        fy[count] = f_y;
+        vdx[count] = dx;
+        vdy[count] = dy;
+        len_sq[count] = dx * dx + dy * dy;
+        heading[count] = (dy > 1.0f) ? (atan2f(dx, dy) * (180.0f / (float)M_PI)) : 0.0f;
+        count++;
     }
+
+    if (count == 0) return result;
 
     /* 1. Search for a valid Left + Right boundary pair */
     int best_l = -1;
@@ -411,12 +451,8 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     float best_pair_score = -99999.0f;
 
     for (size_t i = 0; i < count; i++) {
-        /* Vector must point forward (dy >= 6px) to reject horizontal/crossing artifacts */
-        if (vdy[i] < 6.0f) continue;
-
         for (size_t j = 0; j < count; j++) {
             if (i == j) continue;
-            if (vdy[j] < 6.0f) continue;
 
             /* i must be strictly left of j at near end */
             if (nx[i] >= nx[j]) continue;
