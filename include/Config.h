@@ -61,10 +61,10 @@
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
 #define KP_CORNER                    1.75f     // Crisp cornering authority without tire scrub / understeer
 #define KP_STRAIGHT                  0.50f     // Firm straight-line tracking authority to eliminate wandering
-#define KD_CORNER                    0.050f    // Fast transient apex settling without counter-steer pushback
+#define KD_CORNER                    0.025f    // Calm counter-steer settling without derivative kick inversion
 #define KD_STRAIGHT                  0.120f    // Calibrated derivative damping for straightaways
 #define DEFAULT_KI                   0.0f
-#define DEFAULT_ALPHA                0.35f     // Low-pass filter coefficient on derivative term
+#define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
 
 // ---- Error Weights ----
 #define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight for straight centering

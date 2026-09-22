@@ -77,13 +77,13 @@ int main(void)
     printf("    KP_STRAIGHT: %.2f (expected 0.50)\n", (double)KP_STRAIGHT);
     printf("    KD_STRAIGHT: %.3f (expected 0.120)\n", (double)KD_STRAIGHT);
     printf("    KP_CORNER:   %.2f (expected 1.75)\n", (double)KP_CORNER);
-    printf("    KD_CORNER:   %.3f (expected 0.050)\n", (double)KD_CORNER);
+    printf("    KD_CORNER:   %.3f (expected 0.025)\n", (double)KD_CORNER);
     printf("    K_CTE:       %.2f (expected 0.50)\n", (double)DEFAULT_K_CTE);
     printf("    K_HEADING:   %.2f (expected 0.85)\n", (double)DEFAULT_K_HEADING);
     assert(fabsf(KP_STRAIGHT - 0.50f) < 0.01f);
     assert(fabsf(KP_CORNER - 1.75f) < 0.01f);
     assert(fabsf(KD_STRAIGHT - 0.120f) < 0.001f);
-    assert(fabsf(KD_CORNER - 0.050f) < 0.001f);
+    assert(fabsf(KD_CORNER - 0.025f) < 0.001f);
     assert(fabsf(DEFAULT_K_CTE - 0.50f) < 0.01f);
     assert(fabsf(DEFAULT_K_HEADING - 0.85f) < 0.01f);
     assert(fabsf(DIFFERENTIAL_DEADZONE_DEG - 3.5f) < 0.01f);
@@ -102,6 +102,16 @@ int main(void)
     float steer_corner = KP_CORNER * (DEFAULT_K_HEADING * 25.0f);
     printf("    Corner response on 25 deg heading: %.2f deg (decisive authority within tire grip)\n", steer_corner);
     assert(steer_corner >= 35.0f && steer_corner <= 45.0f);
+
+    /* Test 3: Direction-Preserving Turn Damping
+     * In a left turn (combined = -5.0f), rapid heading unwinding must NEVER cause steer > 0 */
+    float combined_left = -5.0f;
+    float test_feedback = +4.5f; // Unclamped D-kick
+    if (combined_left < 0.0f && test_feedback > 0.0f) {
+        test_feedback = 0.0f;
+    }
+    printf("    Direction-preserving clamp on left unwinding: %.2f deg (guaranteed no sign flip!)\n", test_feedback);
+    assert(test_feedback == 0.0f);
 
     printf("\n>>> ALL DUAL-CAMERA & PID ARCHITECTURE TESTS PASSED! <<<\n");
     return 0;

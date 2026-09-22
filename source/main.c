@@ -267,10 +267,10 @@ int main(void) {
                 }
 
                 /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency (Decoupled from Wheel Drag)
-                 * Deadband of 8.0 deg on heading: normal straightaway chassis yaw flutter (<= 8 deg)
+                 * Deadband of 4.0 deg on heading: normal straightaway chassis yaw flutter (<= 4 deg)
                  * MUST NOT elevate urgency or trigger corner gains. */
-                float dz_heading_urgency = fabsf(filtered_heading) - 8.0f;
-                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 8.0f)) : 0.0f;
+                float dz_heading_urgency = fabsf(filtered_heading) - 4.0f;
+                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 4.0f)) : 0.0f;
                 if (heading_urgency > 1.0f) heading_urgency = 1.0f;
 
                 /* Only let CTE drive corner urgency if heading is turning or CTE enters the outer lane band (>14px) */
@@ -281,8 +281,8 @@ int main(void) {
                 float raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
 
                 /* Front camera predictive urgency pre-engagement:
-                 * Only allow lookahead to elevate urgency if a genuine upcoming turn is detected (> 0.35f) */
-                if (lookahead_turn_factor > 0.35f && lookahead_turn_factor > raw_corner_urgency) {
+                 * Allow lookahead to elevate urgency whenever an upcoming turn is previewed (> 0.20f) */
+                if (lookahead_turn_factor > 0.20f && lookahead_turn_factor > raw_corner_urgency) {
                     raw_corner_urgency = lookahead_turn_factor;
                 }
 
@@ -292,7 +292,8 @@ int main(void) {
                         urgency_streak = 0;
                     }
                 } else {
-                    trusted_corner_urgency = raw_corner_urgency;
+                    /* Smooth urgency decay: prevents mid-corner dropouts and throttle surges */
+                    trusted_corner_urgency = 0.10f * raw_corner_urgency + 0.90f * trusted_corner_urgency;
                     urgency_streak = 0;
                 }
 
@@ -316,6 +317,16 @@ int main(void) {
                 }
                 float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+
+                /* Direction-Preserving Turn Damping:
+                 * Derivative counter-steer damping must smooth corner exit without reversing steering sign!
+                 * If combined < 0 (left turn), feedback_steer must never cross zero to steer right into outside wall.
+                 * If combined > 0 (right turn), feedback_steer must never cross zero to steer left into outside wall. */
+                if (combined < 0.0f && feedback_steer > 0.0f) {
+                    feedback_steer = 0.0f;
+                } else if (combined > 0.0f && feedback_steer < 0.0f) {
+                    feedback_steer = 0.0f;
+                }
 
                 steer_cmd = feedback_steer;
 
@@ -367,15 +378,11 @@ int main(void) {
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
 
                 /* Continuous differential drag authority:
-                 * On straights (trusted_corner_urgency <= 0.20f), differential drag is strictly 0.0f
-                 * ensuring both rear wheels provide 100% symmetric, straight-line drive with zero yaw kicks;
-                 * Only as corner urgency rises (> 0.20f), differential drag smoothly engages (up to 1.0x)
-                 * to pivot the vehicle sharply through the turn. */
-                float diff_scale = 0.0f;
-                if (trusted_corner_urgency > 0.20f) {
-                    diff_scale = (trusted_corner_urgency - 0.20f) / 0.80f;
-                }
-                float active_steer_norm = steer_norm * diff_scale;
+                 * Directly driven by active steering angle beyond the straightaway deadzone (3.5 deg).
+                 * When the wheels turn, the inside wheel drags to pivot the chassis.
+                 * On straightaways (|steer_cmd| <= 3.5 deg), steer_norm is strictly 0.0f,
+                 * guaranteeing 100% symmetric push with zero yaw kick. */
+                float active_steer_norm = steer_norm;
 
                 /* B. Lateral Differential Drag: strictly driven by active physical steering */
                 float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
