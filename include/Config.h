@@ -78,6 +78,12 @@
 #define STATE_ENTER_STREAK           1         // Immediate transition into DRIVE_TURNING (20ms response)
 #define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              5
+
+// ---- Intersection Detection & Dead-Reckoning Navigation ----
+#define INTERSECTION_MIN_VECTORS     3         // Vector count threshold for multi-branch check
+#define INTERSECTION_WIDTH_PX        70.0f     // Near-X spread indicating wide fork / branch (px)
+#define INTERSECTION_HOLD_TICKS      10U       // 200ms dead-reckoning window @ 50Hz (ticks)
+#define INTERSECTION_COOLDOWN_TICKS  25U       // 500ms re-trigger guard after exit @ 50Hz (ticks)
 #define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
 
 // ---- Geometric Boundary Validation ----

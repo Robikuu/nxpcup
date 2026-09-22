@@ -63,6 +63,28 @@ int main(void) {
     printf("  Case 5 (4+ vectors): is_intersection=%u (reason=0x%02x)\n", r5.is_intersection, r5.reason);
     assert(r5.is_intersection == 1);
 
+    /* Case 6: Perpendicular horizontal crossing line (T-junction / + cross) */
+    // Left boundary (14, 50)-(14, 10), Right boundary (64, 50)-(64, 10), Horizontal bar (15, 25)-(65, 25)
+    uint16_t lane_crossbar[12] = {
+        14, 50, 14, 10,
+        64, 50, 64, 10,
+        15, 25, 65, 25
+    };
+    intersection_result_t r6 = detect_intersection(lane_crossbar, 3);
+    printf("  Case 6 (Perpendicular crossbar): is_intersection=%u (reason=0x%02x)\n", r6.is_intersection, r6.reason);
+    assert(r6.is_intersection == 1);
+    assert(r6.reason & INTERSECTION_REASON_HORIZONTAL);
+
+    /* Case 7: Normal sharp corner (2 curved vectors, no crossing, spread ~48px) */
+    // Left boundary (18, 50)-(35, 15), Right boundary (66, 50)-(75, 15)
+    uint16_t lane_corner[8] = {
+        18, 50, 35, 15,
+        66, 50, 75, 15
+    };
+    intersection_result_t r7 = detect_intersection(lane_corner, 2);
+    printf("  Case 7 (Normal sharp corner): is_intersection=%u (reason=0x%02x)\n", r7.is_intersection, r7.reason);
+    assert(r7.is_intersection == 0);
+
     printf("  [PASS] All intersection test cases passed!\n");
     return 0;
 }

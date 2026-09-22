@@ -662,3 +662,99 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     return result;
 }
+
+/* ------------------------------------------------------------------ */
+/* Intersection Detection & Analysis                                  */
+/* ------------------------------------------------------------------ */
+
+static float cross2(float ox, float oy, float ax, float ay, float bx, float by)
+{
+    return (ax - ox) * (by - oy) - (ay - oy) * (bx - ox);
+}
+
+static bool segments_intersect(float ax0, float ay0, float ax1, float ay1,
+                               float bx0, float by0, float bx1, float by1)
+{
+    float d1 = cross2(bx0, by0, bx1, by1, ax0, ay0);
+    float d2 = cross2(bx0, by0, bx1, by1, ax1, ay1);
+    float d3 = cross2(ax0, ay0, ax1, ay1, bx0, by0);
+    float d4 = cross2(ax0, ay0, ax1, ay1, bx1, by1);
+
+    return (((d1 > 0.0f && d2 < 0.0f) || (d1 < 0.0f && d2 > 0.0f)) &&
+            ((d3 > 0.0f && d4 < 0.0f) || (d3 < 0.0f && d4 > 0.0f)));
+}
+
+intersection_result_t detect_intersection(const uint16_t *raw_vectors, size_t raw_num_vectors)
+{
+    intersection_result_t result;
+    result.is_intersection = 0;
+    result.reason          = 0;
+    result.raw_count       = raw_num_vectors;
+
+    if (raw_num_vectors == 0) {
+        return result;
+    }
+
+    if (raw_num_vectors >= (size_t)INTERSECTION_MIN_VECTORS) {
+        result.reason |= INTERSECTION_REASON_COUNT;
+    }
+
+    /* 1. Geometric segment crossing check */
+    for (size_t i = 0; i < raw_num_vectors && !(result.reason & INTERSECTION_REASON_CROSSING); i++) {
+        float ax0 = (float)raw_vectors[4 * i + 0], ay0 = (float)raw_vectors[4 * i + 1];
+        float ax1 = (float)raw_vectors[4 * i + 2], ay1 = (float)raw_vectors[4 * i + 3];
+
+        for (size_t j = i + 1; j < raw_num_vectors; j++) {
+            float bx0 = (float)raw_vectors[4 * j + 0], by0 = (float)raw_vectors[4 * j + 1];
+            float bx1 = (float)raw_vectors[4 * j + 2], by1 = (float)raw_vectors[4 * j + 3];
+
+            if (segments_intersect(ax0, ay0, ax1, ay1, bx0, by0, bx1, by1)) {
+                result.reason |= INTERSECTION_REASON_CROSSING;
+                break;
+            }
+        }
+    }
+
+    /* 2. Wide aperture near-x spread check & Horizontal crossbar check */
+    float min_near_x =  1e9f;
+    float max_near_x = -1e9f;
+
+    for (size_t i = 0; i < raw_num_vectors; i++) {
+        int dx = (int)raw_vectors[4 * i + 2] - (int)raw_vectors[4 * i + 0];
+        int dy = (int)raw_vectors[4 * i + 3] - (int)raw_vectors[4 * i + 1];
+        int adx = (dx < 0) ? -dx : dx;
+        int ady = (dy < 0) ? -dy : dy;
+        int len_sq = dx * dx + dy * dy;
+
+        /* Check for horizontal crossbar (|dx| >= 1.2 * |dy| and len >= 25 px) */
+        if (adx * 10 >= ady * 12 && len_sq >= (25 * 25)) {
+            result.reason |= INTERSECTION_REASON_HORIZONTAL;
+        }
+
+        /* Ignore predominantly horizontal lines when computing longitudinal track width */
+        if (ady == 0 || adx > 2 * ady) {
+            continue;
+        }
+
+        uint16_t y0 = raw_vectors[4 * i + 1];
+        uint16_t y1 = raw_vectors[4 * i + 3];
+        float near_x = (float)((y0 >= y1) ? raw_vectors[4 * i + 0] : raw_vectors[4 * i + 2]);
+
+        if (near_x < min_near_x) min_near_x = near_x;
+        if (near_x > max_near_x) max_near_x = near_x;
+    }
+
+    if (max_near_x > min_near_x && (max_near_x - min_near_x) > (float)INTERSECTION_WIDTH_PX) {
+        result.reason |= INTERSECTION_REASON_WIDTH;
+    }
+
+    /* Safe gating:
+     * - Crossing segments, wide aperture, or horizontal crossbar trigger intersection.
+     * - Raw count alone requires >= 4 vectors to prevent 3-vector center dashed lines from false triggering. */
+    if ((result.reason & (INTERSECTION_REASON_CROSSING | INTERSECTION_REASON_WIDTH | INTERSECTION_REASON_HORIZONTAL)) ||
+        (raw_num_vectors >= 4)) {
+        result.is_intersection = 1;
+    }
+
+    return result;
+}
