@@ -69,6 +69,7 @@ typedef struct {
     float last_steer_cmd;
     drive_state_t drive_state;
     uint32_t state_streak;
+    int8_t streak_sign;
     uint32_t urgency_streak;
     float trusted_corner_urgency;
     uint32_t line_lost_counter;
@@ -80,6 +81,7 @@ void sim_init(sim_context_t *ctx) {
     ctx->applied_speed_left = g_params.speed_straight;
     ctx->applied_speed_right = g_params.speed_straight;
     ctx->drive_state = DRIVE_FORWARD;
+    ctx->streak_sign = 0;
 }
 
 sim_tick_result_t sim_step(sim_context_t *ctx,
@@ -153,13 +155,22 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     }
 
     if (desired_state != ctx->drive_state) {
-        uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : 1U;
+        if (ctx->drive_state == DRIVE_FORWARD) {
+            /* Chicane / flick protection: ensure curve direction is sustained in ONE direction */
+            int8_t current_sign = (ctx->filtered_heading >= 0.0f) ? 1 : -1;
+            if (current_sign != ctx->streak_sign) {
+                ctx->streak_sign = current_sign;
+                ctx->state_streak = 0;
+            }
+        }
+        uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : (uint32_t)STATE_ENTER_STREAK;
         if (++ctx->state_streak >= threshold) {
             ctx->drive_state = desired_state;
             ctx->state_streak = 0;
         }
     } else {
         ctx->state_streak = 0;
+        ctx->streak_sign  = 0;
     }
 
     /* 5. Dynamic Gain Scheduling */
@@ -230,11 +241,11 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     } else if (steer_diff < -max_steer_step) {
         raw_steer = ctx->last_steer_cmd - max_steer_step;
     }
-    ctx->last_steer_cmd = raw_steer;
     float steer_cmd = raw_steer;
 
     if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
     if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
+    ctx->last_steer_cmd = steer_cmd;
 
     /* 7. Longitudinal Speeds & Differential Drag */
     float abs_steer = fabsf(steer_cmd);
@@ -253,9 +264,13 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     if (front_found >= 1 && ctx->lookahead_turn_factor > effective_corner_intensity) {
         effective_corner_intensity = ctx->lookahead_turn_factor;
     }
-    float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+    float longitudinal_base = g_params.speed_straight;
+    float active_steer_norm = 0.0f;
+    if (ctx->drive_state == DRIVE_TURNING) {
+        longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+        active_steer_norm = steer_norm;
+    }
 
-    float active_steer_norm = steer_norm;
     float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
     float target_outside = longitudinal_base;
     float target_inside  = longitudinal_base - diff_delta;
@@ -409,36 +424,70 @@ int main(void)
     /* ----------------------------------------------------------------- */
     /* TEST 3: Chicane / Rapid Direction Reversal (S-Curve)               */
     /* ----------------------------------------------------------------- */
-    printf(">>> TEST 3: S-Curve Chicane Direction Reversal (-35 deg -> +35 deg)\n");
+    printf(">>> TEST 3: S-Curve Chicane (Flick in DRIVE_FORWARD @ 100%% Speed & Sustained Turn)\n");
     sim_context_t ctx3;
     sim_init(&ctx3);
 
-    /* 20 ticks hard left turn */
-    for (int i = 0; i < 20; i++) {
-        sim_step(&ctx3, -12.0f, -28.0f, -30.0f, 0.8f, 2, 2);
+    /* Part 1: Rapid chicane flick (3 ticks left, then 3 ticks right) */
+    sim_tick_result_t r_flick_left;
+    for (int i = 0; i < 3; i++) {
+        r_flick_left = sim_step(&ctx3, -12.0f, -28.0f, -30.0f, 0.8f, 2, 2);
     }
-    printf("  Chicane Part 1 (Left Turn): Steer = %+.2f deg, VL = %.0f, VR = %.0f\n",
-           ctx3.last_steer_cmd, ctx3.applied_speed_left, ctx3.applied_speed_right);
-    assert(ctx3.last_steer_cmd < -30.0f);
-    assert(ctx3.applied_speed_left < ctx3.applied_speed_right); /* Left wheel dragged */
+    printf("  Chicane Part 1 (3-tick Left Flick):  Steer = %+.2f deg, VL = %.0f, VR = %.0f, State = %s\n",
+           r_flick_left.steer_cmd, r_flick_left.applied_speed_left, r_flick_left.applied_speed_right,
+           r_flick_left.drive_state == DRIVE_FORWARD ? "DRIVE_FORWARD" : "DRIVE_TURNING");
+    assert(r_flick_left.drive_state == DRIVE_FORWARD);
+    assert(r_flick_left.applied_speed_left >= 98.0f && r_flick_left.applied_speed_right >= 98.0f);
+    assert(r_flick_left.steer_cmd < -35.0f);
 
-    /* Abrupt reversal to hard right turn */
+    /* Flick right (3 ticks right): sign reverses, state_streak resets, staying in DRIVE_FORWARD */
+    sim_tick_result_t r_flick_right;
     float max_slew_seen = 0.0f;
-    float prev_steer = ctx3.last_steer_cmd;
-    for (int i = 0; i < 15; i++) {
-        sim_tick_result_t r = sim_step(&ctx3, +12.0f, +28.0f, +30.0f, 0.8f, 2, 2);
-        float slew = fabsf(r.steer_cmd - prev_steer);
+    float prev_steer = r_flick_left.steer_cmd;
+    for (int i = 0; i < 3; i++) {
+        r_flick_right = sim_step(&ctx3, +12.0f, +28.0f, +30.0f, 0.8f, 2, 2);
+        float slew = fabsf(r_flick_right.steer_cmd - prev_steer);
         if (slew > max_slew_seen) max_slew_seen = slew;
-        prev_steer = r.steer_cmd;
+        prev_steer = r_flick_right.steer_cmd;
     }
-    printf("  Chicane Part 2 (Reversed to Right): Steer = %+.2f deg, VL = %.0f, VR = %.0f\n",
-           ctx3.last_steer_cmd, ctx3.applied_speed_left, ctx3.applied_speed_right);
-    printf("  Max slew step seen during snap reversal: %.2f deg/tick (max limit: %.2f deg/tick)\n",
+    printf("  Chicane Part 2 (3-tick Right Flick): Steer = %+.2f deg, VL = %.0f, VR = %.0f, State = %s\n",
+           r_flick_right.steer_cmd, r_flick_right.applied_speed_left, r_flick_right.applied_speed_right,
+           r_flick_right.drive_state == DRIVE_FORWARD ? "DRIVE_FORWARD" : "DRIVE_TURNING");
+    assert(r_flick_right.drive_state == DRIVE_FORWARD);
+    assert(r_flick_right.applied_speed_left >= 98.0f && r_flick_right.applied_speed_right >= 98.0f);
+    assert(r_flick_right.steer_cmd > r_flick_left.steer_cmd); /* Reversing aggressively toward right */
+
+    /* Part 2: Sustained corner (continue right turn for 4 more ticks to exceed STATE_ENTER_STREAK) */
+    sim_tick_result_t r_sustained;
+    for (int i = 0; i < 4; i++) {
+        r_sustained = sim_step(&ctx3, +12.0f, +28.0f, +30.0f, 0.8f, 2, 2);
+        float slew = fabsf(r_sustained.steer_cmd - prev_steer);
+        if (slew > max_slew_seen) max_slew_seen = slew;
+        prev_steer = r_sustained.steer_cmd;
+    }
+    printf("  Sustained Corner (Confirmed >4 ticks): Steer = %+.2f deg, VL = %.0f, VR = %.0f, State = %s\n",
+           r_sustained.steer_cmd, r_sustained.applied_speed_left, r_sustained.applied_speed_right,
+           r_sustained.drive_state == DRIVE_FORWARD ? "DRIVE_FORWARD" : "DRIVE_TURNING");
+    assert(r_sustained.drive_state == DRIVE_TURNING);
+    assert(r_sustained.applied_speed_right < r_sustained.applied_speed_left); /* Right inside wheel dragged */
+    printf("  Max slew step seen during rapid reversal: %.2f deg/tick (max limit: %.2f deg/tick)\n",
            max_slew_seen, (double)(MAX_STEER_RATE_PER_SEC * DEFAULT_DT));
-    assert(ctx3.last_steer_cmd > +30.0f);
-    assert(ctx3.applied_speed_right < ctx3.applied_speed_left); /* Right wheel now dragged */
     assert(max_slew_seen <= (MAX_STEER_RATE_PER_SEC * DEFAULT_DT) + 0.001f);
-    printf("  [PASS] Test 3: S-curve direction reversal executed cleanly with slew limiter respected!\n\n");
+
+    /* Part 3: Anti-windup check on sudden reversal from saturation */
+    /* Saturate hard right to physical clamp (+52.5 deg) */
+    for (int i = 0; i < 5; i++) {
+        r_sustained = sim_step(&ctx3, +20.0f, +45.0f, +40.0f, 1.0f, 2, 2);
+    }
+    assert(fabsf(r_sustained.steer_cmd - (float)STEER_CMD_MAX_RIGHT) < 0.01f);
+    assert(fabsf(ctx3.last_steer_cmd - (float)STEER_CMD_MAX_RIGHT) < 0.01f);
+    /* Now snap left: next tick MUST step down immediately by 13.0 deg without delay */
+    sim_tick_result_t r_snap = sim_step(&ctx3, -20.0f, -45.0f, -40.0f, 1.0f, 2, 2);
+    float expected_steer = (float)STEER_CMD_MAX_RIGHT - (MAX_STEER_RATE_PER_SEC * DEFAULT_DT);
+    printf("  Anti-Windup Reversal Check: Clamped = +%.2f deg -> Snap Tick 1 = %+.2f deg (expected %+.2f deg)\n",
+           (float)STEER_CMD_MAX_RIGHT, r_snap.steer_cmd, expected_steer);
+    assert(fabsf(r_snap.steer_cmd - expected_steer) < 0.01f);
+    printf("  [PASS] Test 3: S-curve chicane stays in DRIVE_FORWARD at 100%% speed, anti-windup verified!\n\n");
 
     /* ----------------------------------------------------------------- */
     /* TEST 4: Single Boundary Fallback & Curve Tracking                  */

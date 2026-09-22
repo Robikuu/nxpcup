@@ -103,6 +103,7 @@ int main(void) {
     float         last_steer_cmd          = 0.0f;
     drive_state_t drive_state             = DRIVE_FORWARD;
     uint32_t      state_streak            = 0;
+    int8_t        streak_sign             = 0;
     uint32_t      urgency_streak          = 0;
     float         trusted_corner_urgency  = 0.0f;
 
@@ -146,6 +147,7 @@ int main(void) {
                 last_steer_cmd                = 0.0f;
                 drive_state                   = DRIVE_FORWARD;
                 state_streak                  = 0;
+                streak_sign                   = 0;
                 urgency_streak                = 0;
                 trusted_corner_urgency        = 0.0f;
                 if (motor_test_is_active()) {
@@ -262,13 +264,22 @@ int main(void) {
             }
 
             if (desired_state != drive_state) {
-                uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : 1U;
+                if (drive_state == DRIVE_FORWARD) {
+                    /* Chicane / flick protection: ensure curve direction is sustained in ONE direction */
+                    int8_t current_sign = (filtered_heading >= 0.0f) ? 1 : -1;
+                    if (current_sign != streak_sign) {
+                        streak_sign = current_sign;
+                        state_streak = 0;
+                    }
+                }
+                uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : (uint32_t)STATE_ENTER_STREAK;
                 if (++state_streak >= threshold) {
                     drive_state  = desired_state;
                     state_streak = 0;
                 }
             } else {
                 state_streak = 0;
+                streak_sign  = 0;
             }
 
             /* Cross-track error low-pass filtering */
@@ -368,7 +379,6 @@ int main(void) {
                 } else if (steer_diff < -max_steer_step) {
                     raw_steer = last_steer_cmd - max_steer_step;
                 }
-                last_steer_cmd = raw_steer;
                 steer_cmd = raw_steer;
 
                 /* Clamp to relative command travel: [-77.5f, +52.5f] */
@@ -378,6 +388,9 @@ int main(void) {
                 if (steer_cmd < (float)STEER_CMD_MAX_LEFT) {
                     steer_cmd = (float)STEER_CMD_MAX_LEFT;
                 }
+
+                /* Slew tracker updated AFTER clamping to prevent windup beyond physical servo travel */
+                last_steer_cmd = steer_cmd;
 
                 /* Output to physical servo (offset added exactly once) */
                 Steer(steer_cmd + g_params.steering_offset);
@@ -397,24 +410,22 @@ int main(void) {
                 if (heading_norm > 1.0f) heading_norm = 1.0f;
 
                 /* 4. Longitudinal Base Speed & Differential Assignment
-                 * A. Longitudinal Pre-Braking:
-                 *    Heading error indicates true active corner curvature.
-                 *    Lookahead preview (front camera) pre-brakes ONLY when dual boundaries (found == 2)
-                 *    detect an impending turn ahead. */
+                 * In DRIVE_FORWARD (straightaways & rapid chicane flicks):
+                 * Maintain full 100% straight sprint speed (VL=100, VR=100) with zero differential drag.
+                 * In DRIVE_TURNING (sustained curves after STATE_ENTER_STREAK confirmation):
+                 * Apply corner braking to outside wheel and inside wheel differential drag to pivot. */
                 float effective_corner_intensity = heading_norm;
                 if (g_traj.found >= 1 && lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
-                float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+                float longitudinal_base = g_params.speed_straight;
+                float active_steer_norm = 0.0f;
+                if (drive_state == DRIVE_TURNING) {
+                    longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+                    active_steer_norm = steer_norm;
+                }
 
-                /* Continuous differential drag authority:
-                 * Directly driven by active steering angle beyond the straightaway deadzone (3.5 deg).
-                 * When the wheels turn, the inside wheel drags to pivot the chassis.
-                 * On straightaways (|steer_cmd| <= 3.5 deg), steer_norm is strictly 0.0f,
-                 * guaranteeing 100% symmetric push with zero yaw kick. */
-                float active_steer_norm = steer_norm;
-
-                /* B. Lateral Differential Drag: strictly driven by active physical steering */
+                /* Lateral Differential Drag: strictly driven by active physical steering in DRIVE_TURNING */
                 float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
                 float target_outside = longitudinal_base;
                 float target_inside  = longitudinal_base - diff_delta;

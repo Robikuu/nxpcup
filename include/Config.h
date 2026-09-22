@@ -79,7 +79,7 @@
 
 // ---- State Machine Thresholds ----
 #define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Calibrated corner entry heading threshold (responsive entry into standard curves)
-#define STATE_ENTER_STREAK           1         // Immediate transition into DRIVE_TURNING (20ms response)
+#define STATE_ENTER_STREAK           4         // 4 ticks (80ms) sustained curve confirmation to ignore chicane flicks
 #define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              18U       // ~360ms coast window for traversing intersection gaps without braking
 #define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
