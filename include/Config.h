@@ -25,22 +25,18 @@
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
-// ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
-#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
-#define SPEED_OUTSIDE_CORNER         78.0f     // Fast apex outside wheel drive (%) (carries momentum within tire friction circle)
-#define SPEED_INSIDE_MIN             58.0f     // Inside wheel pivot anchor duty (%) (effective pivot drag without bogging)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 68.0%
+// ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
+#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
+#define SPEED_OUTSIDE_CORNER         74.0f     // Calibrated apex outside wheel drive (%) (maximum speed within tire grip at 12.6V)
+#define SPEED_INSIDE_MIN             50.0f     // Inside wheel pivot anchor duty (%) (sharp pivot torque to whip chassis through turns)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 62.0%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              22.0f     // Rapid pre-braking ramp (~50ms from 100% to 78%)
-#define ACCEL_RAMP_STEP              16.0f     // Progressive corner exit acceleration (~120ms to 100%, maintains front tire grip)
-
-// ---- Battery Voltage Compensation ----
-#define CALIBRATION_BATTERY_VOLTAGE  11.9f     // Nominal tuning reference voltage (V) where car was calibrated
-#define DEFAULT_BATTERY_VOLTAGE      12.6f     // Current charged battery voltage (V)
+#define DECEL_RAMP_STEP              25.0f     // Rapid pre-braking ramp (~60ms from 100% to 74% at 12.6V)
+#define ACCEL_RAMP_STEP              18.0f     // Crisp corner exit acceleration (~100ms to 100%, maintains front tire grip)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
@@ -62,14 +58,14 @@
 #define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view
 #define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
 
-// ---- Dynamic PID Gain Scheduling (Decoupled Feedforward/Feedback) ----
-#define KP_CORNER                    1.40f     // Decisive centering in corners
-#define KP_STRAIGHT                  0.80f     // Firm centering on straights
+// ---- Dynamic PID Gain Scheduling (12.6V High-Speed Stabilized) ----
+#define KP_CORNER                    1.45f     // Decisive turning authority without tire scrub / understeer
+#define KP_STRAIGHT                  0.70f     // Calibrated straight-line tracking authority to eliminate high-speed twitch
 #define KD_CORNER                    0.180f    // Active derivative damping on lateral velocity d(CTE)/dt
-#define KD_STRAIGHT                  0.150f    // High-speed straightaway damping
+#define KD_STRAIGHT                  0.160f    // High-speed straightaway damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
-#define MAX_STEER_RATE_PER_SEC       600.0f    // Max steering slew rate (deg/s) prevents chassis snapping
+#define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) enables rapid corner-entry flick
 
 // ---- Error Weights ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
@@ -111,8 +107,6 @@ typedef struct {
     float dt;
     float accel_ramp;
     float decel_ramp;
-    float battery_voltage;
-    float vbat_scale;
     uint8_t state;
 } robot_params_t;
 
