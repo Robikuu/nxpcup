@@ -65,7 +65,7 @@
 #define KD_STRAIGHT                  0.150f    // High-speed straightaway damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
-#define MAX_STEER_RATE_PER_SEC       450.0f    // Max steering slew rate (deg/s) prevents chassis snapping
+#define MAX_STEER_RATE_PER_SEC       600.0f    // Max steering slew rate (deg/s) prevents chassis snapping
 
 // ---- Error Weights ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight

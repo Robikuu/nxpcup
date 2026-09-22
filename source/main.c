@@ -319,10 +319,29 @@ int main(void) {
                 /* 2. Decoupled Steering Authority:
                  * - CTE error is actively damped and regulated by the PID controller.
                  * - Heading error acts as direct, instantaneous feedforward anticipation into curves.
-                 * - Total steering = pid_cte + k_heading * filtered_heading.
                  * - Slew rate is capped by MAX_STEER_RATE_PER_SEC to prevent sudden chassis snapping and tire scrub. */
                 float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
-                float raw_steer = pid_cte + g_params.k_heading * filtered_heading;
+
+                /* Decisive Turn-In & Apex Protection:
+                 * When entering or negotiating a corner (|filtered_heading| >= 8.0 deg or trusted_corner_urgency >= 0.25f),
+                 * if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
+                 * The CTE PID controller is trying to steer towards the outside wall (fighting the turn).
+                 * Suppress pid_cte so the vehicle bites cleanly into the corner apex without understeer! */
+                if ((drive_state == DRIVE_TURNING || trusted_corner_urgency >= 0.25f) &&
+                    (filtered_cte * filtered_heading < 0.0f) &&
+                    fabsf(filtered_heading) >= 8.0f) {
+                    pid_cte = 0.0f;
+                }
+
+                /* Curvature-Gated Heading Feedforward:
+                 * On straightaways (|filtered_heading| <= 4.0 deg), track curvature is zero; yaw flutter
+                 * must NOT inject positive feedforward turn commands.
+                 * As a corner approaches, heading feedforward smoothly scales up with corner urgency
+                 * to guide the front wheels directly into the curve apex. */
+                float heading_ff_scale = (drive_state == DRIVE_TURNING) ? 1.0f : trusted_corner_urgency;
+                float heading_feedforward = heading_ff_scale * (g_params.k_heading * filtered_heading);
+
+                float raw_steer = pid_cte + heading_feedforward;
 
                 const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
                 float steer_diff = raw_steer - last_steer_cmd;
