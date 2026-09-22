@@ -212,18 +212,18 @@ int main(void) {
             /* State machine transitions with dual-camera consensus:
              * - DRIVE_TURNING (Corner):
              *   Triggered either by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG)
-             *   OR by forward lookahead preview of upcoming turn (lookahead_turn_factor >= 0.45f).
+             *   OR by forward lookahead preview of upcoming turn (lookahead_turn_factor >= 0.50f).
              * - DRIVE_FORWARD (Straight):
-             *   Strictly confirmed by TOP CAMERA: local lane is centered (|filtered_heading| <= 10.0 deg
-             *   and |filtered_cte| <= 10.0 px) AND lookahead confirms no immediate curve (lookahead_turn_factor < 0.35f).
+             *   Strictly confirmed by TOP CAMERA: local lane is centered (|filtered_heading| <= 6.0 deg
+             *   and |filtered_cte| <= 8.0 px) AND lookahead confirms no immediate curve (lookahead_turn_factor < 0.30f).
              *   Hysteresis debounce of STATE_EXIT_STREAK (5 ticks = 100ms) guarantees chatter-free transitions. */
             drive_state_t desired_state;
             if (sr.found == 0) {
                 desired_state = DRIVE_BRAKING;
             } else {
-                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.45f);
+                bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG || lookahead_turn_factor >= 0.50f);
                 if (drive_state == DRIVE_TURNING) {
-                    bool straight_confirmed = (fabsf(filtered_heading) <= 10.0f && fabsf(filtered_cte) <= 10.0f && lookahead_turn_factor < 0.35f);
+                    bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f && lookahead_turn_factor < 0.30f);
                     desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
                 } else {
                     desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
@@ -267,10 +267,10 @@ int main(void) {
                 }
 
                 /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency (Decoupled from Wheel Drag)
-                 * Deadband of 10.0 deg on heading: normal straightaway chassis yaw flutter (<= 10 deg)
+                 * Deadband of 8.0 deg on heading: normal straightaway chassis yaw flutter (<= 8 deg)
                  * MUST NOT elevate urgency or trigger corner gains. */
-                float dz_heading_urgency = fabsf(filtered_heading) - 10.0f;
-                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 10.0f)) : 0.0f;
+                float dz_heading_urgency = fabsf(filtered_heading) - 8.0f;
+                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 8.0f)) : 0.0f;
                 if (heading_urgency > 1.0f) heading_urgency = 1.0f;
 
                 /* Only let CTE drive corner urgency if heading is turning or CTE enters the outer lane band (>14px) */
@@ -281,8 +281,8 @@ int main(void) {
                 float raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
 
                 /* Front camera predictive urgency pre-engagement:
-                 * Only allow lookahead to elevate urgency if a genuine upcoming turn is detected (> 0.25f) */
-                if (lookahead_turn_factor > 0.25f && lookahead_turn_factor > raw_corner_urgency) {
+                 * Only allow lookahead to elevate urgency if a genuine upcoming turn is detected (> 0.35f) */
+                if (lookahead_turn_factor > 0.35f && lookahead_turn_factor > raw_corner_urgency) {
                     raw_corner_urgency = lookahead_turn_factor;
                 }
 
@@ -305,19 +305,21 @@ int main(void) {
                  * Steering servo is 100% driven by Top Camera local PID feedback.
                  * Flexcomm 2 Front Camera operates strictly for predictive speed profiling & state transitions. */
                 float effective_cte = filtered_cte;
-                /* Apex Protection: In a corner (|filtered_heading| > 10.0 deg),
-                 * if CTE opposes heading (filtered_cte * filtered_heading < 0), the vehicle
-                 * is clipping the inside apex. Attenuate the opposing CTE by 75% so clipping
-                 * the apex NEVER cancels heading authority or counter-steers into the outside wall! */
-                if (filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) > 10.0f) {
-                    effective_cte = filtered_cte * 0.25f;
+                /* Decisive Turn-In & Apex Protection:
+                 * When the vehicle is negotiating a turn (|filtered_heading| >= 3.5 deg)
+                 * and CTE opposes heading (filtered_cte * filtered_heading < 0), the car is
+                 * approaching the turn from the outside or clipping the inside apex.
+                 * Suppress the opposing CTE (effective_cte = 0.0f) so heading error immediately
+                 * commands authoritative steering into the curve without being cancelled out! */
+                if (filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) >= 3.5f) {
+                    effective_cte = 0.0f;
                 }
                 float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;
                 float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
 
                 steer_cmd = feedback_steer;
 
-                /* Clamp to relative command travel: [-87.0f, +70.0f] */
+                /* Clamp to relative command travel: [-77.5f, +52.5f] */
                 if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) {
                     steer_cmd = (float)STEER_CMD_MAX_RIGHT;
                 }
@@ -365,13 +367,13 @@ int main(void) {
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
 
                 /* Continuous differential drag authority:
-                 * On straights (trusted_corner_urgency <= 0.25f), differential drag is strictly 0.0f
+                 * On straights (trusted_corner_urgency <= 0.20f), differential drag is strictly 0.0f
                  * ensuring both rear wheels provide 100% symmetric, straight-line drive with zero yaw kicks;
-                 * Only as corner urgency rises (> 0.25f), differential drag smoothly engages (up to 1.0x)
+                 * Only as corner urgency rises (> 0.20f), differential drag smoothly engages (up to 1.0x)
                  * to pivot the vehicle sharply through the turn. */
                 float diff_scale = 0.0f;
-                if (trusted_corner_urgency > 0.25f) {
-                    diff_scale = (trusted_corner_urgency - 0.25f) / 0.75f;
+                if (trusted_corner_urgency > 0.20f) {
+                    diff_scale = (trusted_corner_urgency - 0.20f) / 0.80f;
                 }
                 float active_steer_norm = steer_norm * diff_scale;
 

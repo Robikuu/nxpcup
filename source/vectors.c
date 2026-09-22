@@ -588,28 +588,43 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         }
 
         /* Centerline synthesis from single boundary:
-         * The raw dx = xf - xn contains perspective convergence that makes a straight
-         * road falsely appear as a turn. On a straight road, each boundary converges
-         * toward the vanishing point (PIXY_CENTER_X) proportionally to the depth ratio.
-         * Subtract the expected perspective dx so a straight road yields 0 deg angle. */
-        float sign = is_right ? -1.0f : 1.0f;
-        float mid_near_x = xn + sign * (float)PIXY_TRACK_HALF_WIDTH;
-        float mid_far_x  = xf + sign * (float)PIXY_TRACK_HALF_WIDTH;
+         * The forward camera is tilted looking down the track. On a straight track,
+         * perspective foreshortening causes each boundary to converge toward the
+         * optical vanishing point (PIXY_CENTER_X, Y_vanish ~ 0).
+         * If the raw line slope atan2(dx, dy) is used without perspective compensation,
+         * a straight boundary falsely looks like a 26-28 deg curve, permanently triggering
+         * maximum urgency and killing straightaway speed.
+         *
+         * For a straight boundary starting at (xn, yn), its expected perspective position at yf is:
+         *   x_expected = PIXY_CENTER_X + (xn - PIXY_CENTER_X) * (yf / yn)
+         * The true turn curvature is the departure of xf from this straight perspective line:
+         *   dx_turn = xf - x_expected
+         */
+        float yn_clamped = (yn > 5.0f) ? yn : 5.0f;
+        float depth_ratio = yf / yn_clamped;
+        if (depth_ratio < 0.0f) depth_ratio = 0.0f;
+        if (depth_ratio > 1.0f) depth_ratio = 1.0f;
 
+        float x_expected = (float)PIXY_CENTER_X + (xn - (float)PIXY_CENTER_X) * depth_ratio;
+        float dx_turn = xf - x_expected;
         float dy = yn - yf;
-        float dx = xf - xn;
 
-        /* The lane centerline runs parallel to the single boundary vector.
-         * Angle is computed directly from the line vector (dx = xf - xn, dy = yn - yf),
-         * matching the ground-truth top camera logic and preventing false turn inversion in corners. */
+        /* Apparent track half-width at distance yf */
+        float track_half_far = (float)PIXY_TRACK_HALF_WIDTH * depth_ratio;
+        if (track_half_far < 5.0f)  track_half_far = 5.0f;
+        if (track_half_far > (float)PIXY_TRACK_HALF_WIDTH) track_half_far = (float)PIXY_TRACK_HALF_WIDTH;
+
+        float sign = is_right ? -1.0f : 1.0f;
+        float mid_far_x = xf + sign * track_half_far;
+
         if (dy > 0.5f) {
-            result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
+            result.trajectory_angle_deg = atan2f(dx_turn, dy) * (180.0f / (float)M_PI);
         }
         result.trajectory_offset_px = mid_far_x - (float)PIXY_CENTER_X;
 
-        float seg_len = sqrtf(dx * dx + dy * dy);
+        float seg_len = sqrtf(dx_turn * dx_turn + dy * dy);
         if (seg_len > 1.0f) {
-            result.curvature = fabsf(dx) / (seg_len * seg_len);
+            result.curvature = fabsf(dx_turn) / (seg_len * seg_len);
         }
 
         result.found = 1;
@@ -637,6 +652,13 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     }
 
     result.lookahead_urgency = (angle_urgency > offset_urgency) ? angle_urgency : offset_urgency;
+
+    /* Single-boundary gating: An isolated single line can have jitter or partial perspective mismatch.
+     * Scale its urgency by 0.70x so single-boundary noise never falsely cuts straightaway speed.
+     * Full 1.0x urgency requires dual-boundary geometric confirmation (found == 2). */
+    if (result.found == 1) {
+        result.lookahead_urgency *= 0.70f;
+    }
 
     return result;
 }

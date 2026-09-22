@@ -22,8 +22,8 @@
 #define STEERING_OFFSET              12.5f     // Straight-line trim offset (trimmed to eliminate rightward lane drift)
 
 // Relative command limits (steer_cmd relative to center trim)
-#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +74.5f
-#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -82.5f
+#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
+#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Sprint Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 100% battery voltage push)
@@ -42,7 +42,7 @@
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
 #define REVERSAL_DECEL_STEP          18.0f     // Rapidly locks new inside wheel into pivot drag
 #define YAW_CONFLICT_DEADBAND        3.0f      // Steer angle deadband to trigger yaw conflict logic
-#define DIFFERENTIAL_DEADZONE_DEG    6.0f      // Steer angle deadzone below which zero differential drag applies
+#define DIFFERENTIAL_DEADZONE_DEG    3.5f      // Steer angle deadzone below which zero differential drag applies (crisp turn-in bite)
 
 // ---- Corner Urgency & Predictive Lookahead Gating ----
 #define CTE_URGENCY_PX               24.0f     // |filtered_cte| (px) at which corner gains engage (prevents straight hunting)
@@ -59,22 +59,22 @@
 #define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
 
 // ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    1.45f     // Crisp cornering authority without tire scrub / understeer
+#define KP_CORNER                    1.75f     // Crisp cornering authority without tire scrub / understeer
 #define KP_STRAIGHT                  0.50f     // Firm straight-line tracking authority to eliminate wandering
-#define KD_CORNER                    0.080f    // Fast transient apex settling without counter-steer pushback
+#define KD_CORNER                    0.050f    // Fast transient apex settling without counter-steer pushback
 #define KD_STRAIGHT                  0.120f    // Calibrated derivative damping for straightaways
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.35f     // Low-pass filter coefficient on derivative term
 
 // ---- Error Weights ----
 #define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight for straight centering
-#define DEFAULT_K_HEADING            0.60f     // Calibrated heading weight for anticipatory turn-in
+#define DEFAULT_K_HEADING            0.85f     // Decisive heading weight for anticipatory turn-in
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
 
 // ---- State Machine Thresholds ----
-#define CORNER_HEADING_THRESHOLD_DEG 18.0f     // Fast corner detection threshold (prevents straightaway oscillation chatter)
+#define CORNER_HEADING_THRESHOLD_DEG 12.0f     // Fast corner detection threshold (lowered from 18.0f for early corner entry)
 #define STATE_ENTER_STREAK           1         // Immediate transition into DRIVE_TURNING (20ms response)
 #define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              5
