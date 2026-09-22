@@ -58,17 +58,18 @@
 #define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view
 #define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
 
-// ---- Dynamic PID Gain Scheduling (Anti-Weave Damped) ----
-#define KP_CORNER                    1.75f     // Crisp cornering authority without tire scrub / understeer
-#define KP_STRAIGHT                  0.50f     // Firm straight-line tracking authority to eliminate wandering
-#define KD_CORNER                    0.025f    // Calm counter-steer settling without derivative kick inversion
-#define KD_STRAIGHT                  0.120f    // Calibrated derivative damping for straightaways
+// ---- Dynamic PID Gain Scheduling (Decoupled Feedforward/Feedback) ----
+#define KP_CORNER                    1.40f     // Decisive centering in corners
+#define KP_STRAIGHT                  0.80f     // Firm centering on straights
+#define KD_CORNER                    0.180f    // Active derivative damping on lateral velocity d(CTE)/dt
+#define KD_STRAIGHT                  0.150f    // High-speed straightaway damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
+#define MAX_STEER_RATE_PER_SEC       450.0f    // Max steering slew rate (deg/s) prevents chassis snapping
 
 // ---- Error Weights ----
-#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight for straight centering
-#define DEFAULT_K_HEADING            0.85f     // Decisive heading weight for anticipatory turn-in
+#define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
+#define DEFAULT_K_HEADING            0.85f     // Direct heading feedforward into curves
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

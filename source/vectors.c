@@ -520,17 +520,6 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float dy = mid_near_y - mid_far_y;
         float dx = mid_far_x  - mid_near_x;
 
-        /* Apex-cut bias: shift far target toward inside of corner.
-         * On straights (|dx| <= 2.5f), no bias applied. */
-        if (fabsf(dx) > 2.5f && dy > 1.0f) {
-            float lane_half = (rx_far - lx_far) * 0.5f;
-            if (lane_half < 5.0f)  lane_half = 5.0f;
-            if (lane_half > 25.0f) lane_half = 25.0f;
-            float apex_shift = (dx > 0.0f ? 1.0f : -1.0f) * lane_half * (float)APEX_CUT_RATIO;
-            mid_far_x += apex_shift;
-            dx = mid_far_x - mid_near_x;
-        }
-
         if (dy > 1.0f) {
             result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
         }
@@ -663,11 +652,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     result.lookahead_urgency = (angle_urgency > offset_urgency) ? angle_urgency : offset_urgency;
 
-    /* Single-boundary gating: An isolated single line can have jitter or partial perspective mismatch.
-     * Scale its urgency by 0.70x so single-boundary noise never falsely cuts straightaway speed.
-     * Full 1.0x urgency requires dual-boundary geometric confirmation (found == 2). */
+    /* Single-boundary gating: An isolated single line in tilted perspective has high slope noise.
+     * Only dual-boundary geometric confirmation (found == 2) is permitted to trigger pre-braking. */
     if (result.found == 1) {
-        result.lookahead_urgency *= 0.70f;
+        result.lookahead_urgency = 0.0f;
     }
 
     return result;

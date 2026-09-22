@@ -100,6 +100,7 @@ int main(void) {
     float    applied_speed_left      = g_params.speed_straight;
     float    applied_speed_right     = g_params.speed_straight;
     float         steer_cmd               = 0.0f;
+    float         last_steer_cmd          = 0.0f;
     drive_state_t drive_state             = DRIVE_FORWARD;
     uint32_t      state_streak            = 0;
     uint32_t      urgency_streak          = 0;
@@ -142,6 +143,7 @@ int main(void) {
                 applied_speed_left            = g_params.speed_straight;
                 applied_speed_right           = g_params.speed_straight;
                 steer_cmd                     = 0.0f;
+                last_steer_cmd                = 0.0f;
                 drive_state                   = DRIVE_FORWARD;
                 state_streak                  = 0;
                 urgency_streak                = 0;
@@ -165,17 +167,20 @@ int main(void) {
                     filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
 
                     /* Lookahead urgency for corner speed modulation:
-                     * Fast attack (0.70x) to immediately initiate pre-braking on the straight;
-                     * Smooth decay (0.25x) to maintain stable deceleration through preview jitter. */
-                    if (g_traj.lookahead_urgency > lookahead_turn_factor) {
-                        lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
+                     * Only active when dual track boundaries are reliably confirmed (found == 2) */
+                    if (g_traj.found == 2) {
+                        if (g_traj.lookahead_urgency > lookahead_turn_factor) {
+                            lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
+                        } else {
+                            lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
+                        }
                     } else {
-                        lookahead_turn_factor = 0.25f * g_traj.lookahead_urgency + 0.75f * lookahead_turn_factor;
+                        lookahead_turn_factor *= 0.50f;
                     }
                 } else {
                     filtered_traj_angle   *= 0.80f;
                     filtered_traj_offset  *= 0.80f;
-                    lookahead_turn_factor *= 0.85f;
+                    lookahead_turn_factor *= 0.50f;
                     g_traj.found = 0;
                 }
             }
@@ -312,30 +317,22 @@ int main(void) {
                 steer_pid.alpha = g_params.alpha;
 
                 /* 2. Decoupled Steering Authority:
-                 * Steering servo is 100% driven by Top Camera local PID feedback.
-                 * Flexcomm 2 Front Camera operates strictly for predictive speed profiling & pre-braking. */
-                float effective_cte = filtered_cte;
-                /* Decisive Turn-In & Apex Protection:
-                 * Only engage when the vehicle is ACTUALLY in a turn (DRIVE_TURNING and |filtered_heading| >= 8.0 deg)
-                 * and CTE opposes heading (filtered_cte * filtered_heading < 0).
-                 * On straightaways, effective_cte is ALWAYS preserved to firmly center the vehicle! */
-                if (drive_state == DRIVE_TURNING && filtered_cte * filtered_heading < 0.0f && fabsf(filtered_heading) >= 8.0f) {
-                    effective_cte = 0.0f;
-                }
-                float combined = g_params.k_cte * effective_cte + g_params.k_heading * filtered_heading;
-                float feedback_steer = -pid_update(&steer_pid, 0.0f, combined, g_params.dt);
+                 * - CTE error is actively damped and regulated by the PID controller.
+                 * - Heading error acts as direct, instantaneous feedforward anticipation into curves.
+                 * - Total steering = pid_cte + k_heading * filtered_heading.
+                 * - Slew rate is capped by MAX_STEER_RATE_PER_SEC to prevent sudden chassis snapping and tire scrub. */
+                float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
+                float raw_steer = pid_cte + g_params.k_heading * filtered_heading;
 
-                /* Direction-Preserving Turn Damping:
-                 * Derivative counter-steer damping must smooth corner exit without reversing steering sign!
-                 * If combined < 0 (left turn), feedback_steer must never cross zero to steer right into outside wall.
-                 * If combined > 0 (right turn), feedback_steer must never cross zero to steer left into outside wall. */
-                if (combined < 0.0f && feedback_steer > 0.0f) {
-                    feedback_steer = 0.0f;
-                } else if (combined > 0.0f && feedback_steer < 0.0f) {
-                    feedback_steer = 0.0f;
+                const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
+                float steer_diff = raw_steer - last_steer_cmd;
+                if (steer_diff > max_steer_step) {
+                    raw_steer = last_steer_cmd + max_steer_step;
+                } else if (steer_diff < -max_steer_step) {
+                    raw_steer = last_steer_cmd - max_steer_step;
                 }
-
-                steer_cmd = feedback_steer;
+                last_steer_cmd = raw_steer;
+                steer_cmd = raw_steer;
 
                 /* Clamp to relative command travel: [-77.5f, +52.5f] */
                 if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) {
@@ -362,24 +359,13 @@ int main(void) {
                 float heading_norm = dz_heading / ((float)HEADING_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                 if (heading_norm > 1.0f) heading_norm = 1.0f;
 
-                /* 4. Asymmetric Target Wheel Speed Assignment
-                 * A. Longitudinal Pre-Braking: slows down vehicle base speed into upcoming corners.
-                 *    Both wheels decelerate symmetrically so there is ZERO yaw kick on straights.
-                 *    Proactive braking: combines local heading angle, lateral displacement (CTE),
-                 *    and lookahead front camera preview.
-                 *    Crucial for corner exit: if the vehicle has swung wide (|CTE| > 8px), it HOLDS
-                 *    controlled cornering speed (80%) until centered, preventing 100% sprint wheelspin! */
-                float abs_cte = fabsf(filtered_cte);
-                float dz_cte = abs_cte - 8.0f;
-                if (dz_cte < 0.0f) dz_cte = 0.0f;
-                float cte_norm = dz_cte / (20.0f - 8.0f);
-                if (cte_norm > 1.0f) cte_norm = 1.0f;
-
+                /* 4. Longitudinal Base Speed & Differential Assignment
+                 * A. Longitudinal Pre-Braking:
+                 *    Heading error indicates true active corner curvature.
+                 *    Lookahead preview (front camera) pre-brakes ONLY when dual boundaries (found == 2)
+                 *    detect an impending turn ahead. */
                 float effective_corner_intensity = heading_norm;
-                if (cte_norm > effective_corner_intensity) {
-                    effective_corner_intensity = cte_norm;
-                }
-                if (lookahead_turn_factor > effective_corner_intensity) {
+                if (g_traj.found == 2 && lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
