@@ -59,23 +59,26 @@
 #define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
 
 // ---- Dynamic PID Gain Scheduling (12.6V High-Speed Stabilized) ----
-#define KP_CORNER                    1.45f     // Decisive turning authority without tire scrub / understeer
+#define KP_CORNER                    3.50f     // Decisive turning authority without understeer (tested 3.5 - 4.5)
 #define KP_STRAIGHT                  0.70f     // Calibrated straight-line tracking authority to eliminate high-speed twitch
-#define KD_CORNER                    0.180f    // Active derivative damping on lateral velocity d(CTE)/dt
+#define KD_CORNER                    0.200f    // Active derivative damping on lateral velocity d(CTE)/dt
 #define KD_STRAIGHT                  0.160f    // High-speed straightaway damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
 #define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) enables rapid corner-entry flick
 
-// ---- Error Weights ----
+// ---- Error Weights & Anticipatory Feedforward ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
-#define DEFAULT_K_HEADING            0.85f     // Direct heading feedforward into curves
+#define DEFAULT_K_HEADING            1.30f     // Direct heading feedforward into curves (calibrated for high-speed bite)
+#define DEFAULT_K_LOOKAHEAD          0.35f     // Forward camera lookahead steering anticipation gain
+#define HEADING_DEADBAND_DEG         3.0f      // Heading deadband below which top camera feedforward is strictly 0 (prevents straight twitch)
+#define LOOKAHEAD_DEADBAND_DEG       6.0f      // Trajectory deadband below which lookahead feedforward is strictly 0
  
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
 
 // ---- State Machine Thresholds ----
-#define CORNER_HEADING_THRESHOLD_DEG 15.0f     // Calibrated corner entry heading threshold (prevents straightaway twitch)
+#define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Calibrated corner entry heading threshold (responsive entry into standard curves)
 #define STATE_ENTER_STREAK           1         // Immediate transition into DRIVE_TURNING (20ms response)
 #define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              18U       // ~360ms coast window for traversing intersection gaps without braking
@@ -104,6 +107,7 @@ typedef struct {
     float steering_offset;
     float k_cte;
     float k_heading;
+    float k_lookahead;
     float dt;
     float accel_ramp;
     float decel_ramp;

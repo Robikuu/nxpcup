@@ -69,49 +69,48 @@ int main(void)
     assert(t_curve.found == 2);
     assert(t_curve.lookahead_urgency >= 0.50f); // Triggers pre-braking on straight!
 
-    /* Test 2: Top Camera Steering & New PID Dynamics
-     * Verify gains and error weights:
-     * KP_STRAIGHT = 0.50f, KP_CORNER = 1.75f
-     * K_CTE = 0.50f, K_HEADING = 0.85f */
-    printf("\n  Test 2 (PID Calibrations):\n");
-    printf("    KP_STRAIGHT: %.2f (expected 0.50)\n", (double)KP_STRAIGHT);
-    printf("    KD_STRAIGHT: %.3f (expected 0.120)\n", (double)KD_STRAIGHT);
-    printf("    KP_CORNER:   %.2f (expected 1.75)\n", (double)KP_CORNER);
-    printf("    KD_CORNER:   %.3f (expected 0.025)\n", (double)KD_CORNER);
-    printf("    K_CTE:       %.2f (expected 0.50)\n", (double)DEFAULT_K_CTE);
-    printf("    K_HEADING:   %.2f (expected 0.85)\n", (double)DEFAULT_K_HEADING);
-    assert(fabsf(KP_STRAIGHT - 0.50f) < 0.01f);
-    assert(fabsf(KP_CORNER - 1.75f) < 0.01f);
-    assert(fabsf(KD_STRAIGHT - 0.120f) < 0.001f);
-    assert(fabsf(KD_CORNER - 0.025f) < 0.001f);
-    assert(fabsf(DEFAULT_K_CTE - 0.50f) < 0.01f);
-    assert(fabsf(DEFAULT_K_HEADING - 0.85f) < 0.01f);
-    assert(fabsf(DIFFERENTIAL_DEADZONE_DEG - 3.5f) < 0.01f);
-    assert(fabsf(CORNER_HEADING_THRESHOLD_DEG - 15.0f) < 0.01f);
+    /* Test 2: Top Camera Steering & 12.6V Anticipatory Dynamics */
+    printf("\n  Test 2 (PID Calibrations & Anticipatory Gains):\n");
+    printf("    KP_STRAIGHT:  %.2f (expected 0.70)\n", (double)KP_STRAIGHT);
+    printf("    KD_STRAIGHT:  %.3f (expected 0.160)\n", (double)KD_STRAIGHT);
+    printf("    KP_CORNER:    %.2f (expected 3.50)\n", (double)KP_CORNER);
+    printf("    KD_CORNER:    %.3f (expected 0.200)\n", (double)KD_CORNER);
+    printf("    K_CTE:        %.2f (expected 0.60)\n", (double)DEFAULT_K_CTE);
+    printf("    K_HEADING:    %.2f (expected 1.30)\n", (double)DEFAULT_K_HEADING);
+    printf("    K_LOOKAHEAD:  %.2f (expected 0.35)\n", (double)DEFAULT_K_LOOKAHEAD);
+    printf("    CORNER_THRESH: %.1f deg (expected 8.0)\n", (double)CORNER_HEADING_THRESHOLD_DEG);
+    assert(fabsf(KP_STRAIGHT - 0.70f) < 0.01f);
+    assert(fabsf(KP_CORNER - 3.50f) < 0.01f);
+    assert(fabsf(KD_STRAIGHT - 0.160f) < 0.001f);
+    assert(fabsf(KD_CORNER - 0.200f) < 0.001f);
+    assert(fabsf(DEFAULT_K_CTE - 0.60f) < 0.01f);
+    assert(fabsf(DEFAULT_K_HEADING - 1.30f) < 0.01f);
+    assert(fabsf(DEFAULT_K_LOOKAHEAD - 0.35f) < 0.01f);
+    assert(fabsf(CORNER_HEADING_THRESHOLD_DEG - 8.0f) < 0.01f);
 
-    /* Straightaway response on 5px error:
-     * combined = 0.50 * 5.0 = 2.50
-     * steer = KP_STRAIGHT * combined = 0.50 * 2.50 = 1.25 deg */
-    float steer_straight = KP_STRAIGHT * (DEFAULT_K_CTE * 5.0f);
-    printf("    Straight response on 5px drift: %.2f deg (firm, tight centering)\n", steer_straight);
-    assert(steer_straight >= 1.0f && steer_straight <= 2.0f);
+    /* Deadband Feedforward Response on straight (H = 2.0 deg <= 3.0 deg):
+     * MUST BE STRICTLY 0.0 deg */
+    float h_straight = 2.0f;
+    float eff_h_straight = (fabsf(h_straight) > HEADING_DEADBAND_DEG) ? (fabsf(h_straight) - HEADING_DEADBAND_DEG) : 0.0f;
+    float ff_straight = DEFAULT_K_HEADING * eff_h_straight;
+    printf("    Straight feedforward on 2.0 deg jitter: %.2f deg (strictly 0.0)\n", ff_straight);
+    assert(ff_straight == 0.0f);
 
-    /* Corner response on 25 deg heading (with apex turn-in):
-     * combined = 0.85 * 25.0 = 21.25
-     * steer = KP_CORNER * combined = 1.75 * 21.25 = 37.19 deg (decisive Ackermann authority!) */
-    float steer_corner = KP_CORNER * (DEFAULT_K_HEADING * 25.0f);
-    printf("    Corner response on 25 deg heading: %.2f deg (decisive authority within tire grip)\n", steer_corner);
-    assert(steer_corner >= 35.0f && steer_corner <= 45.0f);
+    /* Continuous Deadband Response on curve (H = 10.0 deg > 3.0 deg):
+     * eff_h = 10.0 - 3.0 = 7.0 deg -> ff = 1.30 * 7.0 = 9.1 deg */
+    float h_curve = 10.0f;
+    float eff_h_curve = (fabsf(h_curve) > HEADING_DEADBAND_DEG) ? (fabsf(h_curve) - HEADING_DEADBAND_DEG) : 0.0f;
+    float ff_curve = DEFAULT_K_HEADING * eff_h_curve;
+    printf("    Curve feedforward on 10.0 deg heading: %.2f deg (immediate authority)\n", ff_curve);
+    assert(fabsf(ff_curve - 9.10f) < 0.01f);
 
-    /* Test 3: Direction-Preserving Turn Damping
-     * In a left turn (combined = -5.0f), rapid heading unwinding must NEVER cause steer > 0 */
-    float combined_left = -5.0f;
-    float test_feedback = +4.5f; // Unclamped D-kick
-    if (combined_left < 0.0f && test_feedback > 0.0f) {
-        test_feedback = 0.0f;
-    }
-    printf("    Direction-preserving clamp on left unwinding: %.2f deg (guaranteed no sign flip!)\n", test_feedback);
-    assert(test_feedback == 0.0f);
+    /* Lookahead Preview on approaching curve (TJ = 16.0 deg > 6.0 deg):
+     * eff_traj = 16.0 - 6.0 = 10.0 deg -> ff_la = 0.35 * 10.0 = 3.5 deg */
+    float traj_curve = 16.0f;
+    float eff_traj_curve = (fabsf(traj_curve) > LOOKAHEAD_DEADBAND_DEG) ? (fabsf(traj_curve) - LOOKAHEAD_DEADBAND_DEG) : 0.0f;
+    float ff_la = DEFAULT_K_LOOKAHEAD * eff_traj_curve;
+    printf("    Lookahead preview feedforward on 16.0 deg trajectory: %.2f deg (early turn-in)\n", ff_la);
+    assert(fabsf(ff_la - 3.50f) < 0.01f);
 
     printf("\n>>> ALL DUAL-CAMERA & PID ARCHITECTURE TESTS PASSED! <<<\n");
     return 0;

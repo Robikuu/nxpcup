@@ -25,6 +25,7 @@ void params_init(void) {
     g_params.speed_inside_min     = SPEED_INSIDE_MIN;
     g_params.k_cte               = DEFAULT_K_CTE;
     g_params.k_heading           = DEFAULT_K_HEADING;
+    g_params.k_lookahead         = DEFAULT_K_LOOKAHEAD;
     g_params.dt                  = DEFAULT_DT;
     g_params.alpha               = DEFAULT_ALPHA;
     g_params.steering_offset     = STEERING_OFFSET;
@@ -158,6 +159,7 @@ static void command_execute(char *cmd) {
     else if (!strcmp(keyword, "alpha") && has_val) { g_params.alpha = val; send_ack_dbl("alpha=", val); }
     else if (!strcmp(keyword, "k_cte") && has_val) { g_params.k_cte = val; send_ack_dbl("k_cte=", val); }
     else if (!strcmp(keyword, "k_heading") && has_val) { g_params.k_heading = val; send_ack_dbl("k_heading=", val); }
+    else if ((!strcmp(keyword, "k_lookahead") || !strcmp(keyword, "k_la")) && has_val) { g_params.k_lookahead = val; send_ack_dbl("k_lookahead=", val); }
     else if (!strcmp(keyword, "steering_offset") && has_val) { g_params.steering_offset = val; send_ack_dbl("steering_offset=", val); }
     else if (!strcmp(keyword, "accel_ramp") && has_val) { g_params.accel_ramp = val; send_ack_dbl("accel_ramp=", val); }
     else if (!strcmp(keyword, "decel_ramp") && has_val) { g_params.decel_ramp = val; send_ack_dbl("decel_ramp=", val); }
@@ -205,6 +207,7 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "offset=", g_params.steering_offset);
         n = append_flt(buf, n, sizeof(buf), "k_cte=", g_params.k_cte);
         n = append_flt(buf, n, sizeof(buf), "k_head=", g_params.k_heading);
+        n = append_flt(buf, n, sizeof(buf), "k_la=", g_params.k_lookahead);
         n = append_flt(buf, n, sizeof(buf), "dt=", g_params.dt);
         n = append_flt(buf, n, sizeof(buf), "alpha=", g_params.alpha);
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
@@ -213,7 +216,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, status\r\n");
+        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, k_lookahead, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, status\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

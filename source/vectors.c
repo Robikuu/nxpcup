@@ -652,10 +652,16 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
     result.lookahead_urgency = (angle_urgency > offset_urgency) ? angle_urgency : offset_urgency;
 
-    /* Single-boundary gating: An isolated single line in tilted perspective has high slope noise.
-     * Only dual-boundary geometric confirmation (found == 2) is permitted to trigger pre-braking. */
+    /* Single-boundary gating: An isolated single line in tilted perspective has higher slope noise.
+     * When only a single boundary is visible, apply a higher trajectory threshold (8.0 deg)
+     * and scale urgency by 0.60f to provide robust curve anticipation without false triggers. */
     if (result.found == 1) {
-        result.lookahead_urgency = 0.0f;
+        if (abs_angle > 8.0f) {
+            result.lookahead_urgency = 0.60f * ((abs_angle - 8.0f) / ((float)HEADING_FULL_BRAKE_DEG - 8.0f));
+            if (result.lookahead_urgency > 0.60f) result.lookahead_urgency = 0.60f;
+        } else {
+            result.lookahead_urgency = 0.0f;
+        }
     }
 
     return result;

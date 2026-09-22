@@ -166,14 +166,9 @@ int main(void) {
                     filtered_traj_angle  = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
                     filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
 
-                    /* Lookahead urgency for corner speed modulation:
-                     * Only active when dual track boundaries are reliably confirmed (found == 2) */
-                    if (g_traj.found == 2) {
-                        if (g_traj.lookahead_urgency > lookahead_turn_factor) {
-                            lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
-                        } else {
-                            lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
-                        }
+                    /* Lookahead urgency for corner speed modulation & steering preview */
+                    if (g_traj.found >= 1) {
+                        lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
                     } else {
                         lookahead_turn_factor *= 0.50f;
                     }
@@ -257,9 +252,10 @@ int main(void) {
              *   and |filtered_cte| <= 8.0 px).
              *   Hysteresis debounce of STATE_EXIT_STREAK (5 ticks = 100ms) guarantees chatter-free transitions. */
             drive_state_t desired_state;
-            bool corner_trigger = (fabsf(filtered_heading) >= CORNER_HEADING_THRESHOLD_DEG);
+            bool corner_trigger = (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG) ||
+                                  (fabsf(filtered_traj_angle) >= 10.0f && lookahead_turn_factor >= 0.30f);
             if (drive_state == DRIVE_TURNING) {
-                bool straight_confirmed = (fabsf(filtered_heading) <= 6.0f && fabsf(filtered_cte) <= 8.0f);
+                bool straight_confirmed = (fabsf(filtered_heading) <= 5.0f && fabsf(filtered_cte) <= 8.0f);
                 desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
             } else {
                 desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
@@ -283,22 +279,29 @@ int main(void) {
                     filtered_cte = 0.4f * sr.cte + 0.6f * filtered_cte;
                 }
 
-                /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency (Decoupled from Wheel Drag)
-                 * Deadband of 4.0 deg on heading: normal straightaway chassis yaw flutter (<= 4 deg)
-                 * MUST NOT elevate urgency or trigger corner gains. */
-                float dz_heading_urgency = fabsf(filtered_heading) - 4.0f;
-                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 4.0f)) : 0.0f;
+                /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency
+                 * Continuous deadband of 2.5 deg on heading: straightaway yaw jitter is strictly ignored. */
+                float dz_heading_urgency = fabsf(filtered_heading) - 2.5f;
+                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 2.5f)) : 0.0f;
                 if (heading_urgency > 1.0f) heading_urgency = 1.0f;
 
-                /* Only let CTE drive corner urgency if heading is turning or CTE enters the outer lane band (>14px) */
+                /* Only let CTE drive corner urgency if CTE enters the outer lane band (>14px) */
                 float cte_excess = fabsf(filtered_cte) - 14.0f;
                 float cte_urgency = (cte_excess > 0.0f) ? (cte_excess / ((float)CTE_URGENCY_PX - 14.0f)) : 0.0f;
                 if (cte_urgency > 1.0f) cte_urgency = 1.0f;
 
-                /* Local Top Camera drives PID urgency:
-                 * Gain scheduling strictly reflects the vehicle's immediate heading & lateral error.
-                 * Front Camera lookahead_turn_factor is reserved for longitudinal speed pre-braking. */
-                float raw_corner_urgency = (heading_urgency > cte_urgency) ? heading_urgency : cte_urgency;
+                /* Forward Camera lookahead preview elevates urgency proactively before entry */
+                float la_urgency = 0.0f;
+                float dz_traj = fabsf(filtered_traj_angle) - (float)LOOKAHEAD_DEADBAND_DEG;
+                if (dz_traj > 0.0f) {
+                    la_urgency = dz_traj / ((float)HEADING_FULL_BRAKE_DEG - (float)LOOKAHEAD_DEADBAND_DEG);
+                    if (la_urgency > 1.0f) la_urgency = 1.0f;
+                }
+                if (lookahead_turn_factor > la_urgency) la_urgency = lookahead_turn_factor;
+
+                float raw_corner_urgency = heading_urgency;
+                if (cte_urgency > raw_corner_urgency) raw_corner_urgency = cte_urgency;
+                if (la_urgency > raw_corner_urgency)  raw_corner_urgency = la_urgency;
 
                 if (raw_corner_urgency > trusted_corner_urgency) {
                     if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
@@ -319,29 +322,44 @@ int main(void) {
                 /* 2. Decoupled Steering Authority:
                  * - CTE error is actively damped and regulated by the PID controller.
                  * - Heading error acts as direct, instantaneous feedforward anticipation into curves.
+                 * - Forward camera trajectory acts as lookahead preview feedforward into upcoming corners.
                  * - Slew rate is capped by MAX_STEER_RATE_PER_SEC to prevent sudden chassis snapping and tire scrub. */
                 float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
                 /* Decisive Turn-In & Apex Protection:
-                 * When entering or negotiating a corner (|filtered_heading| >= 8.0 deg or trusted_corner_urgency >= 0.25f),
-                 * if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
+                 * When entering or negotiating a corner (DRIVE_TURNING, trusted_corner_urgency >= 0.20f,
+                 * or |filtered_heading| >= 4.0 deg), if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
                  * The CTE PID controller is trying to steer towards the outside wall (fighting the turn).
                  * Suppress pid_cte so the vehicle bites cleanly into the corner apex without understeer! */
-                if ((drive_state == DRIVE_TURNING || trusted_corner_urgency >= 0.25f) &&
+                if ((drive_state == DRIVE_TURNING || trusted_corner_urgency >= 0.20f || fabsf(filtered_heading) >= 4.0f) &&
                     (filtered_cte * filtered_heading < 0.0f) &&
-                    fabsf(filtered_heading) >= 8.0f) {
+                    fabsf(filtered_heading) >= 4.0f) {
                     pid_cte = 0.0f;
                 }
 
-                /* Curvature-Gated Heading Feedforward:
-                 * On straightaways (|filtered_heading| <= 4.0 deg), track curvature is zero; yaw flutter
-                 * must NOT inject positive feedforward turn commands.
-                 * As a corner approaches, heading feedforward smoothly scales up with corner urgency
-                 * to guide the front wheels directly into the curve apex. */
-                float heading_ff_scale = (drive_state == DRIVE_TURNING) ? 1.0f : trusted_corner_urgency;
-                float heading_feedforward = heading_ff_scale * (g_params.k_heading * filtered_heading);
+                /* Continuous Deadband Heading Feedforward:
+                 * On straightaways (|filtered_heading| <= HEADING_DEADBAND_DEG), track curvature is zero;
+                 * feedforward is strictly 0.0f, locking the car to centerline via PID derivative damping.
+                 * As soon as a curve begins (|filtered_heading| > HEADING_DEADBAND_DEG), full k_heading gain
+                 * applies immediately without fractional urgency division or lag! */
+                float abs_h = fabsf(filtered_heading);
+                float effective_h = 0.0f;
+                if (abs_h > (float)HEADING_DEADBAND_DEG) {
+                    effective_h = (abs_h - (float)HEADING_DEADBAND_DEG) * ((filtered_heading > 0.0f) ? 1.0f : -1.0f);
+                }
+                float heading_feedforward = g_params.k_heading * effective_h;
 
-                float raw_steer = pid_cte + heading_feedforward;
+                /* Forward Camera Lookahead Steering Anticipation:
+                 * Previews the track 1.0 - 2.0m ahead. When a curve approaches (|filtered_traj_angle| > LOOKAHEAD_DEADBAND_DEG),
+                 * applies anticipatory steering feedforward to begin angling the front wheels 100-150ms before apex entry! */
+                float abs_traj = fabsf(filtered_traj_angle);
+                float effective_traj = 0.0f;
+                if (abs_traj > (float)LOOKAHEAD_DEADBAND_DEG) {
+                    effective_traj = (abs_traj - (float)LOOKAHEAD_DEADBAND_DEG) * ((filtered_traj_angle > 0.0f) ? 1.0f : -1.0f);
+                }
+                float lookahead_feedforward = g_params.k_lookahead * effective_traj;
+
+                float raw_steer = pid_cte + heading_feedforward + lookahead_feedforward;
 
                 const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
                 float steer_diff = raw_steer - last_steer_cmd;
@@ -384,7 +402,7 @@ int main(void) {
                  *    Lookahead preview (front camera) pre-brakes ONLY when dual boundaries (found == 2)
                  *    detect an impending turn ahead. */
                 float effective_corner_intensity = heading_norm;
-                if (g_traj.found == 2 && lookahead_turn_factor > effective_corner_intensity) {
+                if (g_traj.found >= 1 && lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
                 float longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
