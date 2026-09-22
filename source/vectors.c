@@ -410,15 +410,8 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             float h_diff = heading[i] - heading[j];
             if (h_diff < -10.0f || h_diff > 62.0f) continue;
 
-            /* Lookahead pair score:
-             * Prioritize vectors reaching far ahead toward the horizon (small fy),
-             * with vector length, forward span, and perspective-adjusted separation (~24px far, ~46px near). */
-            float min_fy = (fy[i] < fy[j]) ? fy[i] : fy[j];
-            float horizon_reach = (float)PIXY_FRAME_HEIGHT - min_fy;
-            float span = (vdy[i] + vdy[j]) * 0.5f;
-            float expected_sep = 24.0f + 22.0f * (min_fy / (float)PIXY_FRAME_HEIGHT);
-            float sep_penalty = fabsf(sep - expected_sep) * 1.0f;
-            float score = horizon_reach * 1.5f + span * 1.0f - sep_penalty + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
+            /* Pair score: near-camera presence, realistic separation (~46px), and vector length */
+            float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 46.0f) * 1.5f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
             if (score > best_pair_score) {
                 best_pair_score = score;
                 best_l = (int)i;
@@ -484,8 +477,7 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             /* Reject center dashed line fragments (near camera center x ~ 39.5).
              * Outer track boundaries are at x ~ 15 (left) or x ~ 64 (right). */
             if (fabsf(nx[i] - (float)PIXY_CENTER_X) < 8.0f) continue;
-            float horizon_reach = (float)PIXY_FRAME_HEIGHT - fy[i];
-            float s = horizon_reach * 1.5f + vdy[i] * 1.0f + sqrtf(len_sq[i]);
+            float s = ny[i] * 2.0f + sqrtf(len_sq[i]);
             if (s > best_single_score) {
                 best_single_score = s;
                 best_single = (int)i;
@@ -581,22 +573,6 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     }
 
     result.lookahead_urgency = (angle_urgency > offset_urgency) ? angle_urgency : offset_urgency;
-
-    /* Scan all detected preview vectors for upcoming curves in the distance */
-    for (size_t k = 0; k < count; k++) {
-        if (vdy[k] < 6.0f) continue;
-        /* Vectors in the horizon preview zone (fy <= 35) with genuine turn angle */
-        if (fy[k] <= 35.0f && sqrtf(len_sq[k]) >= 8.0f) {
-            float v_angle = fabsf(heading[k]);
-            if (v_angle > 10.0f) {
-                float v_urgency = (v_angle - 10.0f) / ((float)HEADING_FULL_BRAKE_DEG - 10.0f);
-                if (v_urgency > 1.0f) v_urgency = 1.0f;
-                if (v_urgency > result.lookahead_urgency) {
-                    result.lookahead_urgency = v_urgency;
-                }
-            }
-        }
-    }
 
     return result;
 }
