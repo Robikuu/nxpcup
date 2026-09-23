@@ -51,36 +51,36 @@
 #define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full corner intensity scaling
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
-// ---- Forward Camera Horizon & Track Floor Gating ----
-// Pixy2 frame height is 52px (Y=0 is top horizon/sky, Y=51 is bottom ground).
-// Discard upper quarter (Y < 13) to eliminate background ceiling/walls/room clutter.
-// Require candidate vectors to anchor on the track floor (Y_near >= 24).
-#define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view
-#define FORWARD_CAM_FLOOR_Y_MIN      24U       // Lookahead vector base must touch track floor
+// ---- Forward Camera Lookahead Horizon & Root Anchor Geometry ----
+#define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view (walls/lights)
+#define FORWARD_CAM_ROOT_ANCHOR_Y_MIN 30U      // Vector base must anchor in foreground bumper zone (Y >= 30)
+#define FORWARD_CAM_SAMPLE_HORIZON_Y 20.0f     // Lookahead horizon sample line (~1.5m ahead)
+#define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
+#define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
+#define LOOKAHEAD_DEADBAND_PX        5.0f      // Neutral straightaway margin from center (+/- 5.0px)
+#define LOOKAHEAD_HYSTERESIS_ENTER_PX 6.0f     // Lookahead offset threshold to trigger DRIVE_TURNING
+#define LOOKAHEAD_HYSTERESIS_EXIT_PX  4.0f     // Lookahead offset threshold to return to DRIVE_FORWARD
+#define LOOKAHEAD_DROPOUT_HOLD_TICKS 3U        // 3 ticks (60ms) hold-last-valid window for optical flicker
 
-// ---- Dynamic PID Gain Scheduling (12.6V High-Speed Stabilized) ----
-#define KP_CORNER                    3.50f     // Decisive turning authority without understeer (tested 3.5 - 4.5)
-#define KP_STRAIGHT                  0.70f     // Calibrated straight-line tracking authority to eliminate high-speed twitch
-#define KD_CORNER                    0.200f    // Active derivative damping on lateral velocity d(CTE)/dt
-#define KD_STRAIGHT                  0.160f    // High-speed straightaway damping
+// ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
+#define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
+#define KP_CORNER                    1.60f     // Crisp cornering authority (no oversteer snap)
+#define KD_STRAIGHT                  0.180f    // Lateral velocity damping
+#define KD_CORNER                    0.180f    // Lateral velocity damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
-#define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) enables rapid corner-entry flick
+#define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) -> 13.0 deg/tick
 
-// ---- Error Weights & Anticipatory Feedforward ----
+// ---- Error Weights & Decoupled Feedforward ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
-#define DEFAULT_K_HEADING            1.30f     // Direct heading feedforward into curves (calibrated for high-speed bite)
-#define DEFAULT_K_LOOKAHEAD          0.35f     // Forward camera lookahead steering anticipation gain
-#define HEADING_DEADBAND_DEG         3.0f      // Heading deadband below which top camera feedforward is strictly 0 (prevents straight twitch)
-#define LOOKAHEAD_DEADBAND_DEG       6.0f      // Trajectory deadband below which lookahead feedforward is strictly 0
- 
-// ---- Control Loop ----
-#define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
+#define DEFAULT_K_HEADING            1.10f     // Direct base camera heading feedforward into curves
+#define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
+#define HEADING_DEADBAND_DEG         4.0f      // Heading deadband below which base feedforward is 0.0
 
 // ---- State Machine Thresholds ----
-#define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Calibrated corner entry heading threshold (responsive entry into standard curves)
-#define STATE_ENTER_STREAK           4         // 4 ticks (80ms) sustained curve confirmation to ignore chicane flicks
-#define STATE_EXIT_STREAK            5         // Ticks before returning to DRIVE_FORWARD
+#define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Base camera heading threshold for corner confirmation
+#define STATE_ENTER_STREAK           2         // 2 ticks (40ms) sustained curve confirmation
+#define STATE_EXIT_STREAK            2         // 2 ticks (40ms) before returning to DRIVE_FORWARD
 #define LINE_LOST_LIMIT              18U       // ~360ms coast window for traversing intersection gaps without braking
 #define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
 
