@@ -378,28 +378,31 @@ steering_result_t compute_steering_error(const uint16_t *vectors, size_t num_vec
 }
 
 /* ------------------------------------------------------------------ */
-/* compute_lookahead_trajectory - Trajectory planning from front cam  */
+/* compute_lookahead_trajectory - Foreground Root Anchor Algorithm     */
 /* ------------------------------------------------------------------ */
 trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t num_vectors)
 {
     trajectory_result_t result;
     result.trajectory_angle_deg = 0.0f;
     result.trajectory_offset_px = 0.0f;
-    result.curvature           = 0.0f;
-    result.lookahead_urgency   = 0.0f;
-    result.found               = 0;
+    result.lookahead_x          = (float)PIXY_CENTER_X;
+    result.curvature            = 0.0f;
+    result.lookahead_urgency    = 0.0f;
+    result.left_root_found      = 0;
+    result.right_root_found     = 0;
+    result.found                = 0;
 
     if (num_vectors == 0) return result;
 
     /* Orient each vector from near (yn >= yf, higher y is closer to bumper) to far (yf, horizon)
-     * and filter out room background clutter (upper quarter Y < 13 and ungrounded vectors Ynear < 24) */
+     * and filter out room background clutter (upper quarter Y < 13) and horizontal cross lines */
     size_t max_in = (num_vectors > (size_t)MAX_FILTER_VECTORS) ? (size_t)MAX_FILTER_VECTORS : num_vectors;
     size_t count = 0;
     float nx[MAX_FILTER_VECTORS], ny[MAX_FILTER_VECTORS], fx[MAX_FILTER_VECTORS], fy[MAX_FILTER_VECTORS];
-    float vdx[MAX_FILTER_VECTORS], vdy[MAX_FILTER_VECTORS], len_sq[MAX_FILTER_VECTORS], heading[MAX_FILTER_VECTORS];
+    float len[MAX_FILTER_VECTORS];
 
     for (size_t i = 0; i < max_in; i++) {
-        float x0 = (float)vectors[4 * i];
+        float x0 = (float)vectors[4 * i + 0];
         float y0 = (float)vectors[4 * i + 1];
         float x1 = (float)vectors[4 * i + 2];
         float y1 = (float)vectors[4 * i + 3];
@@ -412,19 +415,12 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         }
 
         /* 1. Upper quarter horizon discard:
-         * If both endpoints are in the upper quarter (y < 13), it's background walls / ceiling / chairs */
+         * If both endpoints are in the upper quarter (y < 13), it's background clutter */
         if (n_y < (float)FORWARD_CAM_HORIZON_Y_MIN && f_y < (float)FORWARD_CAM_HORIZON_Y_MIN) {
             continue;
         }
 
-        /* 2. Track floor connection gate:
-         * Candidate lookahead vectors must have their base anchored on the track floor (n_y >= 24).
-         * Rejects floating background furniture that does not connect to the track floor near the vehicle */
-        if (n_y < (float)FORWARD_CAM_FLOOR_Y_MIN) {
-            continue;
-        }
-
-        /* 3. Clip far endpoint if it extends into the upper quarter room ceiling */
+        /* 2. Clip far endpoint if it extends into the upper quarter room ceiling */
         if (f_y < (float)FORWARD_CAM_HORIZON_Y_MIN) {
             float total_dy = n_y - f_y;
             if (total_dy > 0.5f) {
@@ -437,7 +433,7 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         float dx = f_x - n_x;
         float dy = n_y - f_y;
 
-        /* Reject vectors pointing near-horizontal or backwards (dy < 6.0px) */
+        /* 3. Reject vectors pointing near-horizontal or backwards (dy < 6.0px) */
         if (dy < 6.0f) {
             continue;
         }
@@ -446,223 +442,169 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         ny[count] = n_y;
         fx[count] = f_x;
         fy[count] = f_y;
-        vdx[count] = dx;
-        vdy[count] = dy;
-        len_sq[count] = dx * dx + dy * dy;
-        heading[count] = (dy > 1.0f) ? (atan2f(dx, dy) * (180.0f / (float)M_PI)) : 0.0f;
+        len[count] = sqrtf(dx * dx + dy * dy);
         count++;
     }
 
     if (count == 0) return result;
 
-    /* 1. Search for a valid Left + Right boundary pair */
-    int best_l = -1;
-    int best_r = -1;
-    float best_pair_score = -99999.0f;
+    /*
+     * Foreground Root Vector Selection:
+     * A real track boundary currently entering under the vehicle must anchor on the foreground
+     * track floor (Y_near >= FORWARD_CAM_ROOT_ANCHOR_Y_MIN, 30U).
+     * Any vector originating higher up (e.g. peeling horizon branches) is excluded.
+     * The center zone [35.0, 44.0] is excluded at the bumper, rejecting center dashed lines.
+     */
+    int best_left_idx = -1;
+    float best_left_score = -99999.0f;
+    int best_right_idx = -1;
+    float best_right_score = -99999.0f;
 
     for (size_t i = 0; i < count; i++) {
-        for (size_t j = 0; j < count; j++) {
-            if (i == j) continue;
+        /* Must anchor in foreground bumper zone */
+        if (ny[i] < (float)FORWARD_CAM_ROOT_ANCHOR_Y_MIN) {
+            continue;
+        }
 
-            /* i must be strictly left of j at near end */
-            if (nx[i] >= nx[j]) continue;
+        float score = ny[i] * 2.0f + len[i];
 
-            float sep = nx[j] - nx[i];
-            /* Separation must be physically plausible for full track width in lookahead view.
-             * Full track width is ~46-52px. The center dashed line to an outer boundary is ~24px.
-             * Reject any pair with sep < 34.0px to strictly prevent pairing with the center line! */
-            if (sep < 34.0f || sep > 65.0f) continue;
-
-            /* Boundaries must not cross each other at far end */
-            if (fx[i] >= fx[j]) continue;
-
-            /* Directional heading compatibility (matching top camera logic):
-             * On a straight road, perspective convergence causes left boundary to lean right
-             * (+18.9 deg) and right boundary to lean left (-18.9 deg), giving h_diff ~ +37.8 deg.
-             * The old fabsf() check rejected this at 32 deg. Use directional check:
-             * h_diff = heading[left] - heading[right] should be in [-10, +62] deg. */
-            float h_diff = heading[i] - heading[j];
-            if (h_diff < -10.0f || h_diff > 62.0f) continue;
-
-            /* Pair score: near-camera presence, realistic separation (~46px), and vector length */
-            float score = (ny[i] + ny[j]) * 0.5f - fabsf(sep - 46.0f) * 1.5f + (sqrtf(len_sq[i]) + sqrtf(len_sq[j])) * 0.5f;
-            if (score > best_pair_score) {
-                best_pair_score = score;
-                best_l = (int)i;
-                best_r = (int)j;
+        /* Left Root Candidate (X_near <= 34.0) */
+        if (nx[i] <= (float)FORWARD_CAM_LEFT_MAX_X) {
+            if (score > best_left_score) {
+                best_left_score = score;
+                best_left_idx = (int)i;
+            }
+        }
+        /* Right Root Candidate (X_near >= 45.0) */
+        else if (nx[i] >= (float)FORWARD_CAM_RIGHT_MIN_X) {
+            if (score > best_right_score) {
+                best_right_score = score;
+                best_right_idx = (int)i;
             }
         }
     }
 
-    if (best_l >= 0 && best_r >= 0) {
-        /* Two valid boundaries found: Vector best_l = Left, Vector best_r = Right */
-        float lx_near = nx[best_l];  float ly_near = ny[best_l];
-        float lx_far  = fx[best_l];  float ly_far  = fy[best_l];
-        float rx_near = nx[best_r];  float ry_near = ny[best_r];
-        float rx_far  = fx[best_r];  float ry_far  = fy[best_r];
+    const float sample_y = (float)FORWARD_CAM_SAMPLE_HORIZON_Y; // 20.0f
 
-        /* Update temporal memory */
-        s_last_lookahead_left_x  = lx_near;
-        s_last_lookahead_right_x = rx_near;
-        if (s_last_lookahead_left_x > ((float)PIXY_CENTER_X - 5.0f)) {
-            s_last_lookahead_left_x = (float)PIXY_CENTER_X - 5.0f;
-        }
-        if (s_last_lookahead_right_x < ((float)PIXY_CENTER_X + 5.0f)) {
-            s_last_lookahead_right_x = (float)PIXY_CENTER_X + 5.0f;
-        }
+    /* Case A: Both Left and Right Root Vectors Found */
+    if (best_left_idx >= 0 && best_right_idx >= 0) {
+        result.left_root_found  = 1;
+        result.right_root_found = 1;
+        result.found            = 2;
 
-        /* Centerline trajectory midpoints */
-        float mid_near_x = (lx_near + rx_near) * 0.5f;
-        float mid_far_x  = (lx_far  + rx_far)  * 0.5f;
-        float mid_near_y = (ly_near + ry_near) * 0.5f;
-        float mid_far_y  = (ly_far  + ry_far)  * 0.5f;
-
-        float dy = mid_near_y - mid_far_y;
-        float dx = mid_far_x  - mid_near_x;
-
-        if (dy > 1.0f) {
-            result.trajectory_angle_deg = atan2f(dx, dy) * (180.0f / (float)M_PI);
-        }
-        result.trajectory_offset_px = mid_far_x - (float)PIXY_CENTER_X;
-
-        float seg_len = sqrtf(dx * dx + dy * dy);
-        if (seg_len > 1.0f) {
-            result.curvature = fabsf(dx) / (seg_len * seg_len);
+        /* Project Left Root to sample horizon Y = 20.0f */
+        float l_dy = ny[best_left_idx] - fy[best_left_idx];
+        float xl_20 = nx[best_left_idx];
+        if (l_dy > 0.5f) {
+            float t_l = (ny[best_left_idx] - sample_y) / l_dy;
+            xl_20 = nx[best_left_idx] + t_l * (fx[best_left_idx] - nx[best_left_idx]);
         }
 
-        result.found = 2;
-    } else {
-        /* Single boundary visible: pick the best single forward vector */
-        int best_single = -1;
-        float best_single_score = -99999.0f;
-        for (size_t i = 0; i < count; i++) {
-            if (vdy[i] < 6.0f) continue; /* Reject cross-lines / horizontal artifacts */
-            /* Reject center dashed line fragments (near camera center x ~ 39.5).
-             * Outer track boundaries are at x ~ 15 (left) or x ~ 64 (right). */
-            if (fabsf(nx[i] - (float)PIXY_CENTER_X) < 8.0f) continue;
-            float s = ny[i] * 2.0f + sqrtf(len_sq[i]);
-            if (s > best_single_score) {
-                best_single_score = s;
-                best_single = (int)i;
-            }
+        /* Project Right Root to sample horizon Y = 20.0f */
+        float r_dy = ny[best_right_idx] - fy[best_right_idx];
+        float xr_20 = nx[best_right_idx];
+        if (r_dy > 0.5f) {
+            float t_r = (ny[best_right_idx] - sample_y) / r_dy;
+            xr_20 = nx[best_right_idx] + t_r * (fx[best_right_idx] - nx[best_right_idx]);
         }
 
-        if (best_single < 0) {
-            return result;
+        /* Calculate Lookahead Point as the midpoint at horizon Y = 20.0f */
+        result.lookahead_x = (xl_20 + xr_20) * 0.5f;
+        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+
+        /* Trajectory angle from near midpoint to lookahead point */
+        float near_mid_x = (nx[best_left_idx] + nx[best_right_idx]) * 0.5f;
+        float near_mid_y = (ny[best_left_idx] + ny[best_right_idx]) * 0.5f;
+        float mid_dx = result.lookahead_x - near_mid_x;
+        float mid_dy = near_mid_y - sample_y;
+        if (mid_dy > 0.5f) {
+            result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
         }
 
-        float xn = nx[best_single];
-        float yn = ny[best_single];
-        float xf = fx[best_single];
-        float yf = fy[best_single];
-
-        /* Side classification with deadband and temporal memory:
-         * 1. Clearly right of center -> right boundary
-         * 2. Clearly left of center  -> left boundary
-         * 3. Transition zone [36.5, 42.5] -> use temporal memory */
-        bool is_right;
-        if (xn >= ((float)PIXY_CENTER_X + 3.0f)) {
-            is_right = true;
-        } else if (xn <= ((float)PIXY_CENTER_X - 3.0f)) {
-            is_right = false;
+        /* Lookahead Urgency with +/- 5.0px Deadband */
+        float abs_offset = fabsf(result.trajectory_offset_px);
+        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX);
+            if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
-            float dist_to_left  = fabsf(xn - s_last_lookahead_left_x);
-            float dist_to_right = fabsf(xn - s_last_lookahead_right_x);
-            is_right = (dist_to_right < dist_to_left);
+            result.lookahead_urgency = 0.0f;
         }
 
         /* Update temporal memory */
-        if (is_right) {
-            s_last_lookahead_right_x = xn;
-            s_last_lookahead_left_x  = xn - (2.0f * (float)PIXY_TRACK_HALF_WIDTH);
-        } else {
-            s_last_lookahead_left_x  = xn;
-            s_last_lookahead_right_x = xn + (2.0f * (float)PIXY_TRACK_HALF_WIDTH);
-        }
-        if (s_last_lookahead_left_x > ((float)PIXY_CENTER_X - 5.0f)) {
-            s_last_lookahead_left_x = (float)PIXY_CENTER_X - 5.0f;
-        }
-        if (s_last_lookahead_right_x < ((float)PIXY_CENTER_X + 5.0f)) {
-            s_last_lookahead_right_x = (float)PIXY_CENTER_X + 5.0f;
-        }
-
-        /* Centerline synthesis from single boundary:
-         * The forward camera is tilted looking down the track. On a straight track,
-         * perspective foreshortening causes each boundary to converge toward the
-         * optical vanishing point (PIXY_CENTER_X, Y_vanish ~ 0).
-         * If the raw line slope atan2(dx, dy) is used without perspective compensation,
-         * a straight boundary falsely looks like a 26-28 deg curve, permanently triggering
-         * maximum urgency and killing straightaway speed.
-         *
-         * For a straight boundary starting at (xn, yn), its expected perspective position at yf is:
-         *   x_expected = PIXY_CENTER_X + (xn - PIXY_CENTER_X) * (yf / yn)
-         * The true turn curvature is the departure of xf from this straight perspective line:
-         *   dx_turn = xf - x_expected
-         */
-        float yn_clamped = (yn > 5.0f) ? yn : 5.0f;
-        float depth_ratio = yf / yn_clamped;
-        if (depth_ratio < 0.0f) depth_ratio = 0.0f;
-        if (depth_ratio > 1.0f) depth_ratio = 1.0f;
-
-        float x_expected = (float)PIXY_CENTER_X + (xn - (float)PIXY_CENTER_X) * depth_ratio;
-        float dx_turn = xf - x_expected;
-        float dy = yn - yf;
-
-        /* Apparent track half-width at distance yf */
-        float track_half_far = (float)PIXY_TRACK_HALF_WIDTH * depth_ratio;
-        if (track_half_far < 5.0f)  track_half_far = 5.0f;
-        if (track_half_far > (float)PIXY_TRACK_HALF_WIDTH) track_half_far = (float)PIXY_TRACK_HALF_WIDTH;
-
-        float sign = is_right ? -1.0f : 1.0f;
-        float mid_far_x = xf + sign * track_half_far;
-
-        if (dy > 0.5f) {
-            result.trajectory_angle_deg = atan2f(dx_turn, dy) * (180.0f / (float)M_PI);
-        }
-        result.trajectory_offset_px = mid_far_x - (float)PIXY_CENTER_X;
-
-        float seg_len = sqrtf(dx_turn * dx_turn + dy * dy);
-        if (seg_len > 1.0f) {
-            result.curvature = fabsf(dx_turn) / (seg_len * seg_len);
-        }
-
-        result.found = 1;
+        s_last_lookahead_left_x  = nx[best_left_idx];
+        s_last_lookahead_right_x = nx[best_right_idx];
+        return result;
     }
 
-    /* Clamp trajectory angle to realistic lookahead limits */
-    if (result.trajectory_angle_deg > 35.0f)  result.trajectory_angle_deg = 35.0f;
-    if (result.trajectory_angle_deg < -35.0f) result.trajectory_angle_deg = -35.0f;
+    /* Case B: Single Root Vector Found */
+    if (best_left_idx >= 0) {
+        result.left_root_found  = 1;
+        result.right_root_found = 0;
+        result.found            = 1;
 
-    /* Compute normalized lookahead urgency (0.0 to 1.0) with deadbands to prevent straight pre-braking:
-     * - Ignore trajectory angles <= 6.0 deg (straightaway horizon jitter/alignment)
-     * - Ignore lateral offset <= 15.0 px (matches CTE straight deadband) */
-    float abs_angle = fabsf(result.trajectory_angle_deg);
-    float angle_urgency = 0.0f;
-    if (abs_angle > 6.0f) {
-        angle_urgency = (abs_angle - 6.0f) / ((float)HEADING_FULL_BRAKE_DEG - 6.0f);
-        if (angle_urgency > 1.0f) angle_urgency = 1.0f;
-    }
+        float l_dy = ny[best_left_idx] - fy[best_left_idx];
+        float xl_20 = nx[best_left_idx];
+        if (l_dy > 0.5f) {
+            float t_l = (ny[best_left_idx] - sample_y) / l_dy;
+            xl_20 = nx[best_left_idx] + t_l * (fx[best_left_idx] - nx[best_left_idx]);
+        }
 
-    float abs_offset = fabsf(result.trajectory_offset_px);
-    float offset_urgency = 0.0f;
-    if (abs_offset > 15.0f) {
-        offset_urgency = (abs_offset - 15.0f) / ((float)PIXY_CENTER_X - 15.0f);
-        if (offset_urgency > 1.0f) offset_urgency = 1.0f;
-    }
+        /* Synthesize lookahead point by adding nominal half-width at horizon (~15px) */
+        result.lookahead_x = xl_20 + 15.0f;
+        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
 
-    result.lookahead_urgency = (angle_urgency > offset_urgency) ? angle_urgency : offset_urgency;
+        float mid_dx = (fx[best_left_idx] - nx[best_left_idx]);
+        float mid_dy = l_dy;
+        if (mid_dy > 0.5f) {
+            result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
+        }
 
-    /* Single-boundary gating: An isolated single line in tilted perspective has higher slope noise.
-     * When only a single boundary is visible, apply a higher trajectory threshold (8.0 deg)
-     * and scale urgency by 0.60f to provide robust curve anticipation without false triggers. */
-    if (result.found == 1) {
-        if (abs_angle > 8.0f) {
-            result.lookahead_urgency = 0.60f * ((abs_angle - 8.0f) / ((float)HEADING_FULL_BRAKE_DEG - 8.0f));
+        float abs_offset = fabsf(result.trajectory_offset_px);
+        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = 0.60f * ((abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX));
             if (result.lookahead_urgency > 0.60f) result.lookahead_urgency = 0.60f;
         } else {
             result.lookahead_urgency = 0.0f;
         }
+
+        s_last_lookahead_left_x = nx[best_left_idx];
+        return result;
     }
 
+    if (best_right_idx >= 0) {
+        result.left_root_found  = 0;
+        result.right_root_found = 1;
+        result.found            = 1;
+
+        float r_dy = ny[best_right_idx] - fy[best_right_idx];
+        float xr_20 = nx[best_right_idx];
+        if (r_dy > 0.5f) {
+            float t_r = (ny[best_right_idx] - sample_y) / r_dy;
+            xr_20 = nx[best_right_idx] + t_r * (fx[best_right_idx] - nx[best_right_idx]);
+        }
+
+        /* Synthesize lookahead point by subtracting nominal half-width at horizon (~15px) */
+        result.lookahead_x = xr_20 - 15.0f;
+        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+
+        float mid_dx = (fx[best_right_idx] - nx[best_right_idx]);
+        float mid_dy = r_dy;
+        if (mid_dy > 0.5f) {
+            result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
+        }
+
+        float abs_offset = fabsf(result.trajectory_offset_px);
+        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = 0.60f * ((abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX));
+            if (result.lookahead_urgency > 0.60f) result.lookahead_urgency = 0.60f;
+        } else {
+            result.lookahead_urgency = 0.0f;
+        }
+
+        s_last_lookahead_right_x = nx[best_right_idx];
+        return result;
+    }
+
+    /* Case C: No Root Vectors Found */
     return result;
 }
