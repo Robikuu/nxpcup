@@ -26,16 +26,9 @@
 volatile bool g_tickFlag = false;
 robot_params_t g_params;
 
-typedef enum {
-    DRIVE_FORWARD,
-    DRIVE_TURNING,
-    DRIVE_BRAKING
-} drive_state_t;
-
 void SysTick_Handler(void) {
     g_tickFlag = true;
 }
-
 
 int main(void) {
     /* 1. Hardware initializations */
@@ -81,35 +74,35 @@ int main(void) {
     /* 5. 50 Hz control loop (20ms) */
     SysTick_Config(SystemCoreClock / 50U);
 
-    /* 6. State variables */
+    /* 6. Continuous Curvature Governor & 3-Macro-State Variables */
     uint16_t vectors_pid[MAX_VECTORS * 4];
-    size_t   num_vectors_pid         = 0;
+    size_t   num_vectors_pid          = 0;
     uint16_t vectors_front[MAX_VECTORS * 4];
-    size_t   num_vectors_front       = 0;
+    size_t   num_vectors_front        = 0;
+
     trajectory_result_t g_traj;
     memset(&g_traj, 0, sizeof(g_traj));
-    g_traj.lookahead_x       = (float)PIXY_CENTER_X;
-    float    filtered_traj_angle     = 0.0f;
-    float    filtered_traj_offset    = 0.0f;
-    float    lookahead_turn_factor   = 0.0f;
-    float    s_last_valid_lookahead_x = (float)PIXY_CENTER_X;
+    g_traj.lookahead_x        = (float)PIXY_CENTER_X;
+
+    float    filtered_traj_angle      = 0.0f;
+    float    lookahead_turn_factor    = 0.0f;
     uint32_t s_front_dropout_ticks    = 0;
-    uint32_t line_lost_counter       = 0;
-    float    filtered_cte            = 0.0f;
-    int      cte_filter_init         = 0;
-    float    filtered_heading        = 0.0f;
-    int      heading_filter_init     = 0;
-    float    applied_speed_left      = g_params.speed_straight;
-    float    applied_speed_right     = g_params.speed_straight;
-    float         steer_cmd               = 0.0f;
-    float         last_steer_cmd          = 0.0f;
-    drive_state_t drive_state             = DRIVE_FORWARD;
-    bool          s_corner_apex_reached   = false;
-    uint32_t      s_corner_abort_ticks    = 0;
-    uint32_t      state_streak            = 0;
-    int8_t        streak_sign             = 0;
-    uint32_t      urgency_streak          = 0;
-    float         trusted_corner_urgency  = 0.0f;
+
+    uint8_t  macro_state              = MACRO_STATE_NORMAL;
+    uint32_t intersection_ticks       = 0;
+    uint32_t line_lost_ticks          = 0;
+    uint32_t line_reacquire_streak    = 0;
+
+    float    filtered_cte             = 0.0f;
+    int      cte_filter_init          = 0;
+    float    filtered_heading         = 0.0f;
+    int      heading_filter_init      = 0;
+
+    float    applied_speed_left       = g_params.speed_straight;
+    float    applied_speed_right      = g_params.speed_straight;
+    float    steer_cmd                = 0.0f;
+    float    last_steer_cmd           = 0.0f;
+    float    kappa                    = 0.0f;
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -136,29 +129,25 @@ int main(void) {
             if (g_params.state != STATE_RUNNING) {
                 reset_pid_state(&steer_pid);
                 reset_steering_tracking();
-                line_lost_counter         = 0;
-                filtered_cte              = 0.0f;
-                cte_filter_init           = 0;
-                filtered_heading          = 0.0f;
-                heading_filter_init       = 0;
-                filtered_traj_angle       = 0.0f;
-                filtered_traj_offset      = 0.0f;
-                lookahead_turn_factor     = 0.0f;
-                s_last_valid_lookahead_x  = (float)PIXY_CENTER_X;
-                s_front_dropout_ticks     = 0;
+                macro_state              = MACRO_STATE_NORMAL;
+                intersection_ticks       = 0;
+                line_lost_ticks          = 0;
+                line_reacquire_streak    = 0;
+                filtered_cte             = 0.0f;
+                cte_filter_init          = 0;
+                filtered_heading         = 0.0f;
+                heading_filter_init      = 0;
+                filtered_traj_angle      = 0.0f;
+                lookahead_turn_factor    = 0.0f;
+                s_front_dropout_ticks    = 0;
                 memset(&g_traj, 0, sizeof(g_traj));
-                g_traj.lookahead_x        = (float)PIXY_CENTER_X;
-                applied_speed_left        = g_params.speed_straight;
-                applied_speed_right       = g_params.speed_straight;
-                steer_cmd                 = 0.0f;
-                last_steer_cmd            = 0.0f;
-                drive_state               = DRIVE_FORWARD;
-                s_corner_apex_reached     = false;
-                s_corner_abort_ticks      = 0;
-                state_streak              = 0;
-                streak_sign               = 0;
-                urgency_streak            = 0;
-                trusted_corner_urgency    = 0.0f;
+                g_traj.lookahead_x       = (float)PIXY_CENTER_X;
+                applied_speed_left       = g_params.speed_straight;
+                applied_speed_right      = g_params.speed_straight;
+                steer_cmd                = 0.0f;
+                last_steer_cmd           = 0.0f;
+                kappa                    = 0.0f;
+
                 if (motor_test_is_active()) {
                     motor_test_tick();
                 } else {
@@ -167,394 +156,269 @@ int main(void) {
                 continue;
             }
 
-            /* Trajectory Camera polling (LP_FLEXCOMM2 - 50 Hz every tick) */
+            /* --- 1. Trajectory Camera Polling (LP_FLEXCOMM2 - Forward Horizon View) --- */
             status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
             if (s_front == kStatus_Success && num_vectors_front > 0) {
                 g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
+                s_front_dropout_ticks = 0;
+                filtered_traj_angle   = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
+                lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency     + 0.50f * lookahead_turn_factor;
             } else {
+                s_front_dropout_ticks++;
+                filtered_traj_angle   *= 0.80f;
+                lookahead_turn_factor *= 0.80f;
                 memset(&g_traj, 0, sizeof(g_traj));
                 g_traj.lookahead_x = (float)PIXY_CENTER_X;
             }
 
-            /* 50 Hz Foreground Lookahead & Dropout Hold Filter */
-            if (g_traj.found >= 1) {
-                s_last_valid_lookahead_x = g_traj.lookahead_x;
-                s_front_dropout_ticks    = 0;
-                filtered_traj_angle      = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
-                filtered_traj_offset     = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
-                lookahead_turn_factor    = 0.50f * g_traj.lookahead_urgency     + 0.50f * lookahead_turn_factor;
+            /* --- 2. PID Camera Polling & Geometry Validation (Top/Homography View) --- */
+            status_t s_pid = pixy_get_vectors(&cam_pid, vectors_pid, MAX_VECTORS, &num_vectors_pid);
+            bool intersection_trigger = false;
+
+            if (s_pid == kStatus_Success && num_vectors_pid > 0) {
+                /* Detect crossing lines before Pass 2 horizontal-vector rejection */
+                for (size_t i = 0; i < num_vectors_pid; i++) {
+                    int dx = (int)vectors_pid[4 * i + 2] - (int)vectors_pid[4 * i + 0];
+                    int dy = (int)vectors_pid[4 * i + 3] - (int)vectors_pid[4 * i + 1];
+                    if (dx < 0) dx = -dx;
+                    if (dy < 0) dy = -dy;
+                    if (dx >= 18 && (dx * 20 > dy * 17)) {
+                        intersection_trigger = true;
+                        break;
+                    }
+                }
+                vector_filtering(vectors_pid, &num_vectors_pid);
             } else {
-                /* Zero root vectors detected: 1-3 tick hold-last-valid filter */
-                s_front_dropout_ticks++;
-                filtered_traj_angle  *= 0.80f;
-                filtered_traj_offset *= 0.80f;
-                if (s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS) {
-                    /* Extended dropout: check top-camera sanity guard ONLY in DRIVE_FORWARD */
-                    if (drive_state == DRIVE_FORWARD && fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f) {
-                        /* Straightaway sanity veto: vehicle is dead-center on a straight! */
-                        lookahead_turn_factor *= 0.80f;
-                    } else {
-                        /* Curve confirmed or in DRIVE_TURNING: line lost in corner */
-                        lookahead_turn_factor = 0.60f;
-                    }
-                }
+                num_vectors_pid = 0;
             }
 
-            /* In DRIVE_TURNING: enforce urgency floor on corner approach before apex */
-            if (drive_state == DRIVE_TURNING && !s_corner_apex_reached) {
-                if (lookahead_turn_factor < 0.60f) {
-                    lookahead_turn_factor = 0.60f;
-                }
+            steering_result_t sr;
+            if (s_pid == kStatus_Success && num_vectors_pid > 0) {
+                sr = compute_steering_error(vectors_pid, num_vectors_pid);
+            } else {
+                sr.found       = 0;
+                sr.cte         = 0.0f;
+                sr.heading_deg = 0.0f;
             }
 
-            /* PID Camera line tracking (Top/Homography view) */
-            status_t s = pixy_get_vectors(&cam_pid, vectors_pid, MAX_VECTORS, &num_vectors_pid);
-            if (s != kStatus_Success || num_vectors_pid == 0) {
-                urgency_streak         = 0;
-                trusted_corner_urgency *= 0.90f;
-                if (++line_lost_counter <= LINE_LOST_LIMIT) {
-                    /* Dead-reckoning coast through intersection gap without braking */
-                    Steer(g_params.steering_offset);
-                    HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
-                } else {
-                    drive_state = DRIVE_BRAKING;
-                    Steer(g_params.steering_offset);
-                    HbridgeBrake(&g_hbridge);
-                    reset_steering_tracking();
-                    reset_pid_state(&steer_pid);
-                    static uint8_t s_brake_div = 0;
-                    if (++s_brake_div >= 5) {
-                        s_brake_div = 0;
-                        esp_printf("L:0 ST:B (braking)\r\n");
-                    }
-                }
-                continue;
-            }
-
-            /* Geometric pair validation & filtering on PID camera (Pass 2 rejects crossing lines) */
-            vector_filtering(vectors_pid, &num_vectors_pid);
-
-            /* Error computation with perspective synthesis */
-            steering_result_t sr = compute_steering_error(vectors_pid, num_vectors_pid);
-
+            /* --- 3. Macro State Transitions --- */
             if (sr.found == 0) {
-                urgency_streak         = 0;
-                trusted_corner_urgency *= 0.90f;
-                if (++line_lost_counter <= LINE_LOST_LIMIT) {
-                    /* Dead-reckoning coast through intersection gap without braking */
-                    Steer(g_params.steering_offset);
-                    HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
+                line_reacquire_streak = 0;
+                line_lost_ticks++;
+                if (line_lost_ticks >= (uint32_t)LINE_LOST_DEBOUNCE_TICKS) {
+                    macro_state = MACRO_STATE_LINE_LOST;
+                }
+            } else {
+                if (macro_state == MACRO_STATE_LINE_LOST) {
+                    if (++line_reacquire_streak >= (uint32_t)LINE_REACQUIRE_TICKS) {
+                        /* Exit LINE_LOST -> NORMAL: Reset filters to prevent steering kick */
+                        macro_state           = MACRO_STATE_NORMAL;
+                        line_lost_ticks       = 0;
+                        line_reacquire_streak = 0;
+                        cte_filter_init       = 0;
+                        heading_filter_init   = 0;
+                        reset_pid_state(&steer_pid);
+                    }
                 } else {
-                    drive_state = DRIVE_BRAKING;
-                    Steer(g_params.steering_offset);
-                    HbridgeBrake(&g_hbridge);
-                    reset_steering_tracking();
-                    reset_pid_state(&steer_pid);
-                    static uint8_t s_brake_div = 0;
-                    if (++s_brake_div >= 5) {
-                        s_brake_div = 0;
-                        esp_printf("L:0 ST:B (braking)\r\n");
-                    }
-                }
-                continue;
-            }
-
-            /* Valid lane lines confirmed: reset line loss tracking */
-            line_lost_counter = 0;
-
-            if (!heading_filter_init) {
-                filtered_heading    = sr.heading_deg;
-                heading_filter_init = 1;
-            } else {
-                filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
-            }
-
-            /* State machine transitions:
-             * - Track corner apex entry:
-             *   Once the vehicle physically experiences curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG),
-             *   or significant steering deflection (|steer_cmd| >= 15.0 deg) or outer lane displacement (|filtered_cte| >= 14.0 px),
-             *   mark apex reached!
-             * - DRIVE_TURNING (Corner):
-             *   Triggered by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG),
-             *   or lookahead point exceeding enter hysteresis (> 4.0px),
-             *   or confirmed sustained line loss outside straight sanity veto.
-             * - DRIVE_FORWARD (Straight):
-             *   If apex has been reached: strictly confirmed when both top camera and front lookahead confirm centering:
-             *   |filtered_heading| <= 4.0 deg, |filtered_cte| <= 6.0 px, and lookahead offset <= 3.0 px (for 4 ticks = 80ms).
-             *   If apex NOT yet reached (on approach): hold DRIVE_TURNING until apex is negotiated (or safety timeout expires). */
-            if (drive_state == DRIVE_TURNING) {
-                if (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG ||
-                    fabsf(steer_cmd) >= 15.0f ||
-                    fabsf(filtered_cte) >= 14.0f) {
-                    s_corner_apex_reached = true;
-                    s_corner_abort_ticks  = 0;
+                    line_lost_ticks       = 0;
+                    line_reacquire_streak = 0;
                 }
             }
 
-            float la_offset = fabsf(s_last_valid_lookahead_x - (float)PIXY_CENTER_X);
-            bool corner_trigger = (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG) ||
-                                  (la_offset >= (float)LOOKAHEAD_HYSTERESIS_ENTER_PX && s_front_dropout_ticks == 0) ||
-                                  (s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS &&
-                                   !(fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f));
+            if (macro_state == MACRO_STATE_NORMAL && intersection_trigger) {
+                macro_state        = MACRO_STATE_INTERSECTION;
+                intersection_ticks = 0;
+                reset_pid_state(&steer_pid);
+            }
 
-            drive_state_t desired_state;
-            if (drive_state == DRIVE_TURNING) {
-                bool straight_confirmed = (fabsf(filtered_heading) <= 4.0f &&
-                                           fabsf(filtered_cte) <= 6.0f &&
-                                           la_offset <= (float)LOOKAHEAD_HYSTERESIS_EXIT_PX);
-                if (s_corner_apex_reached) {
-                    /* Apex has been negotiated: safe to return to DRIVE_FORWARD once straight is confirmed */
-                    desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+            /* --- 4. Base Camera Line Filtering (When Lines Present) --- */
+            if (sr.found > 0) {
+                if (!heading_filter_init) {
+                    filtered_heading    = sr.heading_deg;
+                    heading_filter_init = 1;
                 } else {
-                    /* On corner approach before apex: DO NOT abort to DRIVE_FORWARD unless long safety timeout expires */
-                    if (straight_confirmed) {
-                        if (++s_corner_abort_ticks >= (uint32_t)CORNER_APPROACH_ABORT_TICKS) {
-                            desired_state = DRIVE_FORWARD; /* False alarm safety exit */
-                        } else {
-                            desired_state = DRIVE_TURNING; /* Hold corner pre-braking state! */
-                        }
-                    } else {
-                        s_corner_abort_ticks = 0;
-                        desired_state = DRIVE_TURNING;
-                    }
+                    filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
                 }
-            } else {
-                desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
-            }
 
-            if (desired_state != drive_state) {
-                if (drive_state == DRIVE_FORWARD) {
-                    /* Chicane / flick protection: ensure curve direction is sustained in ONE direction */
-                    int8_t current_sign = (filtered_heading >= 0.0f) ? 1 : -1;
-                    if (current_sign != streak_sign) {
-                        streak_sign = current_sign;
-                        state_streak = 0;
-                    }
-                }
-                uint32_t threshold = (desired_state == DRIVE_FORWARD) ? (uint32_t)STATE_EXIT_STREAK : (uint32_t)STATE_ENTER_STREAK;
-                if (++state_streak >= threshold) {
-                    drive_state  = desired_state;
-                    state_streak = 0;
-                    if (drive_state == DRIVE_TURNING) {
-                        s_corner_apex_reached = false;
-                        s_corner_abort_ticks  = 0;
-                    }
-                }
-            } else {
-                state_streak = 0;
-                streak_sign  = 0;
-            }
-
-            /* Cross-track error low-pass filtering */
                 if (!cte_filter_init) {
                     filtered_cte    = sr.cte;
                     cte_filter_init = 1;
                 } else {
-                    filtered_cte = 0.4f * sr.cte + 0.6f * filtered_cte;
+                    filtered_cte = 0.40f * sr.cte + 0.60f * filtered_cte;
                 }
+            }
 
-                /* 1. Dynamic PID Gain Scheduling Based on Corner Urgency
-                 * Continuous deadband of 2.5 deg on heading: straightaway yaw jitter is strictly ignored. */
-                float dz_heading_urgency = fabsf(filtered_heading) - 2.5f;
-                float heading_urgency = (dz_heading_urgency > 0.0f) ? (dz_heading_urgency / ((float)HEADING_FULL_BRAKE_DEG - 2.5f)) : 0.0f;
-                if (heading_urgency > 1.0f) heading_urgency = 1.0f;
+            /* --- 5. State-Specific Control Computation --- */
+            float target_speed = g_params.speed_straight;
+            float raw_steer    = 0.0f;
 
-                /* Only let CTE drive corner urgency if CTE enters the outer lane band (>14px) */
-                float cte_excess = fabsf(filtered_cte) - 14.0f;
-                float cte_urgency = (cte_excess > 0.0f) ? (cte_excess / ((float)CTE_URGENCY_PX - 14.0f)) : 0.0f;
-                if (cte_urgency > 1.0f) cte_urgency = 1.0f;
-
-                float raw_corner_urgency = heading_urgency;
-                if (cte_urgency > raw_corner_urgency) raw_corner_urgency = cte_urgency;
-                if (lookahead_turn_factor > raw_corner_urgency) raw_corner_urgency = lookahead_turn_factor;
-
-                if (raw_corner_urgency > trusted_corner_urgency) {
-                    if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
-                        trusted_corner_urgency = raw_corner_urgency;
-                        urgency_streak = 0;
-                    }
-                } else {
-                    /* Smooth urgency decay: prevents mid-corner dropouts and throttle surges */
-                    trusted_corner_urgency = 0.10f * raw_corner_urgency + 0.90f * trusted_corner_urgency;
-                    urgency_streak = 0;
-                }
-
-                steer_pid.kp    = g_params.kp_straight + trusted_corner_urgency * (g_params.kp_corner - g_params.kp_straight);
-                steer_pid.ki    = g_params.ki;
-                steer_pid.kd    = g_params.kd_straight + trusted_corner_urgency * (g_params.kd_corner - g_params.kd_straight);
-                steer_pid.alpha = g_params.alpha;
-
-                /* 2. Decoupled Steering Authority:
-                 * - CTE error is actively damped and regulated by the PID controller.
-                 * - Heading error acts as direct, instantaneous feedforward anticipation into curves.
-                 * - Lookahead feedforward is STRICTLY ZERO (100% decoupled from servo).
-                 * - Slew rate is capped by MAX_STEER_RATE_PER_SEC to prevent sudden chassis snapping and tire scrub. */
-                float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
-
-                /* Decisive Turn-In & Apex Protection:
-                 * When actively negotiating a corner (DRIVE_TURNING) with significant curvature
-                 * (|filtered_heading| >= 8.0 deg), if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
-                 * Suppress pid_cte so the vehicle bites cleanly through the apex without understeer!
-                 * On straightaways (DRIVE_FORWARD), pid_cte is NEVER suppressed. */
-                if (drive_state == DRIVE_TURNING &&
-                    (filtered_cte * filtered_heading < 0.0f) &&
-                    fabsf(filtered_heading) >= 8.0f) {
-                    pid_cte = 0.0f;
-                }
-
-                /* Continuous Deadband Heading Feedforward:
-                 * On straightaways (|filtered_heading| <= HEADING_DEADBAND_DEG), track curvature is zero;
-                 * feedforward is strictly 0.0f, locking the car to centerline via PID derivative damping.
-                 * As soon as a curve begins (|filtered_heading| > HEADING_DEADBAND_DEG), full k_heading gain
-                 * applies immediately without fractional urgency division or lag! */
+            if (macro_state == MACRO_STATE_NORMAL) {
+                /* A. Preview Curvature Metric (kappa) with Deadbands */
                 float abs_h = fabsf(filtered_heading);
+                float k_base = 0.0f;
+                if (abs_h > (float)GOVERNOR_HEADING_DEADBAND_DEG) {
+                    k_base = (abs_h - (float)GOVERNOR_HEADING_DEADBAND_DEG) /
+                             ((float)GOVERNOR_HEADING_MAX_DEG - (float)GOVERNOR_HEADING_DEADBAND_DEG);
+                    if (k_base > 1.0f) k_base = 1.0f;
+                }
+
+                float k_front = lookahead_turn_factor;
+                if (k_front > 1.0f) k_front = 1.0f;
+
+                kappa = (k_base > k_front) ? k_base : k_front;
+                if (kappa > 1.0f) kappa = 1.0f;
+
+                /* B. Continuous Target Speed */
+                target_speed = g_params.speed_straight - kappa * (g_params.speed_straight - g_params.speed_outside_corner);
+
+                /* C. Decoupled Steering Authority */
                 float effective_h = 0.0f;
                 if (abs_h > (float)HEADING_DEADBAND_DEG) {
                     effective_h = (abs_h - (float)HEADING_DEADBAND_DEG) * ((filtered_heading > 0.0f) ? 1.0f : -1.0f);
                 }
-                float heading_feedforward = g_params.k_heading * effective_h;
+                float heading_ff = g_params.k_heading * effective_h;
+                float pid_cte    = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
-                /* STRICTLY DECOUPLED: Front camera does NOT inject steering angle */
-                float raw_steer = pid_cte + heading_feedforward;
-
-                const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
-                float steer_diff = raw_steer - last_steer_cmd;
-                if (steer_diff > max_steer_step) {
-                    raw_steer = last_steer_cmd + max_steer_step;
-                } else if (steer_diff < -max_steer_step) {
-                    raw_steer = last_steer_cmd - max_steer_step;
-                }
-                steer_cmd = raw_steer;
-
-                /* Clamp to relative command travel: [-77.5f, +52.5f] */
-                if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) {
-                    steer_cmd = (float)STEER_CMD_MAX_RIGHT;
-                }
-                if (steer_cmd < (float)STEER_CMD_MAX_LEFT) {
-                    steer_cmd = (float)STEER_CMD_MAX_LEFT;
+                /* Apex protection: suppress opposing CTE damping in deep curves to bite into apex */
+                if (abs_h >= 8.0f && (filtered_cte * filtered_heading < 0.0f)) {
+                    pid_cte = 0.0f;
                 }
 
-                /* Slew tracker updated AFTER clamping to prevent windup beyond physical servo travel */
-                last_steer_cmd = steer_cmd;
+                raw_steer = pid_cte + heading_ff;
+            }
+            else if (macro_state == MACRO_STATE_INTERSECTION) {
+                kappa        = 0.0f;
+                target_speed = 70.0f;
+                raw_steer    = 0.0f; /* Hold straight across intersection */
 
-                /* Output to physical servo (offset added exactly once) */
-                Steer(steer_cmd + g_params.steering_offset);
+                if (++intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
+                    /* Guaranteed Timeout Exit -> NORMAL */
+                    macro_state         = MACRO_STATE_NORMAL;
+                    intersection_ticks  = 0;
+                    cte_filter_init     = 0;
+                    heading_filter_init = 0;
+                    reset_pid_state(&steer_pid);
+                }
+            }
+            else if (macro_state == MACRO_STATE_LINE_LOST) {
+                kappa     = 0.0f;
+                raw_steer = 0.0f; /* Hold straight */
 
-                /* 3. Direction-Aware Steering Normalization & Predictive Corner Intensity */
-                float abs_steer = fabsf(steer_cmd);
-                float dz_steer = abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG;
-                if (dz_steer < 0.0f) dz_steer = 0.0f;
+                if (line_lost_ticks <= (uint32_t)LINE_LOST_BRAKE_TICKS) {
+                    /* Phase 1: Coast straight at current applied speed */
+                    target_speed = applied_speed_left;
+                } else if (line_lost_ticks <= (uint32_t)LINE_LOST_STOP_TICKS) {
+                    /* Phase 2: Active Dynamic Braking */
+                    target_speed = 0.0f;
+                } else {
+                    /* Phase 3: Emergency Stop */
+                    target_speed   = 0.0f;
+                    g_params.state = STATE_IDLE;
+                    HbridgeBrake(&g_hbridge);
+                }
+            }
 
-                float steer_norm = dz_steer / ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
+            /* --- 6. Global Steering Slew Rate Limiter --- */
+            const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
+            float steer_diff = raw_steer - last_steer_cmd;
+            if (steer_diff > max_steer_step) {
+                raw_steer = last_steer_cmd + max_steer_step;
+            } else if (steer_diff < -max_steer_step) {
+                raw_steer = last_steer_cmd - max_steer_step;
+            }
+
+            if (raw_steer > (float)STEER_CMD_MAX_RIGHT) raw_steer = (float)STEER_CMD_MAX_RIGHT;
+            if (raw_steer < (float)STEER_CMD_MAX_LEFT)  raw_steer = (float)STEER_CMD_MAX_LEFT;
+            steer_cmd      = raw_steer;
+            last_steer_cmd = steer_cmd;
+
+            Steer(steer_cmd + g_params.steering_offset);
+
+            /* --- 7. Dynamic Differential Drag (Tank Steering Bite) --- */
+            float abs_steer = fabsf(steer_cmd);
+            float steer_norm = 0.0f;
+            if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
+                             ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                 if (steer_norm > 1.0f) steer_norm = 1.0f;
+            }
 
-                float abs_heading = fabsf(filtered_heading);
-                float dz_heading = abs_heading - (float)DIFFERENTIAL_DEADZONE_DEG;
-                if (dz_heading < 0.0f) dz_heading = 0.0f;
-                float heading_norm = dz_heading / ((float)HEADING_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
-                if (heading_norm > 1.0f) heading_norm = 1.0f;
+            float diff_delta = steer_norm * (target_speed - g_params.speed_inside_min);
+            if (diff_delta < 0.0f) diff_delta = 0.0f;
 
-                /* 4. Longitudinal Base Speed & Differential Assignment
-                 * In DRIVE_FORWARD (straightaways & rapid chicane flicks):
-                 * Maintain full 100% straight sprint speed with zero differential drag.
-                 * Proactively pre-brake if front lookahead senses an upcoming corner (> 0.15 urgency).
-                 * In DRIVE_TURNING (sustained curves after STATE_ENTER_STREAK confirmation):
-                 * Immediately clamp base speed to corner envelope (70% down to 58%) and apply inside wheel pivot drag. */
-                float effective_corner_intensity = heading_norm;
-                if (lookahead_turn_factor > effective_corner_intensity) {
-                    effective_corner_intensity = lookahead_turn_factor;
+            float target_left  = target_speed;
+            float target_right = target_speed;
+
+            if (steer_cmd > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                /* Turning Right: Left outside, Right inside */
+                target_left  = target_speed;
+                target_right = target_speed - diff_delta;
+            } else if (steer_cmd < -(float)DIFFERENTIAL_DEADZONE_DEG) {
+                /* Turning Left: Right outside, Left inside */
+                target_left  = target_speed - diff_delta;
+                target_right = target_speed;
+            }
+
+            /* --- 8. Bilateral Anti-Spin Traction Guard & Speed Slew Limiter --- */
+            bool yaw_conflict = false;
+            if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                if (steer_cmd > (float)YAW_CONFLICT_DEADBAND &&
+                    (target_left - target_right) > 5.0f &&
+                    applied_speed_left < applied_speed_right) {
+                    yaw_conflict = true;
+                } else if (steer_cmd < -(float)YAW_CONFLICT_DEADBAND &&
+                           (target_right - target_left) > 5.0f &&
+                           applied_speed_right < applied_speed_left) {
+                    yaw_conflict = true;
                 }
-                float longitudinal_base = g_params.speed_straight;
-                float active_steer_norm = 0.0f;
-                if (drive_state == DRIVE_TURNING) {
-                    float corner_entry_cap = 70.0f;
-                    longitudinal_base = corner_entry_cap - effective_corner_intensity * (corner_entry_cap - g_params.speed_outside_corner);
-                    active_steer_norm = steer_norm;
-                } else if (lookahead_turn_factor > 0.15f) {
-                    /* Proactive pre-braking on straightaway approach before entering DRIVE_TURNING */
-                    longitudinal_base = g_params.speed_straight - lookahead_turn_factor * (g_params.speed_straight - 70.0f);
-                }
+            }
 
-                /* Lateral Differential Drag: strictly driven by active physical steering in DRIVE_TURNING */
-                float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
-                float target_outside = longitudinal_base;
-                float target_inside  = longitudinal_base - diff_delta;
+            float step_accel_l = (yaw_conflict && target_left > applied_speed_left) ? (float)REVERSAL_RELEASE_STEP : g_params.accel_ramp;
+            float step_decel_l = (yaw_conflict && target_left < applied_speed_left) ? (float)REVERSAL_DECEL_STEP   : g_params.decel_ramp;
+            float step_accel_r = (yaw_conflict && target_right > applied_speed_right) ? (float)REVERSAL_RELEASE_STEP : g_params.accel_ramp;
+            float step_decel_r = (yaw_conflict && target_right < applied_speed_right) ? (float)REVERSAL_DECEL_STEP   : g_params.decel_ramp;
 
-                float target_left    = longitudinal_base;
-                float target_right   = longitudinal_base;
+            /* Left wheel rate limiting */
+            if (target_left < applied_speed_left) {
+                applied_speed_left -= step_decel_l;
+                if (applied_speed_left < target_left) applied_speed_left = target_left;
+            } else {
+                applied_speed_left += step_accel_l;
+                if (applied_speed_left > target_left) applied_speed_left = target_left;
+            }
 
-                if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
-                    if (steer_cmd > 0.0f) {
-                        /* Right turn: Left is outside, Right is inside */
-                        target_left  = target_outside;
-                        target_right = target_inside;
-                    } else {
-                        /* Left turn: Right is outside, Left is inside */
-                        target_left  = target_inside;
-                        target_right = target_outside;
-                    }
-                }
+            /* Right wheel rate limiting */
+            if (target_right < applied_speed_right) {
+                applied_speed_right -= step_decel_r;
+                if (applied_speed_right < target_right) applied_speed_right = target_right;
+            } else {
+                applied_speed_right += step_accel_r;
+                if (applied_speed_right > target_right) applied_speed_right = target_right;
+            }
 
-                /* 5. Bilateral Anti-Spin Traction Guard with Dynamic Reversal Override
-                 * Chicane / S-curve reversal override:
-                 * Only trigger when target speeds actively demand an OPPOSITE turn:
-                 * - Steering right, demanding left wheel faster than right (target_left > target_right + 5%),
-                 *   while applied speeds are still configured for a left turn (applied_left < applied_right).
-                 * - Steering left, demanding right wheel faster than left (target_right > target_left + 5%),
-                 *   while applied speeds are still configured for a right turn (applied_right < applied_left).
-                 * CRITICAL: On corner exit onto a straight, target_left == target_right, so yaw_conflict
-                 * is strictly FALSE. This completely prevents dumping a +35% torque spike into the
-                 * unweighted inside rear wheel on exit (eliminates corner-exit wheelspin)! */
-                bool yaw_conflict = false;
-                if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
-                    if (steer_cmd > (float)YAW_CONFLICT_DEADBAND && (target_left - target_right) > 5.0f && applied_speed_left < applied_speed_right) {
-                        yaw_conflict = true;
-                    } else if (steer_cmd < -(float)YAW_CONFLICT_DEADBAND && (target_right - target_left) > 5.0f && applied_speed_right < applied_speed_left) {
-                        yaw_conflict = true;
-                    }
-                }
-
-                float step_accel_l = (yaw_conflict && target_left > applied_speed_left) ? (float)REVERSAL_RELEASE_STEP : g_params.accel_ramp;
-                float step_decel_l = (yaw_conflict && target_left < applied_speed_left) ? (float)REVERSAL_DECEL_STEP   : g_params.decel_ramp;
-                float step_accel_r = (yaw_conflict && target_right > applied_speed_right) ? (float)REVERSAL_RELEASE_STEP : g_params.accel_ramp;
-                float step_decel_r = (yaw_conflict && target_right < applied_speed_right) ? (float)REVERSAL_DECEL_STEP   : g_params.decel_ramp;
-
-                /* Left wheel rate limiting */
-                if (target_left < applied_speed_left) {
-                    applied_speed_left -= step_decel_l;
-                    if (applied_speed_left < target_left) applied_speed_left = target_left;
-                } else {
-                    applied_speed_left += step_accel_l;
-                    if (applied_speed_left > target_left) applied_speed_left = target_left;
-                }
-
-                /* Right wheel rate limiting */
-                if (target_right < applied_speed_right) {
-                    applied_speed_right -= step_decel_r;
-                    if (applied_speed_right < target_right) applied_speed_right = target_right;
-                } else {
-                    applied_speed_right += step_accel_r;
-                    if (applied_speed_right > target_right) applied_speed_right = target_right;
-                }
-
-                /* Actuate dual motors */
+            /* Actuate dual motors */
+            if (macro_state == MACRO_STATE_LINE_LOST && line_lost_ticks > (uint32_t)LINE_LOST_BRAKE_TICKS) {
+                HbridgeBrake(&g_hbridge);
+            } else {
                 HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
+            }
 
-                /* Telemetry output with heading (H), trajectory (TJ), and lookahead (LA)
-                 * Throttled to 12.5 Hz (every 4th tick = 80ms) to prevent UART buffer flooding & save CPU time */
-                static uint8_t s_telemetry_div = 0;
-                if (++s_telemetry_div >= 4) {
-                    s_telemetry_div = 0;
-                    esp_printf("L:%u/%u R:%d F:%d H:%d TJ:%d S:%d LA:%d ST:%s VL:%d VR:%d\r\n",
-                               (unsigned)sr.found, (unsigned)num_vectors_front,
-                               (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
-                               (int)(filtered_heading * 10.0f),
-                               (int)(filtered_traj_angle * 10.0f),
-                               (int)(steer_cmd * 10.0f),
-                               (int)(lookahead_turn_factor * 100.0f),
-                               (drive_state == DRIVE_FORWARD) ? "F" : "T",
-                               (int)applied_speed_left, (int)applied_speed_right);
-                }
+            /* --- 9. Telemetry Output (Throttled to 12.5 Hz = Every 4th Tick) --- */
+            static uint8_t s_telemetry_div = 0;
+            if (++s_telemetry_div >= 4) {
+                s_telemetry_div = 0;
+                const char *st_str = (macro_state == MACRO_STATE_NORMAL) ? "N" :
+                                     ((macro_state == MACRO_STATE_INTERSECTION) ? "I" : "L");
+                esp_printf("L:%u/%u R:%d F:%d H:%d TJ:%d S:%d LA:%d ST:%s VL:%d VR:%d\r\n",
+                           (unsigned)sr.found, (unsigned)num_vectors_front,
+                           (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
+                           (int)(filtered_heading * 10.0f),
+                           (int)(filtered_traj_angle * 10.0f),
+                           (int)(steer_cmd * 10.0f),
+                           (int)(kappa * 100.0f),
+                           st_str,
+                           (int)applied_speed_left, (int)applied_speed_right);
+            }
         }
     }
 }

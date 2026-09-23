@@ -551,10 +551,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
         }
 
-        /* Lookahead Urgency with +/- 2.5px Deadband and Full Urgency at LOOKAHEAD_FULL_URGENCY_PX */
-        float abs_offset = fabsf(result.trajectory_offset_px);
-        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
+        /* Lookahead Urgency driven by relative curvature (mid_dx) to prevent steady-state CTE drift false alarms */
+        float abs_curvature = fabsf(mid_dx);
+        if (abs_curvature > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = (abs_curvature - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
             if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
@@ -593,9 +593,9 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
         }
 
-        float abs_offset = fabsf(result.trajectory_offset_px);
-        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
+        float abs_curvature = fabsf(mid_dx);
+        if (abs_curvature > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = (abs_curvature - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
             if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
@@ -633,9 +633,9 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
         }
 
-        float abs_offset = fabsf(result.trajectory_offset_px);
-        if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
+        float abs_curvature = fabsf(mid_dx);
+        if (abs_curvature > (float)LOOKAHEAD_DEADBAND_PX) {
+            result.lookahead_urgency = (abs_curvature - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
             if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
