@@ -77,6 +77,9 @@
 #define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
 #define HEADING_DEADBAND_DEG         4.0f      // Heading deadband below which base feedforward is 0.0
 
+// ---- Control Loop ----
+#define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
+
 // ---- State Machine Thresholds ----
 #define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Base camera heading threshold for corner confirmation
 #define STATE_ENTER_STREAK           2         // 2 ticks (40ms) sustained curve confirmation
