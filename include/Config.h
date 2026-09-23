@@ -105,7 +105,6 @@
 #define STATE_EXIT_STREAK            2         // 2 ticks (40ms) fast return to DRIVE_FORWARD on straight
 #define CORNER_APPROACH_ABORT_TICKS  18U       // 18 ticks (360ms) safety timeout to abort corner pre-braking on false alarm
 #define LINE_LOST_LIMIT              18U       // ~360ms coast window for traversing intersection gaps without braking
-#define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
 
 // ---- Geometric Boundary Validation ----
 #define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width (rejects center-dash at 25px, preserves tight curves at 34px)
