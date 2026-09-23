@@ -86,12 +86,14 @@ int main(void) {
     size_t   num_vectors_pid         = 0;
     uint16_t vectors_front[MAX_VECTORS * 4];
     size_t   num_vectors_front       = 0;
-    uint32_t front_cam_phase         = 0;
     trajectory_result_t g_traj;
     memset(&g_traj, 0, sizeof(g_traj));
+    g_traj.lookahead_x       = (float)PIXY_CENTER_X;
     float    filtered_traj_angle     = 0.0f;
     float    filtered_traj_offset    = 0.0f;
     float    lookahead_turn_factor   = 0.0f;
+    float    s_last_valid_lookahead_x = (float)PIXY_CENTER_X;
+    uint32_t s_front_dropout_ticks    = 0;
     uint32_t line_lost_counter       = 0;
     float    filtered_cte            = 0.0f;
     int      cte_filter_init         = 0;
@@ -140,16 +142,19 @@ int main(void) {
                 filtered_traj_angle       = 0.0f;
                 filtered_traj_offset      = 0.0f;
                 lookahead_turn_factor     = 0.0f;
+                s_last_valid_lookahead_x  = (float)PIXY_CENTER_X;
+                s_front_dropout_ticks     = 0;
                 memset(&g_traj, 0, sizeof(g_traj));
-                applied_speed_left            = g_params.speed_straight;
-                applied_speed_right           = g_params.speed_straight;
-                steer_cmd                     = 0.0f;
-                last_steer_cmd                = 0.0f;
-                drive_state                   = DRIVE_FORWARD;
-                state_streak                  = 0;
-                streak_sign                   = 0;
-                urgency_streak                = 0;
-                trusted_corner_urgency        = 0.0f;
+                g_traj.lookahead_x        = (float)PIXY_CENTER_X;
+                applied_speed_left        = g_params.speed_straight;
+                applied_speed_right       = g_params.speed_straight;
+                steer_cmd                 = 0.0f;
+                last_steer_cmd            = 0.0f;
+                drive_state               = DRIVE_FORWARD;
+                state_streak              = 0;
+                streak_sign               = 0;
+                urgency_streak            = 0;
+                trusted_corner_urgency    = 0.0f;
                 if (motor_test_is_active()) {
                     motor_test_tick();
                 } else {
@@ -158,27 +163,36 @@ int main(void) {
                 continue;
             }
 
-            /* Trajectory Camera polling (LP_FLEXCOMM2 - alternating 25 Hz) */
-            if ((front_cam_phase++ & 1) == 0) {
-                status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
-                if (s_front == kStatus_Success && num_vectors_front > 0) {
-                    /* Calculate trajectory of the car ahead from front camera */
-                    g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
+            /* Trajectory Camera polling (LP_FLEXCOMM2 - 50 Hz every tick) */
+            status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
+            if (s_front == kStatus_Success && num_vectors_front > 0) {
+                g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
+            } else {
+                memset(&g_traj, 0, sizeof(g_traj));
+                g_traj.lookahead_x = (float)PIXY_CENTER_X;
+            }
 
-                    filtered_traj_angle  = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
-                    filtered_traj_offset = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
-
-                    /* Lookahead urgency for corner speed modulation & steering preview */
-                    if (g_traj.found >= 1) {
-                        lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency + 0.50f * lookahead_turn_factor;
+            /* 50 Hz Foreground Lookahead & Dropout Hold Filter */
+            if (g_traj.found >= 1) {
+                s_last_valid_lookahead_x = g_traj.lookahead_x;
+                s_front_dropout_ticks    = 0;
+                filtered_traj_angle      = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
+                filtered_traj_offset     = 0.50f * g_traj.trajectory_offset_px  + 0.50f * filtered_traj_offset;
+                lookahead_turn_factor    = 0.50f * g_traj.lookahead_urgency     + 0.50f * lookahead_turn_factor;
+            } else {
+                /* Zero root vectors detected: 1-3 tick hold-last-valid filter */
+                s_front_dropout_ticks++;
+                filtered_traj_angle  *= 0.80f;
+                filtered_traj_offset *= 0.80f;
+                if (s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS) {
+                    /* Extended dropout: check top-camera sanity guard */
+                    if (fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f) {
+                        /* Straightaway sanity veto: vehicle is dead-center on a straight! */
+                        lookahead_turn_factor *= 0.80f;
                     } else {
-                        lookahead_turn_factor *= 0.50f;
+                        /* Curve confirmed: line lost in corner */
+                        lookahead_turn_factor = 0.60f;
                     }
-                } else {
-                    filtered_traj_angle   *= 0.80f;
-                    filtered_traj_offset  *= 0.80f;
-                    lookahead_turn_factor *= 0.50f;
-                    g_traj.found = 0;
                 }
             }
 
@@ -248,16 +262,24 @@ int main(void) {
 
             /* State machine transitions:
              * - DRIVE_TURNING (Corner):
-             *   Triggered by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG).
+             *   Triggered by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG),
+             *   or lookahead point exceeding enter hysteresis (> 6.0px),
+             *   or confirmed sustained line loss outside straight sanity veto.
              * - DRIVE_FORWARD (Straight):
-             *   Strictly confirmed by TOP CAMERA: local lane is centered (|filtered_heading| <= 6.0 deg
-             *   and |filtered_cte| <= 8.0 px).
-             *   Hysteresis debounce of STATE_EXIT_STREAK (5 ticks = 100ms) guarantees chatter-free transitions. */
-            drive_state_t desired_state;
+             *   Strictly confirmed when both top camera and front lookahead confirm centering:
+             *   |filtered_heading| <= 4.0 deg, |filtered_cte| <= 6.0 px, and lookahead offset <= 4.0 px.
+             *   Hysteresis debounce of STATE_EXIT_STREAK (2 ticks = 40ms) guarantees chatter-free transitions. */
+            float la_offset = fabsf(s_last_valid_lookahead_x - (float)PIXY_CENTER_X);
             bool corner_trigger = (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG) ||
-                                  (fabsf(filtered_traj_angle) >= 10.0f && lookahead_turn_factor >= 0.30f);
+                                  (la_offset >= (float)LOOKAHEAD_HYSTERESIS_ENTER_PX && s_front_dropout_ticks == 0) ||
+                                  (s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS &&
+                                   !(fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f));
+
+            drive_state_t desired_state;
             if (drive_state == DRIVE_TURNING) {
-                bool straight_confirmed = (fabsf(filtered_heading) <= 5.0f && fabsf(filtered_cte) <= 8.0f);
+                bool straight_confirmed = (fabsf(filtered_heading) <= 4.0f &&
+                                           fabsf(filtered_cte) <= 6.0f &&
+                                           la_offset <= (float)LOOKAHEAD_HYSTERESIS_EXIT_PX);
                 desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
             } else {
                 desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
@@ -301,18 +323,9 @@ int main(void) {
                 float cte_urgency = (cte_excess > 0.0f) ? (cte_excess / ((float)CTE_URGENCY_PX - 14.0f)) : 0.0f;
                 if (cte_urgency > 1.0f) cte_urgency = 1.0f;
 
-                /* Forward Camera lookahead preview elevates urgency proactively before entry */
-                float la_urgency = 0.0f;
-                float dz_traj = fabsf(filtered_traj_angle) - (float)LOOKAHEAD_DEADBAND_DEG;
-                if (dz_traj > 0.0f) {
-                    la_urgency = dz_traj / ((float)HEADING_FULL_BRAKE_DEG - (float)LOOKAHEAD_DEADBAND_DEG);
-                    if (la_urgency > 1.0f) la_urgency = 1.0f;
-                }
-                if (lookahead_turn_factor > la_urgency) la_urgency = lookahead_turn_factor;
-
                 float raw_corner_urgency = heading_urgency;
                 if (cte_urgency > raw_corner_urgency) raw_corner_urgency = cte_urgency;
-                if (la_urgency > raw_corner_urgency)  raw_corner_urgency = la_urgency;
+                if (lookahead_turn_factor > raw_corner_urgency) raw_corner_urgency = lookahead_turn_factor;
 
                 if (raw_corner_urgency > trusted_corner_urgency) {
                     if (++urgency_streak >= (uint32_t)CORNER_URGENCY_STREAK) {
@@ -333,18 +346,18 @@ int main(void) {
                 /* 2. Decoupled Steering Authority:
                  * - CTE error is actively damped and regulated by the PID controller.
                  * - Heading error acts as direct, instantaneous feedforward anticipation into curves.
-                 * - Forward camera trajectory acts as lookahead preview feedforward into upcoming corners.
+                 * - Lookahead feedforward is STRICTLY ZERO (100% decoupled from servo).
                  * - Slew rate is capped by MAX_STEER_RATE_PER_SEC to prevent sudden chassis snapping and tire scrub. */
                 float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
                 /* Decisive Turn-In & Apex Protection:
-                 * When entering or negotiating a corner (DRIVE_TURNING, trusted_corner_urgency >= 0.20f,
-                 * or |filtered_heading| >= 4.0 deg), if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
-                 * The CTE PID controller is trying to steer towards the outside wall (fighting the turn).
-                 * Suppress pid_cte so the vehicle bites cleanly into the corner apex without understeer! */
-                if ((drive_state == DRIVE_TURNING || trusted_corner_urgency >= 0.20f || fabsf(filtered_heading) >= 4.0f) &&
+                 * When actively negotiating a corner (DRIVE_TURNING) with significant curvature
+                 * (|filtered_heading| >= 8.0 deg), if CTE opposes heading (filtered_cte * filtered_heading < 0.0f):
+                 * Suppress pid_cte so the vehicle bites cleanly through the apex without understeer!
+                 * On straightaways (DRIVE_FORWARD), pid_cte is NEVER suppressed. */
+                if (drive_state == DRIVE_TURNING &&
                     (filtered_cte * filtered_heading < 0.0f) &&
-                    fabsf(filtered_heading) >= 4.0f) {
+                    fabsf(filtered_heading) >= 8.0f) {
                     pid_cte = 0.0f;
                 }
 
@@ -360,17 +373,8 @@ int main(void) {
                 }
                 float heading_feedforward = g_params.k_heading * effective_h;
 
-                /* Forward Camera Lookahead Steering Anticipation:
-                 * Previews the track 1.0 - 2.0m ahead. When a curve approaches (|filtered_traj_angle| > LOOKAHEAD_DEADBAND_DEG),
-                 * applies anticipatory steering feedforward to begin angling the front wheels 100-150ms before apex entry! */
-                float abs_traj = fabsf(filtered_traj_angle);
-                float effective_traj = 0.0f;
-                if (abs_traj > (float)LOOKAHEAD_DEADBAND_DEG) {
-                    effective_traj = (abs_traj - (float)LOOKAHEAD_DEADBAND_DEG) * ((filtered_traj_angle > 0.0f) ? 1.0f : -1.0f);
-                }
-                float lookahead_feedforward = g_params.k_lookahead * effective_traj;
-
-                float raw_steer = pid_cte + heading_feedforward + lookahead_feedforward;
+                /* STRICTLY DECOUPLED: Front camera does NOT inject steering angle */
+                float raw_steer = pid_cte + heading_feedforward;
 
                 const float max_steer_step = (float)MAX_STEER_RATE_PER_SEC * g_params.dt;
                 float steer_diff = raw_steer - last_steer_cmd;
@@ -415,7 +419,7 @@ int main(void) {
                  * In DRIVE_TURNING (sustained curves after STATE_ENTER_STREAK confirmation):
                  * Apply corner braking to outside wheel and inside wheel differential drag to pivot. */
                 float effective_corner_intensity = heading_norm;
-                if (g_traj.found >= 1 && lookahead_turn_factor > effective_corner_intensity) {
+                if (lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
                 }
                 float longitudinal_base = g_params.speed_straight;
