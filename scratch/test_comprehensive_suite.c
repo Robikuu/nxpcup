@@ -270,8 +270,12 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     float longitudinal_base = g_params.speed_straight;
     float active_steer_norm = 0.0f;
     if (ctx->drive_state == DRIVE_TURNING) {
-        longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+        float corner_entry_cap = 70.0f;
+        longitudinal_base = corner_entry_cap - effective_corner_intensity * (corner_entry_cap - g_params.speed_outside_corner);
         active_steer_norm = steer_norm;
+    } else if (ctx->lookahead_turn_factor > 0.15f) {
+        /* Proactive pre-braking on straightaway approach before entering DRIVE_TURNING */
+        longitudinal_base = g_params.speed_straight - ctx->lookahead_turn_factor * (g_params.speed_straight - 70.0f);
     }
 
     float diff_delta = active_steer_norm * (longitudinal_base - g_params.speed_inside_min);
@@ -357,7 +361,9 @@ int main(void) {
     /* Steering MUST remain 0.0 deg (strictly decoupled from lookahead) */
     assert(fabsf(r1.steer_cmd) < 0.001f);
     assert(r1.drive_state == DRIVE_FORWARD);
-    assert(r1.applied_speed_left >= 99.0f && r1.applied_speed_right >= 99.0f);
+    /* Proactive pre-braking drops base speed while maintaining zero differential drag on straight */
+    assert(r1.applied_speed_left <= 90.0f);
+    assert(fabsf(r1.applied_speed_left - r1.applied_speed_right) < 0.01f);
     printf("  [PASS] Test 1: Zero lookahead steering feedforward confirmed!\n\n");
 
     /* ----------------------------------------------------------------- */

@@ -27,15 +27,15 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
-#define SPEED_OUTSIDE_CORNER         74.0f     // Calibrated apex outside wheel drive (%) (maximum speed within tire grip at 12.6V)
-#define SPEED_INSIDE_MIN             50.0f     // Inside wheel pivot anchor duty (%) (sharp pivot torque to whip chassis through turns)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 62.0%
+#define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated apex outside wheel drive (%) (prevents corner understeer push)
+#define SPEED_INSIDE_MIN             35.0f     // Inside wheel pivot anchor duty (%) (sharp pivot torque to whip chassis through turns)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 46.5%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              25.0f     // Rapid pre-braking ramp (~60ms from 100% to 74% at 12.6V)
+#define DECEL_RAMP_STEP              25.0f     // Rapid pre-braking ramp (~60ms from 100% to 58% at 12.6V)
 #define ACCEL_RAMP_STEP              18.0f     // Crisp corner exit acceleration (~100ms to 100%, maintains front tire grip)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
@@ -57,14 +57,15 @@
 #define FORWARD_CAM_SAMPLE_HORIZON_Y 20.0f     // Lookahead horizon sample line (~1.5m ahead)
 #define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
 #define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
-#define LOOKAHEAD_DEADBAND_PX        5.0f      // Neutral straightaway margin from center (+/- 5.0px)
-#define LOOKAHEAD_HYSTERESIS_ENTER_PX 6.0f     // Lookahead offset threshold to trigger DRIVE_TURNING
-#define LOOKAHEAD_HYSTERESIS_EXIT_PX  4.0f     // Lookahead offset threshold to return to DRIVE_FORWARD
+#define LOOKAHEAD_DEADBAND_PX        2.5f      // Neutral straightaway margin from center (+/- 2.5px)
+#define LOOKAHEAD_FULL_URGENCY_PX    8.0f      // Lateral offset at horizon Y=20 for 100% lookahead urgency
+#define LOOKAHEAD_HYSTERESIS_ENTER_PX 3.5f     // Lookahead offset threshold to trigger DRIVE_TURNING
+#define LOOKAHEAD_HYSTERESIS_EXIT_PX  2.0f     // Lookahead offset threshold to return to DRIVE_FORWARD
 #define LOOKAHEAD_DROPOUT_HOLD_TICKS 3U        // 3 ticks (60ms) hold-last-valid window for optical flicker
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
 #define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    1.60f     // Crisp cornering authority (no oversteer snap)
+#define KP_CORNER                    2.60f     // Crisp cornering authority (decisive bite into 90 deg turns)
 #define KD_STRAIGHT                  0.180f    // Lateral velocity damping
 #define KD_CORNER                    0.180f    // Lateral velocity damping
 #define DEFAULT_KI                   0.0f
@@ -73,9 +74,9 @@
 
 // ---- Error Weights & Decoupled Feedforward ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
-#define DEFAULT_K_HEADING            1.10f     // Direct base camera heading feedforward into curves
+#define DEFAULT_K_HEADING            1.70f     // Direct base camera heading feedforward into curves (strong turn-in bite)
 #define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
-#define HEADING_DEADBAND_DEG         4.0f      // Heading deadband below which base feedforward is 0.0
+#define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

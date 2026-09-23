@@ -415,9 +415,10 @@ int main(void) {
 
                 /* 4. Longitudinal Base Speed & Differential Assignment
                  * In DRIVE_FORWARD (straightaways & rapid chicane flicks):
-                 * Maintain full 100% straight sprint speed (VL=100, VR=100) with zero differential drag.
+                 * Maintain full 100% straight sprint speed with zero differential drag.
+                 * Proactively pre-brake if front lookahead senses an upcoming corner (> 0.15 urgency).
                  * In DRIVE_TURNING (sustained curves after STATE_ENTER_STREAK confirmation):
-                 * Apply corner braking to outside wheel and inside wheel differential drag to pivot. */
+                 * Immediately clamp base speed to corner envelope (70% down to 58%) and apply inside wheel pivot drag. */
                 float effective_corner_intensity = heading_norm;
                 if (lookahead_turn_factor > effective_corner_intensity) {
                     effective_corner_intensity = lookahead_turn_factor;
@@ -425,8 +426,12 @@ int main(void) {
                 float longitudinal_base = g_params.speed_straight;
                 float active_steer_norm = 0.0f;
                 if (drive_state == DRIVE_TURNING) {
-                    longitudinal_base = g_params.speed_straight - effective_corner_intensity * (g_params.speed_straight - g_params.speed_outside_corner);
+                    float corner_entry_cap = 70.0f;
+                    longitudinal_base = corner_entry_cap - effective_corner_intensity * (corner_entry_cap - g_params.speed_outside_corner);
                     active_steer_norm = steer_norm;
+                } else if (lookahead_turn_factor > 0.15f) {
+                    /* Proactive pre-braking on straightaway approach before entering DRIVE_TURNING */
+                    longitudinal_base = g_params.speed_straight - lookahead_turn_factor * (g_params.speed_straight - 70.0f);
                 }
 
                 /* Lateral Differential Drag: strictly driven by active physical steering in DRIVE_TURNING */

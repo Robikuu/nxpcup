@@ -521,10 +521,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
         }
 
-        /* Lookahead Urgency with +/- 5.0px Deadband */
+        /* Lookahead Urgency with +/- 2.5px Deadband and Full Urgency at LOOKAHEAD_FULL_URGENCY_PX */
         float abs_offset = fabsf(result.trajectory_offset_px);
         if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX);
+            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
             if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
@@ -561,8 +561,8 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
         float abs_offset = fabsf(result.trajectory_offset_px);
         if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = 0.60f * ((abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX));
-            if (result.lookahead_urgency > 0.60f) result.lookahead_urgency = 0.60f;
+            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
+            if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
         }
@@ -595,8 +595,8 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
 
         float abs_offset = fabsf(result.trajectory_offset_px);
         if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-            result.lookahead_urgency = 0.60f * ((abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / (20.0f - (float)LOOKAHEAD_DEADBAND_PX));
-            if (result.lookahead_urgency > 0.60f) result.lookahead_urgency = 0.60f;
+            result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) / ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
+            if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
         } else {
             result.lookahead_urgency = 0.0f;
         }
