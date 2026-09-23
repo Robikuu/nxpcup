@@ -70,6 +70,8 @@ typedef struct {
     float applied_speed_right;
     float last_steer_cmd;
     drive_state_t drive_state;
+    bool s_corner_apex_reached;
+    uint32_t s_corner_abort_ticks;
     uint32_t state_streak;
     int8_t streak_sign;
     uint32_t urgency_streak;
@@ -83,6 +85,8 @@ void sim_init(sim_context_t *ctx) {
     ctx->applied_speed_left = g_params.speed_straight;
     ctx->applied_speed_right = g_params.speed_straight;
     ctx->drive_state = DRIVE_FORWARD;
+    ctx->s_corner_apex_reached = false;
+    ctx->s_corner_abort_ticks = 0;
     ctx->streak_sign = 0;
     ctx->s_last_valid_lookahead_x = (float)PIXY_CENTER_X;
     ctx->s_front_dropout_ticks = 0;
@@ -104,12 +108,19 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     } else {
         ctx->s_front_dropout_ticks++;
         if (ctx->s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS) {
-            /* Extended dropout: check top-camera straightaway sanity veto */
-            if (fabsf(ctx->filtered_heading) <= 3.0f && fabsf(ctx->filtered_cte) <= 4.0f) {
+            /* Extended dropout: check top-camera straightaway sanity veto ONLY in DRIVE_FORWARD */
+            if (ctx->drive_state == DRIVE_FORWARD && fabsf(ctx->filtered_heading) <= 3.0f && fabsf(ctx->filtered_cte) <= 4.0f) {
                 ctx->lookahead_turn_factor *= 0.80f; // VETO!
             } else {
-                ctx->lookahead_turn_factor = 0.60f; // Confirmed corner
+                ctx->lookahead_turn_factor = 0.60f; // Confirmed corner or DRIVE_TURNING
             }
+        }
+    }
+
+    /* Urgency Floor on Corner Approach in DRIVE_TURNING */
+    if (ctx->drive_state == DRIVE_TURNING && !ctx->s_corner_apex_reached) {
+        if (ctx->lookahead_turn_factor < 0.60f) {
+            ctx->lookahead_turn_factor = 0.60f;
         }
     }
 
@@ -117,7 +128,6 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
     if (top_found == 0) {
         ctx->urgency_streak = 0;
         ctx->trusted_corner_urgency *= 0.90f;
-        ctx->lookahead_turn_factor  *= 0.90f;
         if (++ctx->line_lost_counter <= LINE_LOST_LIMIT) {
             /* Coasting */
             res.steer_cmd = 0.0f;
@@ -155,7 +165,16 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
         ctx->filtered_cte = 0.40f * raw_cte + 0.60f * ctx->filtered_cte;
     }
 
-    /* 4. State Machine with Lookahead Hysteresis */
+    /* 4. State Machine with Apex Latching & Approach Hold */
+    if (ctx->drive_state == DRIVE_TURNING) {
+        if (fabsf(ctx->filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG ||
+            fabsf(ctx->last_steer_cmd) >= 15.0f ||
+            fabsf(ctx->filtered_cte) >= 14.0f) {
+            ctx->s_corner_apex_reached = true;
+            ctx->s_corner_abort_ticks  = 0;
+        }
+    }
+
     float la_offset = fabsf(ctx->s_last_valid_lookahead_x - (float)PIXY_CENTER_X);
     bool corner_trigger = (fabsf(ctx->filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG) ||
                           (la_offset >= (float)LOOKAHEAD_HYSTERESIS_ENTER_PX && ctx->s_front_dropout_ticks == 0) ||
@@ -167,7 +186,20 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
         bool straight_confirmed = (fabsf(ctx->filtered_heading) <= 4.0f &&
                                    fabsf(ctx->filtered_cte) <= 6.0f &&
                                    la_offset <= (float)LOOKAHEAD_HYSTERESIS_EXIT_PX);
-        desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+        if (ctx->s_corner_apex_reached) {
+            desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+        } else {
+            if (straight_confirmed) {
+                if (++ctx->s_corner_abort_ticks >= (uint32_t)CORNER_APPROACH_ABORT_TICKS) {
+                    desired_state = DRIVE_FORWARD;
+                } else {
+                    desired_state = DRIVE_TURNING;
+                }
+            } else {
+                ctx->s_corner_abort_ticks = 0;
+                desired_state = DRIVE_TURNING;
+            }
+        }
     } else {
         desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
     }
@@ -184,6 +216,10 @@ sim_tick_result_t sim_step(sim_context_t *ctx,
         if (++ctx->state_streak >= threshold) {
             ctx->drive_state  = desired_state;
             ctx->state_streak = 0;
+            if (ctx->drive_state == DRIVE_TURNING) {
+                ctx->s_corner_apex_reached = false;
+                ctx->s_corner_abort_ticks  = 0;
+            }
         }
     } else {
         ctx->state_streak = 0;
@@ -501,8 +537,74 @@ int main(void) {
     printf("  Tested %d combinations: 0 NaN, 0 Inf, strictly bounded.\n", n_ext * n_ext);
     printf("  [PASS] Test 7: Complete numerical immunity verified!\n\n");
 
+    /* ----------------------------------------------------------------- */
+    /* TEST 8: Transverse Horizontal Wall Detection at 90 Deg Corners     */
+    /* ----------------------------------------------------------------- */
+    printf(">>> TEST 8: Transverse Horizontal Wall Detection (90 Deg Corner Wall)\n");
+    /* Horizontal line across track: x0=15, y0=25, x1=65, y1=24 (dx=50, dy=1, ny=25) */
+    uint16_t transverse_vectors[4] = { 15, 25, 65, 24 };
+    trajectory_result_t traj_t = compute_lookahead_trajectory(transverse_vectors, 1);
+    printf("  Transverse Wall: Found=%u, Urgency=%.2f, Lookahead X=%.2f, Offset=%+.2f px\n",
+           traj_t.found, traj_t.lookahead_urgency, traj_t.lookahead_x, traj_t.trajectory_offset_px);
+    assert(traj_t.found >= 1);
+    assert(traj_t.lookahead_urgency >= 0.99f);
+    assert(fabsf(traj_t.trajectory_offset_px) >= 15.0f);
+    printf("  [PASS] Test 8: Transverse horizontal wall immediately triggers 100%% urgency!\n\n");
+
+    /* ----------------------------------------------------------------- */
+    /* TEST 9: Corner 1 Pre-Braking Latch & Run 1 Overshoot Immunity      */
+    /* ----------------------------------------------------------------- */
+    printf(">>> TEST 9: Corner 1 Pre-Braking Latch & Run 1 Overshoot Immunity\n");
+    sim_context_t ctx9;
+    sim_init(&ctx9);
+
+    /* 1. Full 100% straight sprint */
+    for (int i = 0; i < 5; i++) {
+        sim_step(&ctx9, 0.0f, 0.0f, 39.5f, 0.0f, 2, 2);
+    }
+    assert(ctx9.drive_state == DRIVE_FORWARD);
+    assert(ctx9.applied_speed_left >= 99.0f);
+
+    /* 2. Approaching Corner 1: Lookahead senses corner ~1.5m ahead */
+    for (int i = 0; i < 3; i++) {
+        sim_step(&ctx9, 0.0f, 0.0f, 20.0f, 0.80f, 2, 2);
+    }
+    assert(ctx9.drive_state == DRIVE_TURNING);
+    assert(ctx9.applied_speed_left <= 75.0f);
+    printf("  Entered DRIVE_TURNING: Speed = %.1f%%\n", ctx9.applied_speed_left);
+
+    /* 3. The Run 1 Trap: Car closes within 0.8m of apex.
+     * Top camera still reads straight (H=0.5 deg, CTE=0.0).
+     * Front camera vectors flatten/drop (la_offset=0.0, urgency=0.0).
+     * Simulate 15 consecutive ticks (300ms) in this pre-apex zone! */
+    for (int tick = 1; tick <= 15; tick++) {
+        sim_tick_result_t r_trap = sim_step(&ctx9, 0.0f, 0.5f, 39.5f, 0.0f, 2, 2);
+        /* MUST NOT abort to DRIVE_FORWARD, MUST NOT surge speed to 100%! */
+        assert(r_trap.drive_state == DRIVE_TURNING);
+        assert(r_trap.applied_speed_left <= 66.0f);
+        assert(r_trap.applied_speed_right <= 66.0f);
+    }
+    printf("  Passed Run 1 Trap (15 ticks straight approach): State = %s, Speed = %.1f%% (STRICTLY GOVERNED)\n",
+           ctx9.drive_state == DRIVE_TURNING ? "DRIVE_TURNING" : "FAIL", ctx9.applied_speed_left);
+
+    /* 4. Car physically enters apex: Heading ramps to 25 deg */
+    for (int i = 0; i < 5; i++) {
+        sim_step(&ctx9, 5.0f, 25.0f, 20.0f, 1.0f, 2, 2);
+    }
+    assert(ctx9.s_corner_apex_reached == true);
+    printf("  Apex Reached: Heading = %.1f deg, s_corner_apex_reached = TRUE\n", ctx9.filtered_heading);
+
+    /* 5. Car finishes turn and straightens out */
+    for (int i = 0; i < 6; i++) {
+        sim_step(&ctx9, 0.0f, 0.0f, 39.5f, 0.0f, 2, 2);
+    }
+    assert(ctx9.drive_state == DRIVE_FORWARD);
+    assert(ctx9.applied_speed_left > 75.0f);
+    printf("  Corner Exited: State = DRIVE_FORWARD, Speed accelerating up to 100%%\n");
+    printf("  [PASS] Test 9: Complete immunity to premature corner un-braking verified!\n\n");
+
     printf("=================================================================\n");
-    printf("   >>> ALL 7 ADVANCED BENCHMARK SUITES PASSED FLAWLESSLY! <<<    \n");
+    printf("   >>> ALL 9 ADVANCED BENCHMARK SUITES PASSED FLAWLESSLY! <<<    \n");
     printf("=================================================================\n");
     return 0;
 }

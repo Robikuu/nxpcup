@@ -58,9 +58,9 @@
 #define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
 #define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
 #define LOOKAHEAD_DEADBAND_PX        2.5f      // Neutral straightaway margin from center (+/- 2.5px)
-#define LOOKAHEAD_FULL_URGENCY_PX    8.0f      // Lateral offset at horizon Y=20 for 100% lookahead urgency
-#define LOOKAHEAD_HYSTERESIS_ENTER_PX 3.5f     // Lookahead offset threshold to trigger DRIVE_TURNING
-#define LOOKAHEAD_HYSTERESIS_EXIT_PX  2.0f     // Lookahead offset threshold to return to DRIVE_FORWARD
+#define LOOKAHEAD_FULL_URGENCY_PX    10.0f     // Lateral offset at horizon Y=20 for 100% lookahead urgency
+#define LOOKAHEAD_HYSTERESIS_ENTER_PX 4.0f     // Lookahead offset threshold to trigger DRIVE_TURNING
+#define LOOKAHEAD_HYSTERESIS_EXIT_PX  3.0f     // Lookahead offset threshold to return to DRIVE_FORWARD
 #define LOOKAHEAD_DROPOUT_HOLD_TICKS 3U        // 3 ticks (60ms) hold-last-valid window for optical flicker
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
@@ -84,7 +84,8 @@
 // ---- State Machine Thresholds ----
 #define CORNER_HEADING_THRESHOLD_DEG 8.0f      // Base camera heading threshold for corner confirmation
 #define STATE_ENTER_STREAK           2         // 2 ticks (40ms) sustained curve confirmation
-#define STATE_EXIT_STREAK            2         // 2 ticks (40ms) before returning to DRIVE_FORWARD
+#define STATE_EXIT_STREAK            4         // 4 ticks (80ms) before returning to DRIVE_FORWARD
+#define CORNER_APPROACH_ABORT_TICKS  35U       // 35 ticks (700ms) safety timeout to abort corner pre-braking on false alarm
 #define LINE_LOST_LIMIT              18U       // ~360ms coast window for traversing intersection gaps without braking
 #define LINE_LOST_BRAKE_TICKS        3         // Debounce frames before cutting power and hard braking
 

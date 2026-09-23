@@ -400,6 +400,9 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
     size_t count = 0;
     float nx[MAX_FILTER_VECTORS], ny[MAX_FILTER_VECTORS], fx[MAX_FILTER_VECTORS], fy[MAX_FILTER_VECTORS];
     float len[MAX_FILTER_VECTORS];
+    bool  transverse_wall_detected = false;
+    float transverse_wall_len = 0.0f;
+    float transverse_wall_mid_x = (float)PIXY_CENTER_X;
 
     for (size_t i = 0; i < max_in; i++) {
         float x0 = (float)vectors[4 * i + 0];
@@ -418,6 +421,17 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
          * If both endpoints are in the upper quarter (y < 13), it's background clutter */
         if (n_y < (float)FORWARD_CAM_HORIZON_Y_MIN && f_y < (float)FORWARD_CAM_HORIZON_Y_MIN) {
             continue;
+        }
+
+        /* Check for transverse horizontal wall across track (90 deg corner boundary ahead) */
+        float raw_dx = fabsf(x1 - x0);
+        float raw_dy = fabsf(y1 - y0);
+        if (raw_dx >= 18.0f && raw_dy <= 7.0f && n_y >= (float)FORWARD_CAM_HORIZON_Y_MIN && n_y <= 48.0f) {
+            transverse_wall_detected = true;
+            if (raw_dx > transverse_wall_len) {
+                transverse_wall_len   = raw_dx;
+                transverse_wall_mid_x = (x0 + x1) * 0.5f;
+            }
         }
 
         /* 2. Clip far endpoint if it extends into the upper quarter room ceiling */
@@ -446,7 +460,23 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
         count++;
     }
 
-    if (count == 0) return result;
+    if (count == 0) {
+        if (transverse_wall_detected) {
+            result.found = 2;
+            result.lookahead_urgency = 1.0f;
+            if (transverse_wall_mid_x > (float)PIXY_CENTER_X + 2.0f) {
+                result.lookahead_x = 70.0f;
+            } else if (transverse_wall_mid_x < (float)PIXY_CENTER_X - 2.0f) {
+                result.lookahead_x = 10.0f;
+            } else {
+                float prev_offset = s_last_lookahead_right_x - (float)PIXY_CENTER_X;
+                result.lookahead_x = (prev_offset >= 0.0f) ? 70.0f : 10.0f;
+            }
+            result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+            result.trajectory_angle_deg = (result.trajectory_offset_px > 0.0f) ? 45.0f : -45.0f;
+        }
+        return result;
+    }
 
     /*
      * Foreground Root Vector Selection:
@@ -530,6 +560,10 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.lookahead_urgency = 0.0f;
         }
 
+        if (transverse_wall_detected) {
+            result.lookahead_urgency = 1.0f;
+        }
+
         /* Update temporal memory */
         s_last_lookahead_left_x  = nx[best_left_idx];
         s_last_lookahead_right_x = nx[best_right_idx];
@@ -567,6 +601,12 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.lookahead_urgency = 0.0f;
         }
 
+        if (transverse_wall_detected) {
+            result.lookahead_urgency = 1.0f;
+            result.lookahead_x = xl_20 + 25.0f;
+            result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+        }
+
         s_last_lookahead_left_x = nx[best_left_idx];
         return result;
     }
@@ -601,10 +641,30 @@ trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t
             result.lookahead_urgency = 0.0f;
         }
 
+        if (transverse_wall_detected) {
+            result.lookahead_urgency = 1.0f;
+            result.lookahead_x = xr_20 - 25.0f;
+            result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+        }
+
         s_last_lookahead_right_x = nx[best_right_idx];
         return result;
     }
 
     /* Case C: No Root Vectors Found */
+    if (transverse_wall_detected) {
+        result.found = 2;
+        result.lookahead_urgency = 1.0f;
+        if (transverse_wall_mid_x > (float)PIXY_CENTER_X + 2.0f) {
+            result.lookahead_x = 70.0f;
+        } else if (transverse_wall_mid_x < (float)PIXY_CENTER_X - 2.0f) {
+            result.lookahead_x = 10.0f;
+        } else {
+            float prev_offset = s_last_lookahead_right_x - (float)PIXY_CENTER_X;
+            result.lookahead_x = (prev_offset >= 0.0f) ? 70.0f : 10.0f;
+        }
+        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
+        result.trajectory_angle_deg = (result.trajectory_offset_px > 0.0f) ? 45.0f : -45.0f;
+    }
     return result;
 }

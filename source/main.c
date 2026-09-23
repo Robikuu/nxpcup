@@ -104,6 +104,8 @@ int main(void) {
     float         steer_cmd               = 0.0f;
     float         last_steer_cmd          = 0.0f;
     drive_state_t drive_state             = DRIVE_FORWARD;
+    bool          s_corner_apex_reached   = false;
+    uint32_t      s_corner_abort_ticks    = 0;
     uint32_t      state_streak            = 0;
     int8_t        streak_sign             = 0;
     uint32_t      urgency_streak          = 0;
@@ -151,6 +153,8 @@ int main(void) {
                 steer_cmd                 = 0.0f;
                 last_steer_cmd            = 0.0f;
                 drive_state               = DRIVE_FORWARD;
+                s_corner_apex_reached     = false;
+                s_corner_abort_ticks      = 0;
                 state_streak              = 0;
                 streak_sign               = 0;
                 urgency_streak            = 0;
@@ -185,14 +189,21 @@ int main(void) {
                 filtered_traj_angle  *= 0.80f;
                 filtered_traj_offset *= 0.80f;
                 if (s_front_dropout_ticks > (uint32_t)LOOKAHEAD_DROPOUT_HOLD_TICKS) {
-                    /* Extended dropout: check top-camera sanity guard */
-                    if (fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f) {
+                    /* Extended dropout: check top-camera sanity guard ONLY in DRIVE_FORWARD */
+                    if (drive_state == DRIVE_FORWARD && fabsf(filtered_heading) <= 3.0f && fabsf(filtered_cte) <= 4.0f) {
                         /* Straightaway sanity veto: vehicle is dead-center on a straight! */
                         lookahead_turn_factor *= 0.80f;
                     } else {
-                        /* Curve confirmed: line lost in corner */
+                        /* Curve confirmed or in DRIVE_TURNING: line lost in corner */
                         lookahead_turn_factor = 0.60f;
                     }
+                }
+            }
+
+            /* In DRIVE_TURNING: enforce urgency floor on corner approach before apex */
+            if (drive_state == DRIVE_TURNING && !s_corner_apex_reached) {
+                if (lookahead_turn_factor < 0.60f) {
+                    lookahead_turn_factor = 0.60f;
                 }
             }
 
@@ -201,7 +212,6 @@ int main(void) {
             if (s != kStatus_Success || num_vectors_pid == 0) {
                 urgency_streak         = 0;
                 trusted_corner_urgency *= 0.90f;
-                lookahead_turn_factor  *= 0.90f;
                 if (++line_lost_counter <= LINE_LOST_LIMIT) {
                     /* Dead-reckoning coast through intersection gap without braking */
                     Steer(g_params.steering_offset);
@@ -230,7 +240,6 @@ int main(void) {
             if (sr.found == 0) {
                 urgency_streak         = 0;
                 trusted_corner_urgency *= 0.90f;
-                lookahead_turn_factor  *= 0.90f;
                 if (++line_lost_counter <= LINE_LOST_LIMIT) {
                     /* Dead-reckoning coast through intersection gap without braking */
                     Steer(g_params.steering_offset);
@@ -261,14 +270,27 @@ int main(void) {
             }
 
             /* State machine transitions:
+             * - Track corner apex entry:
+             *   Once the vehicle physically experiences curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG),
+             *   or significant steering deflection (|steer_cmd| >= 15.0 deg) or outer lane displacement (|filtered_cte| >= 14.0 px),
+             *   mark apex reached!
              * - DRIVE_TURNING (Corner):
              *   Triggered by local top camera curvature (|filtered_heading| >= CORNER_HEADING_THRESHOLD_DEG),
-             *   or lookahead point exceeding enter hysteresis (> 6.0px),
+             *   or lookahead point exceeding enter hysteresis (> 4.0px),
              *   or confirmed sustained line loss outside straight sanity veto.
              * - DRIVE_FORWARD (Straight):
-             *   Strictly confirmed when both top camera and front lookahead confirm centering:
-             *   |filtered_heading| <= 4.0 deg, |filtered_cte| <= 6.0 px, and lookahead offset <= 4.0 px.
-             *   Hysteresis debounce of STATE_EXIT_STREAK (2 ticks = 40ms) guarantees chatter-free transitions. */
+             *   If apex has been reached: strictly confirmed when both top camera and front lookahead confirm centering:
+             *   |filtered_heading| <= 4.0 deg, |filtered_cte| <= 6.0 px, and lookahead offset <= 3.0 px (for 4 ticks = 80ms).
+             *   If apex NOT yet reached (on approach): hold DRIVE_TURNING until apex is negotiated (or safety timeout expires). */
+            if (drive_state == DRIVE_TURNING) {
+                if (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG ||
+                    fabsf(steer_cmd) >= 15.0f ||
+                    fabsf(filtered_cte) >= 14.0f) {
+                    s_corner_apex_reached = true;
+                    s_corner_abort_ticks  = 0;
+                }
+            }
+
             float la_offset = fabsf(s_last_valid_lookahead_x - (float)PIXY_CENTER_X);
             bool corner_trigger = (fabsf(filtered_heading) >= (float)CORNER_HEADING_THRESHOLD_DEG) ||
                                   (la_offset >= (float)LOOKAHEAD_HYSTERESIS_ENTER_PX && s_front_dropout_ticks == 0) ||
@@ -280,7 +302,22 @@ int main(void) {
                 bool straight_confirmed = (fabsf(filtered_heading) <= 4.0f &&
                                            fabsf(filtered_cte) <= 6.0f &&
                                            la_offset <= (float)LOOKAHEAD_HYSTERESIS_EXIT_PX);
-                desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+                if (s_corner_apex_reached) {
+                    /* Apex has been negotiated: safe to return to DRIVE_FORWARD once straight is confirmed */
+                    desired_state = straight_confirmed ? DRIVE_FORWARD : DRIVE_TURNING;
+                } else {
+                    /* On corner approach before apex: DO NOT abort to DRIVE_FORWARD unless long safety timeout expires */
+                    if (straight_confirmed) {
+                        if (++s_corner_abort_ticks >= (uint32_t)CORNER_APPROACH_ABORT_TICKS) {
+                            desired_state = DRIVE_FORWARD; /* False alarm safety exit */
+                        } else {
+                            desired_state = DRIVE_TURNING; /* Hold corner pre-braking state! */
+                        }
+                    } else {
+                        s_corner_abort_ticks = 0;
+                        desired_state = DRIVE_TURNING;
+                    }
+                }
             } else {
                 desired_state = corner_trigger ? DRIVE_TURNING : DRIVE_FORWARD;
             }
@@ -298,6 +335,10 @@ int main(void) {
                 if (++state_streak >= threshold) {
                     drive_state  = desired_state;
                     state_streak = 0;
+                    if (drive_state == DRIVE_TURNING) {
+                        s_corner_apex_reached = false;
+                        s_corner_abort_ticks  = 0;
+                    }
                 }
             } else {
                 state_streak = 0;
