@@ -161,7 +161,7 @@ int main(void) {
             /* --- 1. Trajectory Camera Polling (LP_FLEXCOMM2 - Forward Horizon View) --- */
             status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
             if (s_front == kStatus_Success && num_vectors_front > 0) {
-                g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
+                g_traj = compute_lookahead_curvature(vectors_front, num_vectors_front);
                 s_front_dropout_ticks = 0;
                 filtered_traj_angle   = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
                 /* Asymmetric urgency filter: fast attack into corners, slow decay to prevent optical flicker acceleration surges */
@@ -289,7 +289,7 @@ int main(void) {
                     if (k_base > 1.0f) k_base = 1.0f;
                 }
 
-                float k_front = lookahead_turn_factor;
+                float k_front = lookahead_turn_factor * 1.25f;
                 if (k_front > 1.0f) k_front = 1.0f;
 
                 kappa = (k_base > k_front) ? k_base : k_front;
