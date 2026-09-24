@@ -170,6 +170,14 @@ gov_step_result_t gov_sim_step(gov_sim_ctx_t *ctx,
         }
         float heading_ff = g_params.k_heading * effective_h;
         float pid_cte = -pid_update(&ctx->steer_pid, 0.0f, g_params.k_cte * ctx->filtered_cte, g_params.dt);
+
+        /* Smooth conditional apex protection */
+        if (ctx->filtered_cte * ctx->filtered_heading < 0.0f && abs_h >= 8.0f) {
+            float fade = 1.0f - (abs_h - 8.0f) / ((float)GOVERNOR_HEADING_MAX_DEG - 8.0f);
+            if (fade < 0.0f) fade = 0.0f;
+            pid_cte *= fade;
+        }
+
         raw_steer = pid_cte + heading_ff;
     }
     else if (ctx->macro_state == MACRO_STATE_INTERSECTION) {
@@ -177,7 +185,13 @@ gov_step_result_t gov_sim_step(gov_sim_ctx_t *ctx,
         target_speed = 70.0f;
         raw_steer = 0.0f; // Hold straight across intersection
 
-        if (++ctx->intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
+        if (fabsf(ctx->filtered_heading) >= 10.0f) {
+            ctx->macro_state = MACRO_STATE_NORMAL;
+            ctx->intersection_ticks = 0;
+            ctx->cte_filter_init = 0;
+            ctx->heading_filter_init = 0;
+            reset_pid_state(&ctx->steer_pid);
+        } else if (++ctx->intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
             /* Guaranteed Timeout Exit -> NORMAL */
             ctx->macro_state = MACRO_STATE_NORMAL;
             ctx->intersection_ticks = 0;

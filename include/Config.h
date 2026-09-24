@@ -67,15 +67,15 @@
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
 #define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    1.00f     // Calibrated lateral centering (prevents fighting heading feedforward)
-#define KD_STRAIGHT                  0.080f    // Lateral velocity damping
-#define KD_CORNER                    0.080f    // Damped lateral velocity damping (prevents camera noise kicking)
+#define KP_CORNER                    2.60f     // Crisp cornering authority (decisive bite into 90 deg turns)
+#define KD_STRAIGHT                  0.180f    // Lateral velocity damping
+#define KD_CORNER                    0.180f    // Lateral velocity damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
 #define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) -> 13.0 deg/tick
 
 // ---- Error Weights & Decoupled Feedforward ----
-#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight (smooth centering)
+#define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight (strong centering authority)
 #define DEFAULT_K_HEADING            1.70f     // Direct base camera heading feedforward into curves (strong turn-in bite)
 #define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)

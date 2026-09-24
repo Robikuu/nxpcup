@@ -90,6 +90,7 @@ int main(void) {
 
     uint8_t  macro_state              = MACRO_STATE_NORMAL;
     uint32_t intersection_ticks       = 0;
+    uint32_t intersection_detect_streak = 0;
     uint32_t line_lost_ticks          = 0;
     uint32_t line_reacquire_streak    = 0;
 
@@ -131,6 +132,7 @@ int main(void) {
                 reset_steering_tracking();
                 macro_state              = MACRO_STATE_NORMAL;
                 intersection_ticks       = 0;
+                intersection_detect_streak = 0;
                 line_lost_ticks          = 0;
                 line_reacquire_streak    = 0;
                 filtered_cte             = 0.0f;
@@ -183,9 +185,15 @@ int main(void) {
             if (s_pid == kStatus_Success && num_vectors_pid > 0) {
                 /* Detect crossing lines before Pass 2 horizontal-vector rejection.
                  * CRITICAL: An intersection can ONLY be detected if the vehicle is travelling
-                 * strictly straight along the lane (|H| < 6.0 deg, |steer| < 8.0 deg). In sharp curves,
+                 * strictly straight along the lane (|H| < 6.0 deg, |steer| < 8.0 deg, |TJ| < 12.0 deg,
+                 * lookahead_urgency < 0.20, kappa < 0.20, |CTE| < 12.0 px). In sharp curves,
                  * transverse tape boundaries appear horizontal in perspective projection. */
-                if (fabsf(filtered_heading) < 6.0f && fabsf(steer_cmd) < 8.0f) {
+                if (fabsf(filtered_heading) < 6.0f &&
+                    fabsf(steer_cmd) < 8.0f &&
+                    fabsf(filtered_traj_angle) < 12.0f &&
+                    lookahead_turn_factor < 0.20f &&
+                    kappa < 0.20f &&
+                    fabsf(filtered_cte) < 12.0f) {
                     for (size_t i = 0; i < num_vectors_pid; i++) {
                         int dx = (int)vectors_pid[4 * i + 2] - (int)vectors_pid[4 * i + 0];
                         int dy = (int)vectors_pid[4 * i + 3] - (int)vectors_pid[4 * i + 1];
@@ -235,10 +243,19 @@ int main(void) {
                 }
             }
 
-            if (macro_state == MACRO_STATE_NORMAL && intersection_trigger) {
-                macro_state        = MACRO_STATE_INTERSECTION;
-                intersection_ticks = 0;
-                reset_pid_state(&steer_pid);
+            if (macro_state == MACRO_STATE_NORMAL) {
+                if (intersection_trigger) {
+                    if (++intersection_detect_streak >= 2) {
+                        macro_state                = MACRO_STATE_INTERSECTION;
+                        intersection_ticks         = 0;
+                        intersection_detect_streak = 0;
+                        reset_pid_state(&steer_pid);
+                    }
+                } else {
+                    intersection_detect_streak = 0;
+                }
+            } else {
+                intersection_detect_streak = 0;
             }
 
             /* --- 4. Base Camera Line Filtering (When Lines Present) --- */
@@ -289,14 +306,16 @@ int main(void) {
                 float heading_ff = g_params.k_heading * effective_h;
                 float pid_cte    = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
-                /* Continuous Apex Authority & Smooth CTE Attenuation:
-                 * In straightaways (|H| ≈ 0), CTE has 100% authority to keep the vehicle centered.
-                 * As the vehicle turns into a curve (|H| -> 25 deg), heading feedforward and differential drag
-                 * take command. CTE authority smoothly fades to 0 to prevent fighting the turn.
-                 * On corner exit, CTE authority smoothly fades back in without any sudden steering kicks. */
-                float cte_fade = 1.0f - (abs_h / (float)GOVERNOR_HEADING_MAX_DEG);
-                if (cte_fade < 0.0f) cte_fade = 0.0f;
-                pid_cte *= cte_fade;
+                /* Smooth conditional apex protection:
+                 * When CTE opposes heading (car is hugging inside apex and CTE would try to push it away),
+                 * smoothly attenuate CTE authority between 8.0 deg and 25.0 deg heading.
+                 * When CTE is in the SAME direction as heading (car drifting toward outside wall),
+                 * keep 100% full centering authority to prevent hitting the outside boundary! */
+                if (filtered_cte * filtered_heading < 0.0f && abs_h >= 8.0f) {
+                    float fade = 1.0f - (abs_h - 8.0f) / ((float)GOVERNOR_HEADING_MAX_DEG - 8.0f);
+                    if (fade < 0.0f) fade = 0.0f;
+                    pid_cte *= fade;
+                }
 
                 raw_steer = pid_cte + heading_ff;
             }
@@ -305,9 +324,10 @@ int main(void) {
                 target_speed = 65.0f;
                 raw_steer    = last_steer_cmd * 0.85f; /* Smoothly decay toward straight, never violent snap */
 
-                /* Immediate safety abort: If vehicle heading swings into a curve (|H| >= 12 deg),
-                 * we are clearly in a turn, NOT an intersection. Revert to NORMAL immediately. */
-                if (fabsf(filtered_heading) >= 12.0f) {
+                /* Immediate curve abort: If vehicle heading swings into a curve (|H| >= 10.0 deg)
+                 * or front camera detects upcoming curvature, we are clearly navigating a turn,
+                 * NOT crossing an intersection. Revert to NORMAL immediately so steering is not frozen! */
+                if (fabsf(filtered_heading) >= 10.0f || lookahead_turn_factor >= 0.35f || fabsf(filtered_traj_angle) >= 18.0f) {
                     macro_state         = MACRO_STATE_NORMAL;
                     intersection_ticks  = 0;
                     cte_filter_init     = 0;
