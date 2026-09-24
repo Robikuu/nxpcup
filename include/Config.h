@@ -132,6 +132,8 @@ typedef struct {
     float dt;
     float accel_ramp;
     float decel_ramp;
+    int8_t invert_left;
+    int8_t invert_right;
     uint8_t state;
 } robot_params_t;
 

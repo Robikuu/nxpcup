@@ -31,6 +31,8 @@ void params_init(void) {
     g_params.steering_offset     = STEERING_OFFSET;
     g_params.accel_ramp          = ACCEL_RAMP_STEP;
     g_params.decel_ramp          = DECEL_RAMP_STEP;
+    g_params.invert_left         = 1;
+    g_params.invert_right        = 0;
     g_params.state               = STATE_IDLE;
 }
 
@@ -179,7 +181,9 @@ static void command_execute(char *cmd) {
             if (spd > 100.0f) spd = 100.0f;
             if (spd < -100.0f) spd = -100.0f;
             motor_test_start((int16_t)spd, 0, 200); /* 200 ticks @ 50Hz = 4.0 seconds */
-            send_ack_dbl("OK motor_left 4s speed=", spd);
+            char ack[80];
+            snprintf(ack, sizeof(ack), "OK motor_left 4s speed=%d [inv_l=%d]\r\n", (int)spd, (int)g_params.invert_left);
+            send_ack(ack);
         }
     }
     else if (!strcmp(keyword, "motor_right")) {
@@ -190,8 +194,35 @@ static void command_execute(char *cmd) {
             if (spd > 100.0f) spd = 100.0f;
             if (spd < -100.0f) spd = -100.0f;
             motor_test_start(0, (int16_t)spd, 200); /* 200 ticks @ 50Hz = 4.0 seconds */
-            send_ack_dbl("OK motor_right 4s speed=", spd);
+            char ack[80];
+            snprintf(ack, sizeof(ack), "OK motor_right 4s speed=%d [inv_r=%d]\r\n", (int)spd, (int)g_params.invert_right);
+            send_ack(ack);
         }
+    }
+    else if (!strcmp(keyword, "invert_left")) {
+        if (has_val) {
+            g_params.invert_left = (int8_t)val;
+        } else {
+            g_params.invert_left = !g_params.invert_left;
+        }
+        char ack[48];
+        snprintf(ack, sizeof(ack), "OK invert_left=%d\r\n", (int)g_params.invert_left);
+        send_ack(ack);
+    }
+    else if (!strcmp(keyword, "invert_right")) {
+        if (has_val) {
+            g_params.invert_right = (int8_t)val;
+        } else {
+            g_params.invert_right = !g_params.invert_right;
+        }
+        char ack[48];
+        snprintf(ack, sizeof(ack), "OK invert_right=%d\r\n", (int)g_params.invert_right);
+        send_ack(ack);
+    }
+    else if (!strcmp(keyword, "version")) {
+        char vbuf[96];
+        snprintf(vbuf, sizeof(vbuf), "BUILD: %s %s inv_l=%d inv_r=%d\r\n", __DATE__, __TIME__, (int)g_params.invert_left, (int)g_params.invert_right);
+        send_ack(vbuf);
     }
     else if (!strcmp(keyword, "status")) {
         char buf[512];
@@ -212,11 +243,11 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "alpha=", g_params.alpha);
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
-        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
+        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "inv_l=%d inv_r=%d state=%s\r\n", (int)g_params.invert_left, (int)g_params.invert_right, g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, kp_straight, kp_corner, kd_straight, kd_corner, speed_straight, speed_out, speed_in, k_cte, k_heading, k_lookahead, alpha, steer, motor_left, motor_right, accel_ramp, decel_ramp, status\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, invert_left, invert_right, version, status, steer, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");
