@@ -25,5 +25,6 @@ void reset_steering_tracking(void);
 void vector_filtering(uint16_t *vectors, size_t *num_vectors);
 steering_result_t compute_steering_error(const uint16_t *vectors, size_t num_vectors);
 trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t num_vectors);
+trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t num_vectors);
 
 #endif // VECTORS_H
