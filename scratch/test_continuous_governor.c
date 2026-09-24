@@ -275,10 +275,10 @@ int main(void) {
 
         assert(r.macro_state == MACRO_STATE_NORMAL);
         assert(r.kappa == 0.0f);
-        assert(r.target_speed == 100.0f);
-        assert(r.applied_speed >= 99.0f);
+        assert(r.target_speed == SPEED_STRAIGHT);
+        assert(r.applied_speed >= (SPEED_STRAIGHT - 1.0f));
     }
-    printf("  [PASS] Test 1: Straightaway camera noise is completely zeroed by deadbands; 100%% speed confirmed!\n\n");
+    printf("  [PASS] Test 1: Straightaway camera noise is completely zeroed by deadbands; %.1f%% speed confirmed!\n\n", SPEED_STRAIGHT);
 
     /* ----------------------------------------------------------------- */
     /* TEST 2: Smooth Continuous Curvature Scaling & Corner Pre-Braking  */
@@ -288,18 +288,18 @@ int main(void) {
     gov_sim_init(&ctx2);
 
     /* 1. Approaching 90 deg corner: front camera detects curvature ramping */
-    float prev_speed = 100.0f;
+    float prev_speed = SPEED_STRAIGHT;
     for (int i = 1; i <= 10; i++) {
         float dx = 4.0f + (float)i * 1.0f; // mid_dx ramps from 5px to 14px
         gov_step_result_t r = gov_sim_step(&ctx2, 0.0f, 0.0f, dx, false, false, 2);
         
         assert(r.macro_state == MACRO_STATE_NORMAL);
         assert(r.kappa > 0.0f);
-        assert(r.target_speed < 100.0f);
+        assert(r.target_speed < SPEED_STRAIGHT);
         assert(r.applied_speed <= prev_speed); // Strictly monotonic deceleration
         prev_speed = r.applied_speed;
     }
-    printf("  Decelerated smoothly from 100%% to %.1f%% on corner approach.\n", prev_speed);
+    printf("  Decelerated smoothly from %.1f%% to %.1f%% on corner approach.\n", SPEED_STRAIGHT, prev_speed);
     assert(prev_speed <= 70.0f);
 
     /* 2. Transverse wall detection dead ahead (Corner 1) */

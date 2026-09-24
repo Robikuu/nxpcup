@@ -26,7 +26,7 @@
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
-#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
+#define SPEED_STRAIGHT               80.0f     // Straight line sprint speed (%) (calibrated for track braking distance)
 #define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated apex outside wheel drive (%) (prevents corner understeer push)
 #define SPEED_INSIDE_MIN             48.0f     // Inside wheel pivot anchor duty (%) (gentler pivot, 9.7% min yaw torque verified safe)
 #define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 53.0%

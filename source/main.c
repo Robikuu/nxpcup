@@ -162,11 +162,16 @@ int main(void) {
                 g_traj = compute_lookahead_trajectory(vectors_front, num_vectors_front);
                 s_front_dropout_ticks = 0;
                 filtered_traj_angle   = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
-                lookahead_turn_factor = 0.50f * g_traj.lookahead_urgency     + 0.50f * lookahead_turn_factor;
+                /* Asymmetric urgency filter: fast attack into corners, slow decay to prevent optical flicker acceleration surges */
+                if (g_traj.lookahead_urgency >= lookahead_turn_factor) {
+                    lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
+                } else {
+                    lookahead_turn_factor = 0.15f * g_traj.lookahead_urgency + 0.85f * lookahead_turn_factor;
+                }
             } else {
                 s_front_dropout_ticks++;
                 filtered_traj_angle   *= 0.80f;
-                lookahead_turn_factor *= 0.80f;
+                lookahead_turn_factor *= 0.85f;
                 memset(&g_traj, 0, sizeof(g_traj));
                 g_traj.lookahead_x = (float)PIXY_CENTER_X;
             }
@@ -176,15 +181,20 @@ int main(void) {
             bool intersection_trigger = false;
 
             if (s_pid == kStatus_Success && num_vectors_pid > 0) {
-                /* Detect crossing lines before Pass 2 horizontal-vector rejection */
-                for (size_t i = 0; i < num_vectors_pid; i++) {
-                    int dx = (int)vectors_pid[4 * i + 2] - (int)vectors_pid[4 * i + 0];
-                    int dy = (int)vectors_pid[4 * i + 3] - (int)vectors_pid[4 * i + 1];
-                    if (dx < 0) dx = -dx;
-                    if (dy < 0) dy = -dy;
-                    if (dx >= 18 && (dx * 20 > dy * 17)) {
-                        intersection_trigger = true;
-                        break;
+                /* Detect crossing lines before Pass 2 horizontal-vector rejection.
+                 * CRITICAL: An intersection can ONLY be detected if the vehicle is travelling
+                 * roughly straight along the lane (|H| < 10 deg, |steer| < 12 deg). In sharp curves,
+                 * transverse tape boundaries appear horizontal in perspective projection. */
+                if (fabsf(filtered_heading) < 10.0f && fabsf(steer_cmd) < 12.0f) {
+                    for (size_t i = 0; i < num_vectors_pid; i++) {
+                        int dx = (int)vectors_pid[4 * i + 2] - (int)vectors_pid[4 * i + 0];
+                        int dy = (int)vectors_pid[4 * i + 3] - (int)vectors_pid[4 * i + 1];
+                        if (dx < 0) dx = -dx;
+                        if (dy < 0) dy = -dy;
+                        if (dx >= 18 && (dx * 20 > dy * 17)) {
+                            intersection_trigger = true;
+                            break;
+                        }
                     }
                 }
                 vector_filtering(vectors_pid, &num_vectors_pid);
@@ -288,8 +298,8 @@ int main(void) {
             }
             else if (macro_state == MACRO_STATE_INTERSECTION) {
                 kappa        = 0.0f;
-                target_speed = 70.0f;
-                raw_steer    = 0.0f; /* Hold straight across intersection */
+                target_speed = 65.0f;
+                raw_steer    = last_steer_cmd * 0.85f; /* Smoothly decay toward straight, never violent snap */
 
                 if (++intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
                     /* Guaranteed Timeout Exit -> NORMAL */
@@ -301,17 +311,19 @@ int main(void) {
                 }
             }
             else if (macro_state == MACRO_STATE_LINE_LOST) {
-                kappa     = 0.0f;
-                raw_steer = 0.0f; /* Hold straight */
+                kappa = 0.0f;
 
                 if (line_lost_ticks <= (uint32_t)LINE_LOST_BRAKE_TICKS) {
-                    /* Phase 1: Coast straight at current applied speed */
+                    /* Phase 1: Coast holding last good steering angle to reacquire in curves */
+                    raw_steer    = last_steer_cmd;
                     target_speed = applied_speed_left;
                 } else if (line_lost_ticks <= (uint32_t)LINE_LOST_STOP_TICKS) {
-                    /* Phase 2: Active Dynamic Braking */
+                    /* Phase 2: Active Dynamic Braking while centering steering */
+                    raw_steer    = last_steer_cmd * 0.90f;
                     target_speed = 0.0f;
                 } else {
                     /* Phase 3: Emergency Stop */
+                    raw_steer      = 0.0f;
                     target_speed   = 0.0f;
                     g_params.state = STATE_IDLE;
                     HbridgeBrake(&g_hbridge);
