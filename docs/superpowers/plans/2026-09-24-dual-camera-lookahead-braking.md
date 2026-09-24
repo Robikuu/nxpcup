@@ -18,7 +18,7 @@
 - Modify: `source/vectors.c:388-570`
 - Test: `scratch/test_preview_curvature.c`
 
-- [ ] **Step 1: Write unit test for extended preview curvature**
+- [x] **Step 1: Write unit test for extended preview curvature**
 
 Create `scratch/test_preview_curvature.c` to test the new curvature estimator on:
 1. Far curve at 1.0m ($Y \in [18, 32]$): must return high curvature ($\kappa \ge 0.70$) without requiring bumper-anchor points ($Y \ge 30$).
@@ -86,7 +86,7 @@ int main(void) {
 }
 ```
 
-- [ ] **Step 2: Compile and run test to verify failure**
+- [x] **Step 2: Compile and run test to verify failure**
 
 Compile using gcc or cl:
 ```powershell
@@ -94,7 +94,7 @@ python -c "import subprocess; print(subprocess.run(['gcc', 'scratch/test_preview
 ```
 Expected: Linking error: `undefined reference to compute_lookahead_curvature`.
 
-- [ ] **Step 3: Implement `compute_lookahead_curvature` in `source/vectors.c` and declare in `source/vectors.h`**
+- [x] **Step 3: Implement `compute_lookahead_curvature` in `source/vectors.c` and declare in `source/vectors.h`**
 
 In `source/vectors.h`, declare:
 ```c
@@ -107,7 +107,7 @@ In `source/vectors.c`, implement:
 - Pair left and right candidate vectors without requiring bumper contact ($Y \ge 30$).
 - Calculate horizon midpoint at $Y = 22.0\text{f}$ and evaluate lateral offset curvature.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```powershell
 gcc scratch/test_preview_curvature.c source/vectors.c -I include -I source -o scratch/test_preview_curvature.exe
@@ -115,7 +115,7 @@ gcc scratch/test_preview_curvature.c source/vectors.c -I include -I source -o sc
 ```
 Expected: `ALL PREVIEW CURVATURE TESTS PASSED!`
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add include/Config.h source/vectors.h source/vectors.c scratch/test_preview_curvature.c
@@ -130,19 +130,19 @@ git commit -m "feat(vision): implement extended lookahead curvature preview with
 - Modify: `source/main.c:160-185, 280-310`
 - Test: `scratch/test_speed_governor_sim.py`
 
-- [ ] **Step 1: Write simulation test for pre-braking timing**
+- [x] **Step 1: Write simulation test for pre-braking timing**
 
 Create `scratch/test_speed_governor_sim.py` using telemetry log data from the user's run:
 Simulate the vehicle approaching Corner 1 with the new extended preview estimator. Verify that target speed drops from 100% to 58% at least 6 ticks (120ms) before base camera heading swings into the turn.
 
-- [ ] **Step 2: Run simulation test to verify failure on current main.c logic**
+- [x] **Step 2: Run simulation test to verify failure on current main.c logic**
 
 ```powershell
 python scratch/test_speed_governor_sim.py
 ```
 Expected: Output showing current logic only begins deceleration at Frame 14 (too late).
 
-- [ ] **Step 3: Update `source/main.c` control loop**
+- [x] **Step 3: Update `source/main.c` control loop**
 
 1. Replace `compute_lookahead_trajectory` call with `compute_lookahead_curvature`:
    ```c
@@ -165,14 +165,14 @@ Expected: Output showing current logic only begins deceleration at Frame 14 (too
    ```
 3. Keep steering servo strictly on top camera (PID CTE + heading feedforward) with gain scheduling.
 
-- [ ] **Step 4: Run simulation test to verify it passes**
+- [x] **Step 4: Run simulation test to verify it passes**
 
 ```powershell
 python scratch/test_speed_governor_sim.py
 ```
 Expected: `PRE-BRAKING TIMING TEST PASSED (speed reaches 58% 300ms prior to apex entry)`.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add source/main.c scratch/test_speed_governor_sim.py
@@ -187,7 +187,7 @@ git commit -m "feat(governor): integrate extended preview curvature into continu
 - Modify: `D:\robotica\workspace\nxpcup-ciorba_curata\source\*`
 - Modify: `D:\robotica\workspace\nxpcup-ciorba_curata\include\*`
 
-- [ ] **Step 1: Synchronize all modified files to the MCUXpresso IDE workspace**
+- [x] **Step 1: Synchronize all modified files to the MCUXpresso IDE workspace**
 
 ```powershell
 Copy-Item "d:\nxpcup\source\vectors.c" -Destination "D:\robotica\workspace\nxpcup-ciorba_curata\source\vectors.c" -Force
@@ -197,11 +197,11 @@ Copy-Item "d:\nxpcup\include\Config.h" -Destination "D:\robotica\workspace\nxpcu
 Copy-Item "d:\nxpcup\source\wifi_config.c" -Destination "D:\robotica\workspace\nxpcup-ciorba_curata\source\wifi_config.c" -Force
 ```
 
-- [ ] **Step 2: Verify git status and compile in MCUXpresso**
+- [x] **Step 2: Verify git status and compile in MCUXpresso**
 
 Confirm 0 compiler errors or warnings in MCUXpresso IDE.
 
-- [ ] **Step 3: Commit Task 3**
+- [x] **Step 3: Commit Task 3**
 
 ```bash
 git commit -m "chore(sync): synchronize lookahead pre-braking build to MCUXpresso workspace"
