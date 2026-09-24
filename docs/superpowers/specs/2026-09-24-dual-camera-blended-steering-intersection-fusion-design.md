@@ -2,7 +2,7 @@
 
 - **Date:** 2026-09-24
 - **Target Platform:** NXP FRDM-MCXN947 (dual Cortex-M33, FreeRTOS, dual Pixy2 cameras)
-- **Status:** Approved with Engineering Review Fixes (v4 - Production Ready), Ready for Implementation Planning
+- **Status:** Approved for Implementation (v5 - Hardware-Test Ready)
 
 ---
 
@@ -19,8 +19,8 @@ Telemetry from the `lookahead-prebrake-v1` track run revealed a critical asymmet
   - Completely blind (0 vectors): **3.4% of the run** (5 frames).
 
 ### Key Architectural Fixes
-1. **Continuous Dual-Camera Steering Blend with Shadow Mode Verification:** Replace the top-only steering paradigm with smooth, asymmetric blending ($\alpha$). Includes a zero-risk **Shadow Mode** (`shadow 1`) to log and compare $\delta_{\text{front}}$ alongside $\delta_{\text{top}}$ in real track noise before enabling active blend control.
-2. **Gated Intersection Navigation:** Enforce the NXP Cup rule ("exit on the opposite side it entered") by strictly gating heading-aligned candidate pair selection to confirmed intersections (transverse tape signature while roughly straight), with approach-aware timeout scaling (~1.5 m total transit).
+1. **Continuous Dual-Camera Steering Blend with Shadow Mode Verification:** Replace the top-only steering paradigm with smooth, asymmetric blending ($\alpha$). Includes a zero-risk **Shadow Mode** (`shadow 1`) to log and compare $\delta_{\text{front}}$ alongside $\delta_{\text{top}}$ across the full track (via push-by-hand run) before enabling active blend control.
+2. **Gated Intersection Navigation:** Enforce the NXP Cup rule ("exit on the opposite side it entered") by strictly gating heading-aligned candidate pair selection to confirmed intersections (transverse tape signature while roughly straight), with entrance-clearing verification and approach-aware timeout scaling.
 3. **Self-Healing Temporal Plausibility & Complete PID Reseed:** Temporal jump limits ($\Delta \theta \le 25^\circ$/tick) with a 3-frame auto-reseed to prevent permanent lockouts; full PID state reset (`prev_error = 0`, `integral` frozen) on reacquisition; output servo slew limiting ($\le 12^\circ$/tick).
 
 ---
@@ -116,7 +116,7 @@ s_last_c_top = c_top;
 ```
 
 ### 3.3 Self-Healing Front Camera Plausibility Filter
-Rejects frame-to-frame jump anomalies while preventing permanent lockout via a 3-frame auto-reseed:
+Rejects frame-to-frame jump anomalies while preventing permanent lockout via a 3-frame auto-reseed, and resets `s_front_dropout_ticks` cleanly:
 ```c
 bool front_plausible = false;
 float c_front = 0.0f;
@@ -127,6 +127,7 @@ if (num_vectors_front > 0) {
         s_last_front_angle  = g_traj.trajectory_angle_deg;
         s_last_front_offset = g_traj.trajectory_offset_px;
         s_consecutive_rejections = 0;
+        s_front_dropout_ticks = 0; /* Cleared upon re-seed */
         front_plausible = true;
     } else {
         float angle_jump  = fabsf(g_traj.trajectory_angle_deg - s_last_front_angle);
@@ -154,6 +155,8 @@ if (num_vectors_front > 0) {
     if (front_plausible) {
         c_front = (num_vectors_front >= 2) ? 1.0f : 0.60f;
     }
+} else {
+    s_front_dropout_ticks++;
 }
 ```
 
@@ -206,35 +209,30 @@ s_last_servo_cmd = servo_cmd;
 
 ## 4. Subsystem 2: Gated Intersection Navigation
 
-### 4.1 Approach-Aware Trigger & Straightness Logging
+### 4.1 Approach-Aware Trigger (Log-Only in Phase 1A)
 ```c
 bool is_roughly_straight = (fabsf(filtered_heading) <= 15.0f) && (fabsf(s_last_servo_cmd) <= 18.0f);
 bool has_transverse_tape = (g_traj.has_transverse_tape || top_has_transverse_tape);
 
-if (has_transverse_tape && !is_roughly_straight) {
-    s_curved_intersection_approaches++; /* Logged in telemetry for audit */
-}
-
 if (!g_intersection_active && has_transverse_tape && is_roughly_straight) {
     g_intersection_active = true;
     s_intersection_ticks = 0;
+    s_saw_transverse_in_box = true;
     s_latched_steer = s_last_servo_cmd; /* Latch pre-entry steering angle */
     s_latched_heading = filtered_heading;
 }
 ```
 
 ### 4.2 Gated Candidate Pair Filtering Across Intersection
-During `g_intersection_active == true`:
+During `g_intersection_active == true` (Phase 2):
 * Candidate pairs in [`source/vectors.c`](file:///d:/nxpcup/source/vectors.c) are filtered against latched heading $\psi_{\text{latched}}$:
   $$\Delta \psi = |\theta_{\text{pair}} - \psi_{\text{latched}}|$$
 * If $\Delta \psi > 35.0^\circ$, candidate pair is **hard-rejected** (eliminating $\pm 45^\circ..\pm 90^\circ$ cross-branches).
 * **Fallback Steering Across Intersection:** If no forward longitudinal pair is visible, hold latched pre-entry angle for 5 ticks (100 ms), then decay gently ($0.97^k$).
 
-### 4.3 Approach-Aware Distance Timeout Backstop
+### 4.3 Approach-Aware Transit Timeout Backstop
 The front camera triggers detection $\approx 1.0\text{ m}$ ahead of the box, and the box width is $\approx 0.45\text{ m}$, totaling $\approx 1.45\text{ m}$ of transit.
-At corner speed $v \approx 1.2\text{ m/s}$ (PWM 50%), this requires $\approx 60\text{ ticks}$ (1.2 s):
-$$\text{timeout\_ticks} = \text{clamp}\left( \frac{1.45\text{ m}}{v_{\text{est}} \cdot 0.020\text{ s}}, 35, 75 \right)$$
-* Intersection deactivates when clear longitudinal lines ($\ge 2$ vectors) are tracked on the opposite side for 4 consecutive ticks, or when `s_intersection_ticks >= timeout_ticks`.
+* **Exit condition:** Requires minimum 20 ticks (400 ms) in state, transverse tape cleared, and longitudinal lines ($\ge 2$ vectors) tracked on the opposite side for 4 consecutive ticks, OR timeout backstop (55 ticks).
 
 ---
 
@@ -247,7 +245,7 @@ $$v_{\text{target}} = v_{\text{straight}} - \kappa \cdot (v_{\text{straight}} - 
 * $v_{\text{straight}} = 92\%$ (reduced from 100% for straightaway stability).
 * $v_{\text{corner}} = 45\%$ for sharp corners.
 
-### 5.2 Confidence & Intersection Speed Caps
+### 5.2 Confidence & Intersection Speed Caps (Active in Phase 1B)
 * **Fallback Speed Cap:** When Top camera is blind and Front dominates ($\alpha < 0.30$), cap speed to $\le 52\%$ to prevent cutting inside curbs on far lookahead.
 * **Intersection Speed Cap:** When `g_intersection_active == true`, cap speed to $\le 55\%$.
 
@@ -288,21 +286,21 @@ L:2/3 R:-10 F:-11 H:6 TS:-15 FS:-12 S:-14 BW:85 DOM:T FV:1 IX:0 ST:N VL:88 VR:88
 
 ## 8. Implementation Roadmap
 
-1. **Phase 1A: Telemetry & Shadow Mode Deployment (Zero-Risk):**
-   - Implement `TS:`, `FS:`, `BW:`, `DOM:`, `FV:`, `IX:` in telemetry parser.
-   - Implement $\delta_{\text{front}}$ calculation and temporal plausibility check with 3-frame auto-reseed.
-   - Enable `shadow_mode_enable = 1` by default (car steers on $\delta_{\text{top}}$ as before).
-   - Test on track: log and compare `TS:` vs. `FS:` side-by-side in the ~57% dual-camera frames.
+1. **Phase 1A: Telemetry, Intersection Logger & Shadow Mode (Immediate):**
+   - Implement `TS:`, `FS:`, `BW:`, `DOM:`, `FV:`, `IX:` in telemetry.
+   - Implement $\delta_{\text{front}}$ calculation and temporal plausibility check with 3-frame auto-reseed and `s_front_dropout_ticks` reset.
+   - Implement log-only intersection detector (`IX:1/0`).
+   - Default `shadow_mode_enable = 1` (car steers on $\delta_{\text{top}}$).
+   - Test by pushing car through full loop by hand: capture clean calibration data across the entire circuit.
 
 2. **Phase 1B: Enable Active Blending & Fallback:**
    - Set `shadow_mode_enable = 0`.
    - Enable asymmetric blend weight $\alpha$ ($\Delta_{\text{fall}} = 0.50, \Delta_{\text{rise}} = 0.08$).
    - Enable full Top PID reseed (`prev_error` and `derivative` reset).
-   - Enable servo slew limiter ($\le 12^\circ/\text{tick}$) and dual-blind `STATE_LOST_LINE`.
+   - Enable servo slew limiter ($\le 12^\circ/\text{tick}$), speed caps, and dual-blind `STATE_LOST_LINE`.
 
 3. **Phase 2: Gated Intersection Navigation:**
-   - Transverse tape + straight-approach intersection trigger.
-   - Gated candidate pair $\Delta \psi \le 35^\circ$ filter and latched steering fallback.
+   - Active candidate pair $\Delta \psi \le 35^\circ$ filter and latched steering fallback.
    - Approach-aware timeout backstop (~1.45 m transit).
 
 4. **Phase 3: Track Validation & Speed Governor Dial-In:**
