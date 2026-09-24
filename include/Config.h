@@ -28,8 +28,8 @@
 // ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
 #define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated apex outside wheel drive (%) (prevents corner understeer push)
-#define SPEED_INSIDE_MIN             35.0f     // Inside wheel pivot anchor duty (%) (sharp pivot torque to whip chassis through turns)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 46.5%
+#define SPEED_INSIDE_MIN             48.0f     // Inside wheel pivot anchor duty (%) (gentler pivot, 9.7% min yaw torque verified safe)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 53.0%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
@@ -47,7 +47,7 @@
 // ---- Corner Urgency & Predictive Lookahead Gating ----
 #define CTE_URGENCY_PX               24.0f     // |filtered_cte| (px) at which corner gains engage (prevents straight hunting)
 #define CORNER_URGENCY_STREAK        1         // Immediate engagement on rising corner urgency
-#define STEER_FULL_BRAKE_DEG         30.0f     // Steer angle (deg) for 100% pivot drag (decisive bite at apex)
+#define STEER_FULL_BRAKE_DEG         45.0f     // Steer angle (deg) for 100% pivot drag (wider ramp, smoother chicane transitions)
 #define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full corner intensity scaling
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
