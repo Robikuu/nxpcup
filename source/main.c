@@ -99,7 +99,7 @@ int main(void) {
     float    delta_top                = 0.0f;
     bool     front_plausible          = false;
     bool     s_has_acquired_lane      = false;
-    uint8_t  s_top_acquire_streak     = 0;
+    uint32_t s_startup_rollout_ticks  = 0;
     uint32_t s_curved_intersection_approaches = 0;
 
     uint8_t  macro_state              = MACRO_STATE_NORMAL;
@@ -157,7 +157,7 @@ int main(void) {
                 lookahead_turn_factor    = 0.0f;
                 s_front_dropout_ticks    = 0;
                 s_has_acquired_lane      = false;
-                s_top_acquire_streak     = 0;
+                s_startup_rollout_ticks  = 0;
                 s_blend_weight           = 1.0f;
                 memset(&g_traj, 0, sizeof(g_traj));
                 g_traj.lookahead_x       = (float)PIXY_CENTER_X;
@@ -294,13 +294,10 @@ int main(void) {
                 sr.heading_deg = 0.0f;
             }
 
-            /* Track lane acquisition on Top camera */
-            if (sr.found > 0) {
-                if (!s_has_acquired_lane) {
-                    if (++s_top_acquire_streak >= 2) {
-                        s_has_acquired_lane = true;
-                    }
-                }
+            /* Dual-camera lane acquisition & startup rollout counter */
+            s_startup_rollout_ticks++;
+            if (sr.found > 0 || (front_plausible && num_vectors_front >= 1) || s_startup_rollout_ticks >= 10) {
+                s_has_acquired_lane = true;
             }
 
             /* --- 3. Macro State Transitions --- */
@@ -360,24 +357,16 @@ int main(void) {
                 target_alpha = 1.0f;
             }
 
-            /* Startup Guard: if top camera has not yet acquired lane boundaries,
-             * hold steering strictly straight (0 deg) and keep blend weight locked to 1.0.
-             * Front camera is NOT handed authority before initial lane lock. */
-            if (!s_has_acquired_lane) {
-                target_alpha   = 1.0f;
-                s_blend_weight = 1.0f;
-            } else {
-                /* Asymmetric blend slew rate: fast transfer to front (40ms), smooth return to top (240ms) */
-                float delta_alpha = target_alpha - s_blend_weight;
-                if (delta_alpha > (float)BLEND_RISE_SLEW_MAX) {
-                    delta_alpha = (float)BLEND_RISE_SLEW_MAX;
-                } else if (delta_alpha < -(float)BLEND_FALL_SLEW_MAX) {
-                    delta_alpha = -(float)BLEND_FALL_SLEW_MAX;
-                }
-                s_blend_weight += delta_alpha;
-                if (s_blend_weight > 1.0f) s_blend_weight = 1.0f;
-                if (s_blend_weight < 0.0f) s_blend_weight = 0.0f;
+            /* Asymmetric blend slew rate: fast transfer to front (40ms), smooth return to top (240ms) */
+            float delta_alpha = target_alpha - s_blend_weight;
+            if (delta_alpha > (float)BLEND_RISE_SLEW_MAX) {
+                delta_alpha = (float)BLEND_RISE_SLEW_MAX;
+            } else if (delta_alpha < -(float)BLEND_FALL_SLEW_MAX) {
+                delta_alpha = -(float)BLEND_FALL_SLEW_MAX;
             }
+            s_blend_weight += delta_alpha;
+            if (s_blend_weight > 1.0f) s_blend_weight = 1.0f;
+            if (s_blend_weight < 0.0f) s_blend_weight = 0.0f;
 
             if (sr.found > 0) {
                 if (!heading_filter_init || s_last_c_top == 0.0f) {
@@ -476,8 +465,8 @@ int main(void) {
                     s_last_valid_delta_top = delta_top;
                 }
 
-                if (!s_has_acquired_lane) {
-                    /* Startup Guard: hold steering strictly straight until Top camera locks onto track */
+                if (s_startup_rollout_ticks <= 5) {
+                    /* First 100ms (5 ticks): roll straight forward to clear start line cleanly */
                     raw_steer = 0.0f;
                 } else if (g_params.shadow_mode_enable) {
                     raw_steer = delta_top;
