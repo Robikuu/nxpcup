@@ -26,7 +26,7 @@
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
-#define SPEED_STRAIGHT               80.0f     // Straight line sprint speed (%) (calibrated for track braking distance)
+#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
 #define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated apex outside wheel drive (%) (prevents corner understeer push)
 #define SPEED_INSIDE_MIN             48.0f     // Inside wheel pivot anchor duty (%) (gentler pivot, 9.7% min yaw torque verified safe)
 #define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 53.0%
@@ -67,15 +67,15 @@
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
 #define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    2.60f     // Crisp cornering authority (decisive bite into 90 deg turns)
-#define KD_STRAIGHT                  0.180f    // Lateral velocity damping
-#define KD_CORNER                    0.180f    // Lateral velocity damping
+#define KP_CORNER                    1.00f     // Calibrated lateral centering (prevents fighting heading feedforward)
+#define KD_STRAIGHT                  0.080f    // Lateral velocity damping
+#define KD_CORNER                    0.080f    // Damped lateral velocity damping (prevents camera noise kicking)
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
 #define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) -> 13.0 deg/tick
 
 // ---- Error Weights & Decoupled Feedforward ----
-#define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight
+#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight (smooth centering)
 #define DEFAULT_K_HEADING            1.70f     // Direct base camera heading feedforward into curves (strong turn-in bite)
 #define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)

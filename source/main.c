@@ -183,9 +183,9 @@ int main(void) {
             if (s_pid == kStatus_Success && num_vectors_pid > 0) {
                 /* Detect crossing lines before Pass 2 horizontal-vector rejection.
                  * CRITICAL: An intersection can ONLY be detected if the vehicle is travelling
-                 * roughly straight along the lane (|H| < 10 deg, |steer| < 12 deg). In sharp curves,
+                 * strictly straight along the lane (|H| < 6.0 deg, |steer| < 8.0 deg). In sharp curves,
                  * transverse tape boundaries appear horizontal in perspective projection. */
-                if (fabsf(filtered_heading) < 10.0f && fabsf(steer_cmd) < 12.0f) {
+                if (fabsf(filtered_heading) < 6.0f && fabsf(steer_cmd) < 8.0f) {
                     for (size_t i = 0; i < num_vectors_pid; i++) {
                         int dx = (int)vectors_pid[4 * i + 2] - (int)vectors_pid[4 * i + 0];
                         int dy = (int)vectors_pid[4 * i + 3] - (int)vectors_pid[4 * i + 1];
@@ -289,10 +289,14 @@ int main(void) {
                 float heading_ff = g_params.k_heading * effective_h;
                 float pid_cte    = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
-                /* Apex protection: suppress opposing CTE damping in deep curves to bite into apex */
-                if (abs_h >= 8.0f && (filtered_cte * filtered_heading < 0.0f)) {
-                    pid_cte = 0.0f;
-                }
+                /* Continuous Apex Authority & Smooth CTE Attenuation:
+                 * In straightaways (|H| ≈ 0), CTE has 100% authority to keep the vehicle centered.
+                 * As the vehicle turns into a curve (|H| -> 25 deg), heading feedforward and differential drag
+                 * take command. CTE authority smoothly fades to 0 to prevent fighting the turn.
+                 * On corner exit, CTE authority smoothly fades back in without any sudden steering kicks. */
+                float cte_fade = 1.0f - (abs_h / (float)GOVERNOR_HEADING_MAX_DEG);
+                if (cte_fade < 0.0f) cte_fade = 0.0f;
+                pid_cte *= cte_fade;
 
                 raw_steer = pid_cte + heading_ff;
             }
@@ -301,7 +305,15 @@ int main(void) {
                 target_speed = 65.0f;
                 raw_steer    = last_steer_cmd * 0.85f; /* Smoothly decay toward straight, never violent snap */
 
-                if (++intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
+                /* Immediate safety abort: If vehicle heading swings into a curve (|H| >= 12 deg),
+                 * we are clearly in a turn, NOT an intersection. Revert to NORMAL immediately. */
+                if (fabsf(filtered_heading) >= 12.0f) {
+                    macro_state         = MACRO_STATE_NORMAL;
+                    intersection_ticks  = 0;
+                    cte_filter_init     = 0;
+                    heading_filter_init = 0;
+                    reset_pid_state(&steer_pid);
+                } else if (++intersection_ticks >= (uint32_t)INTERSECTION_TIMEOUT_TICKS) {
                     /* Guaranteed Timeout Exit -> NORMAL */
                     macro_state         = MACRO_STATE_NORMAL;
                     intersection_ticks  = 0;
