@@ -9,12 +9,11 @@
 #define PIXY_CENTER_X                39.5f
 #define PIXY_TRACK_HALF_WIDTH        25.0f
 
-// ---- Top Camera Chassis Exclusion Zone (Ignores Front Bumper & Wheels) ----
-// PixyMon viewport (640x400): X in [200, 450], Y in [360, 400]
-// Scaled to Pixy2 line frame (79x52): X in [24, 56], Y in [46, 51]
-#define TOP_CAM_EXCLUDE_Y_MIN        46U       // Pixy2 frame Y >= 46 (~354-400 in PixyMon)
-#define TOP_CAM_EXCLUDE_X_MIN        24U       // Pixy2 frame X >= 24 (~194 in PixyMon)
-#define TOP_CAM_EXCLUDE_X_MAX        56U       // Pixy2 frame X <= 56 (~453 in PixyMon)
+// ---- Top Camera Chassis Exclusion Zone (Ignores Front Bumper, Wheels, Servo & Tie-Rods) ----
+// Covers entire front axle, wheels at full steering deflection, servo horn, and chassis plate.
+#define TOP_CAM_EXCLUDE_Y_MIN        38U       // Pixy2 frame Y >= 38 (~290-400 in PixyMon, covers axle & wheels)
+#define TOP_CAM_EXCLUDE_X_MIN        18U       // Pixy2 frame X >= 18 (~145 in PixyMon, covers left wheel lock)
+#define TOP_CAM_EXCLUDE_X_MAX        62U       // Pixy2 frame X <= 62 (~505 in PixyMon, covers right wheel lock)
 
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit

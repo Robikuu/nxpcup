@@ -62,6 +62,13 @@ void vector_filtering(uint16_t *vectors, size_t *num_vectors)
             y1 = TOP_CAM_EXCLUDE_Y_MIN - 1;
         }
 
+        /* Reject any remnant vector that became too short (< 4 px) or degenerate */
+        int dx = (int)x1 - (int)x0;
+        int dy = (int)y1 - (int)y0;
+        if ((dx * dx + dy * dy) < 16) {
+            continue;
+        }
+
         vectors[4 * write + 0] = x0;
         vectors[4 * write + 1] = y0;
         vectors[4 * write + 2] = x1;
