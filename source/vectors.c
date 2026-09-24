@@ -764,13 +764,14 @@ trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t 
         result.lookahead_urgency = 1.0f;
         result.curvature = 1.0f;
         if (transverse_wall_mid_x > (float)PIXY_CENTER_X + 2.0f) {
-            result.lookahead_x = 70.0f;
-            result.trajectory_angle_deg = 45.0f;
+            result.lookahead_x          = 10.0f; /* Clear path is on left */
+            result.trajectory_angle_deg = -30.0f;
+            result.trajectory_offset_px = -15.0f;
         } else {
-            result.lookahead_x = 10.0f;
-            result.trajectory_angle_deg = -45.0f;
+            result.lookahead_x          = 70.0f; /* Clear path is on right */
+            result.trajectory_angle_deg = 30.0f;
+            result.trajectory_offset_px = 15.0f;
         }
-        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
         return result;
     }
 
@@ -778,7 +779,8 @@ trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t 
         return result;
     }
 
-    const float sample_y = (float)FORWARD_CAM_SAMPLE_HORIZON_Y; // 22.0f
+    const float far_y  = (float)FORWARD_CAM_SAMPLE_HORIZON_Y; // 20.0f (preview pre-braking)
+    const float near_y = (float)FORWARD_CAM_SAMPLE_NEAR_Y;    // 38.0f (fallback steering)
 
     int best_left_idx = -1;
     float best_left_score = -99999.0f;
@@ -787,15 +789,16 @@ trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t 
 
     for (size_t i = 0; i < count; i++) {
         float dy = ny[i] - fy[i];
-        float x_sample = nx[i];
+        float dx = fx[i] - nx[i];
+        float x_near = nx[i];
         if (dy > 0.5f) {
-            float t = (ny[i] - sample_y) / dy;
-            x_sample = nx[i] + t * (fx[i] - nx[i]);
+            float t = (ny[i] - near_y) / dy;
+            x_near = nx[i] + t * dx;
         }
 
-        float score = len[i] + ny[i];
+        float score = len[i] + ny[i] * 1.5f;
 
-        if (x_sample < (float)PIXY_CENTER_X) {
+        if (x_near < (float)PIXY_CENTER_X) {
             if (score > best_left_score) {
                 best_left_score = score;
                 best_left_idx = (int)i;
@@ -813,31 +816,59 @@ trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t 
         result.right_root_found = 1;
         result.found            = 2;
 
+        /* 1. Near Horizon (Y=38) for Fallback Steering */
         float l_dy = ny[best_left_idx] - fy[best_left_idx];
-        float xl_sample = nx[best_left_idx];
+        float l_dx = fx[best_left_idx] - nx[best_left_idx];
+        float xl_near = nx[best_left_idx];
         if (l_dy > 0.5f) {
-            float t_l = (ny[best_left_idx] - sample_y) / l_dy;
-            xl_sample = nx[best_left_idx] + t_l * (fx[best_left_idx] - nx[best_left_idx]);
+            float t_l = (ny[best_left_idx] - near_y) / l_dy;
+            xl_near = nx[best_left_idx] + t_l * l_dx;
         }
+        if (xl_near < 0.0f) xl_near = 0.0f;
+        if (xl_near > (float)PIXY_FRAME_WIDTH) xl_near = (float)PIXY_FRAME_WIDTH;
 
         float r_dy = ny[best_right_idx] - fy[best_right_idx];
-        float xr_sample = nx[best_right_idx];
+        float r_dx = fx[best_right_idx] - nx[best_right_idx];
+        float xr_near = nx[best_right_idx];
         if (r_dy > 0.5f) {
-            float t_r = (ny[best_right_idx] - sample_y) / r_dy;
-            xr_sample = nx[best_right_idx] + t_r * (fx[best_right_idx] - nx[best_right_idx]);
+            float t_r = (ny[best_right_idx] - near_y) / r_dy;
+            xr_near = nx[best_right_idx] + t_r * r_dx;
+        }
+        if (xr_near < 0.0f) xr_near = 0.0f;
+        if (xr_near > (float)PIXY_FRAME_WIDTH) xr_near = (float)PIXY_FRAME_WIDTH;
+
+        float near_mid_x = (xl_near + xr_near) * 0.5f;
+        result.trajectory_offset_px = near_mid_x - (float)PIXY_CENTER_X;
+
+        /* Near-zone local trajectory angle */
+        float avg_dx = (l_dx + r_dx) * 0.5f;
+        float avg_dy = (l_dy + r_dy) * 0.5f;
+        if (avg_dy > 0.5f) {
+            result.trajectory_angle_deg = atan2f(avg_dx, avg_dy) * (180.0f / (float)M_PI);
         }
 
-        result.lookahead_x = (xl_sample + xr_sample) * 0.5f;
-        result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
-
-        float near_mid_x = (nx[best_left_idx] + nx[best_right_idx]) * 0.5f;
-        float near_mid_y = (ny[best_left_idx] + ny[best_right_idx]) * 0.5f;
-        float mid_dx = result.lookahead_x - near_mid_x;
-        float mid_dy = near_mid_y - sample_y;
-        if (mid_dy > 0.5f) {
-            result.trajectory_angle_deg = atan2f(mid_dx, mid_dy) * (180.0f / (float)M_PI);
+        /* 2. Far Horizon (Y=20) for Preview Pre-Braking */
+        float xl_far = nx[best_left_idx];
+        if (l_dy > 0.5f) {
+            float t_l_far = (ny[best_left_idx] - far_y) / l_dy;
+            xl_far = nx[best_left_idx] + t_l_far * l_dx;
         }
+        if (xl_far < 0.0f) xl_far = 0.0f;
+        if (xl_far > (float)PIXY_FRAME_WIDTH) xl_far = (float)PIXY_FRAME_WIDTH;
 
+        float xr_far = nx[best_right_idx];
+        if (r_dy > 0.5f) {
+            float t_r_far = (ny[best_right_idx] - far_y) / r_dy;
+            xr_far = nx[best_right_idx] + t_r_far * r_dx;
+        }
+        if (xr_far < 0.0f) xr_far = 0.0f;
+        if (xr_far > (float)PIXY_FRAME_WIDTH) xr_far = (float)PIXY_FRAME_WIDTH;
+
+        float far_mid_x = (xl_far + xr_far) * 0.5f;
+        result.lookahead_x = far_mid_x;
+
+        /* Lookahead Urgency: Curvature displacement between far preview and near bumper */
+        float mid_dx = far_mid_x - near_mid_x;
         float abs_curvature = fabsf(mid_dx);
         if (abs_curvature > (float)LOOKAHEAD_DEADBAND_PX) {
             result.lookahead_urgency = (abs_curvature - (float)LOOKAHEAD_DEADBAND_PX) /
@@ -857,21 +888,48 @@ trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t 
         float s_dx = fx[single_idx] - nx[single_idx];
         if (s_dy > 0.5f) {
             result.trajectory_angle_deg = atan2f(s_dx, s_dy) * (180.0f / (float)M_PI);
-            float t = (ny[single_idx] - sample_y) / s_dy;
-            float x_at_sample = nx[single_idx] + t * s_dx;
+
+            /* Near Horizon (Y=38) for Fallback Steering */
+            float t_near = (ny[single_idx] - near_y) / s_dy;
+            float x_near = nx[single_idx] + t_near * s_dx;
+            if (x_near < 0.0f) x_near = 0.0f;
+            if (x_near > (float)PIXY_FRAME_WIDTH) x_near = (float)PIXY_FRAME_WIDTH;
+
+            float near_center_x = 0.0f;
             if (single_idx == best_left_idx) {
                 result.left_root_found = 1;
-                result.lookahead_x = x_at_sample + 17.0f;
+                near_center_x = x_near + 22.0f; /* Half lane width at near bumper */
             } else {
                 result.right_root_found = 1;
-                result.lookahead_x = x_at_sample - 17.0f;
+                near_center_x = x_near - 22.0f;
             }
-            result.trajectory_offset_px = result.lookahead_x - (float)PIXY_CENTER_X;
-            float abs_offset = fabsf(result.trajectory_offset_px);
-            if (abs_offset > (float)LOOKAHEAD_DEADBAND_PX) {
-                result.lookahead_urgency = (abs_offset - (float)LOOKAHEAD_DEADBAND_PX) /
+            result.trajectory_offset_px = near_center_x - (float)PIXY_CENTER_X;
+
+            /* Far Horizon (Y=20) for Preview Pre-Braking */
+            float t_far = (ny[single_idx] - far_y) / s_dy;
+            float x_far = nx[single_idx] + t_far * s_dx;
+            if (x_far < 0.0f) x_far = 0.0f;
+            if (x_far > (float)PIXY_FRAME_WIDTH) x_far = (float)PIXY_FRAME_WIDTH;
+
+            float far_mid_x = 0.0f;
+            if (single_idx == best_left_idx) {
+                far_mid_x = x_far + 17.0f; /* Half lane width at far horizon */
+            } else {
+                far_mid_x = x_far - 17.0f;
+            }
+            result.lookahead_x = far_mid_x;
+
+            /* Curvature displacement */
+            float mid_dx = far_mid_x - near_center_x;
+            float abs_curvature = fabsf(mid_dx);
+            float abs_far_offset = fabsf(far_mid_x - (float)PIXY_CENTER_X);
+            float max_curve = (abs_curvature > abs_far_offset) ? abs_curvature : abs_far_offset;
+            if (max_curve > (float)LOOKAHEAD_DEADBAND_PX) {
+                result.lookahead_urgency = (max_curve - (float)LOOKAHEAD_DEADBAND_PX) /
                                            ((float)LOOKAHEAD_FULL_URGENCY_PX - (float)LOOKAHEAD_DEADBAND_PX);
                 if (result.lookahead_urgency > 1.0f) result.lookahead_urgency = 1.0f;
+            } else {
+                result.lookahead_urgency = 0.0f;
             }
             result.curvature = result.lookahead_urgency;
         }

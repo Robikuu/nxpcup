@@ -11,11 +11,11 @@ typedef struct {
 } steering_result_t;
 
 typedef struct {
-    float   trajectory_angle_deg;  /* Ahead path angle relative to vehicle axis (-35 to +35 deg) */
-    float   trajectory_offset_px;  /* Ahead path lateral displacement from center line (Y=20) */
-    float   lookahead_x;           /* Projected centerline X coordinate at horizon Y=20 */
+    float   trajectory_angle_deg;  /* Near path angle relative to vehicle axis (-45 to +45 deg, sampled at near horizon Y=38) */
+    float   trajectory_offset_px;  /* Near path lateral displacement from center line (sampled at near horizon Y=38) */
+    float   lookahead_x;           /* Projected centerline X coordinate at far horizon Y=20 */
     float   curvature;             /* Path curvature indicator */
-    float   lookahead_urgency;     /* 0.0 to 1.0 urgency for pre-braking */
+    float   lookahead_urgency;     /* 0.0 to 1.0 urgency for pre-braking (evaluated at far horizon Y=20) */
     uint8_t left_root_found;       /* 1 if left foreground root vector detected */
     uint8_t right_root_found;      /* 1 if right foreground root vector detected */
     uint8_t has_transverse_tape;   /* 1 if horizontal crossing tape detected */

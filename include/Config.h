@@ -24,11 +24,11 @@
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
-// ---- Wheel Speeds & Asymmetric Differential Drag (12.6V Full-Power Race Profile) ----
-#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%) (full 12.6V battery voltage push)
-#define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated apex outside wheel drive (%) (prevents corner understeer push)
-#define SPEED_INSIDE_MIN             48.0f     // Inside wheel pivot anchor duty (%) (gentler pivot, 9.7% min yaw torque verified safe)
-#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 53.0%
+// ---- Wheel Speeds & Asymmetric Differential Drag (Testing & Race Profile) ----
+#define SPEED_STRAIGHT               60.0f     // Straight line testing speed (%) (reduced from 100% to decouple steering from traction/lag)
+#define SPEED_OUTSIDE_CORNER         48.0f     // Calibrated apex outside wheel drive (%) (provides decisive pre-braking from 60%)
+#define SPEED_INSIDE_MIN             38.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 43.0%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
@@ -53,7 +53,8 @@
 // ---- Forward Camera Lookahead Horizon & Root Anchor Geometry ----
 #define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view (walls/lights)
 #define FORWARD_CAM_ROOT_ANCHOR_Y_MIN 30U      // Vector base must anchor in foreground bumper zone (Y >= 30)
-#define FORWARD_CAM_SAMPLE_HORIZON_Y 20.0f     // Lookahead horizon sample line (~1.5m ahead)
+#define FORWARD_CAM_SAMPLE_HORIZON_Y 20.0f     // Far preview horizon (~1.5m ahead) for speed governor pre-braking
+#define FORWARD_CAM_SAMPLE_NEAR_Y    38.0f     // Near steering horizon (~0.45m ahead) for fallback steering & feedforward
 #define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
 #define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
 #define STRAIGHT_SANITY_HEADING_MAX_DEG 4.0f   // Max heading angle (deg) to confirm vehicle is parallel to track
@@ -89,7 +90,7 @@
 #define FRONT_K_OFFSET               0.25f     // Calibrated front camera horizon lateral offset gain
 #define BLEND_FALL_SLEW_MAX          0.50f     // 2 ticks (40ms) fast transfer to front camera on top dropout
 #define BLEND_RISE_SLEW_MAX          0.08f     // ~12 ticks (240ms) smooth return to top camera on reacquisition
-#define BLEND_FALLBACK_SPEED_CAP     52.0f     // Max speed when front camera dominates (alpha < 0.30)
+#define BLEND_FALLBACK_SPEED_CAP     48.0f     // Max speed when front camera dominates (alpha < 0.30)
 
 // ---- State Machine & Macro States ----
 #define MACRO_STATE_NORMAL           0
