@@ -93,6 +93,8 @@ int main(void) {
     float    s_last_valid_delta_front = 0.0f;
     uint32_t s_front_hold_ticks       = 0;
     float    s_blend_weight           = 1.0f;
+    float    s_last_c_top             = 1.0f;
+    float    s_last_valid_delta_top   = 0.0f;
     float    delta_front              = 0.0f;
     float    delta_top                = 0.0f;
     bool     front_plausible          = false;
@@ -207,11 +209,11 @@ int main(void) {
                     }
                 }
 
-                /* Front steering calculation */
-                const float K_p_front = 1.00f;
-                const float K_offset_front = 0.35f;
+                /* Front steering calculation (calibrated from shadow test, sign inversion removed) */
+                const float K_p_front = (float)FRONT_KP;
+                const float K_offset_front = (float)FRONT_K_OFFSET;
                 if (front_plausible) {
-                    delta_front = -(K_p_front * filtered_traj_angle + K_offset_front * g_traj.trajectory_offset_px);
+                    delta_front = (K_p_front * filtered_traj_angle + K_offset_front * g_traj.trajectory_offset_px);
                     s_last_valid_delta_front = delta_front;
                     s_front_hold_ticks = 0;
                 } else {
@@ -288,7 +290,10 @@ int main(void) {
             }
 
             /* --- 3. Macro State Transitions --- */
-            if (sr.found == 0) {
+            /* Dual-blind safety: ONLY enter LINE_LOST if BOTH cameras have lost the track */
+            bool dual_blind = (sr.found == 0) && (!front_plausible || num_vectors_front == 0);
+
+            if (dual_blind) {
                 line_reacquire_streak = 0;
                 line_lost_ticks++;
                 if (line_lost_ticks >= (uint32_t)LINE_LOST_DEBOUNCE_TICKS) {
@@ -326,22 +331,48 @@ int main(void) {
                 intersection_detect_streak = 0;
             }
 
-            /* --- 4. Base Camera Line Filtering (When Lines Present) --- */
+            /* --- 4. Dynamic Dual-Camera Blend Weight & Line Filtering --- */
+            /* Instantaneous Top camera confidence based on vector count */
+            float c_top = 0.0f;
             if (sr.found > 0) {
-                if (!heading_filter_init) {
+                c_top = (num_vectors_pid >= 2) ? 1.0f : 0.50f;
+            } else {
+                c_top = 0.0f;
+            }
+
+            /* Target blend weight: if front is invalid and top has any signal, rely entirely on top */
+            float target_alpha = c_top;
+            if (!front_plausible && c_top > 0.0f) {
+                target_alpha = 1.0f;
+            }
+
+            /* Asymmetric blend slew rate: fast transfer to front (40ms), smooth return to top (240ms) */
+            float delta_alpha = target_alpha - s_blend_weight;
+            if (delta_alpha > (float)BLEND_RISE_SLEW_MAX) {
+                delta_alpha = (float)BLEND_RISE_SLEW_MAX;
+            } else if (delta_alpha < -(float)BLEND_FALL_SLEW_MAX) {
+                delta_alpha = -(float)BLEND_FALL_SLEW_MAX;
+            }
+            s_blend_weight += delta_alpha;
+            if (s_blend_weight > 1.0f) s_blend_weight = 1.0f;
+            if (s_blend_weight < 0.0f) s_blend_weight = 0.0f;
+
+            if (sr.found > 0) {
+                if (!heading_filter_init || s_last_c_top == 0.0f) {
                     filtered_heading    = sr.heading_deg;
                     heading_filter_init = 1;
                 } else {
                     filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
                 }
 
-                if (!cte_filter_init) {
+                if (!cte_filter_init || s_last_c_top == 0.0f) {
                     filtered_cte    = sr.cte;
                     cte_filter_init = 1;
                 } else {
                     filtered_cte = 0.40f * sr.cte + 0.60f * filtered_cte;
                 }
             }
+            s_last_c_top = c_top;
 
             /* --- 5. State-Specific Control Computation --- */
             float target_speed = g_params.speed_straight;
@@ -365,6 +396,9 @@ int main(void) {
 
                 /* B. Continuous Target Speed */
                 target_speed = g_params.speed_straight - kappa * (g_params.speed_straight - g_params.speed_outside_corner);
+                if (s_blend_weight < 0.30f && target_speed > (float)BLEND_FALLBACK_SPEED_CAP) {
+                    target_speed = (float)BLEND_FALLBACK_SPEED_CAP;
+                }
 
                 /* C. Dynamic PID Gain Scheduling (Straightaway vs Corner Regimes) */
                 steer_pid.kp = g_params.kp_straight + kappa * (g_params.kp_corner - g_params.kp_straight);
@@ -385,31 +419,38 @@ int main(void) {
                 }
                 float lookahead_ff = g_params.k_lookahead * effective_traj;
 
-                /* F. PID CTE Centering Authority */
-                float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
+                /* F. PID CTE Centering Authority & Reseed */
+                if (c_top > 0.0f) {
+                    float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
-                /* G. Apex Protection: Suppress Counter-Steering CTE into Corners
-                 * When approaching or inside a curve (kappa > 0.15), if PID CTE opposes
-                 * the overall turn direction, attenuate CTE so the car bites into the apex
-                 * rather than pushing wide into the outside boundary. */
-                float turn_dir = 0.0f;
-                if (abs_h > 3.0f) {
-                    turn_dir = filtered_heading;
-                } else if (abs_traj > 5.0f) {
-                    turn_dir = filtered_traj_angle;
+                    /* G. Apex Protection: Suppress Counter-Steering CTE into Corners
+                     * When approaching or inside a curve (kappa > 0.15), if PID CTE opposes
+                     * the overall turn direction, attenuate CTE so the car bites into the apex
+                     * rather than pushing wide into the outside boundary. */
+                    float turn_dir = 0.0f;
+                    if (abs_h > 3.0f) {
+                        turn_dir = filtered_heading;
+                    } else if (abs_traj > 5.0f) {
+                        turn_dir = filtered_traj_angle;
+                    }
+
+                    if (turn_dir != 0.0f && (pid_cte * turn_dir < 0.0f)) {
+                        float atten = 1.0f - 0.75f * kappa;
+                        if (atten < 0.20f) atten = 0.20f;
+                        pid_cte *= atten;
+                    }
+
+                    delta_top = pid_cte + heading_ff + lookahead_ff;
+                    s_last_valid_delta_top = delta_top;
+                } else {
+                    /* Freeze Top PID integrator to prevent windup during blindness */
+                    steer_pid.initialized = 0; /* Clears derivative kick when c_top returns */
+                    delta_top = s_last_valid_delta_top * 0.95f; /* Smooth decay while authority transfers to front */
+                    s_last_valid_delta_top = delta_top;
                 }
-
-                if (turn_dir != 0.0f && (pid_cte * turn_dir < 0.0f)) {
-                    float atten = 1.0f - 0.75f * kappa;
-                    if (atten < 0.20f) atten = 0.20f;
-                    pid_cte *= atten;
-                }
-
-                delta_top = pid_cte + heading_ff + lookahead_ff;
 
                 if (g_params.shadow_mode_enable) {
                     raw_steer = delta_top;
-                    s_blend_weight = 1.0f;
                 } else {
                     raw_steer = s_blend_weight * delta_top + (1.0f - s_blend_weight) * delta_front;
                 }

@@ -28,8 +28,8 @@ front_filter_result_t process_front_frame(test_traj_t g_traj, unsigned num_vecto
     res.c_front = 0.0f;
     res.delta_front = 0.0f;
 
-    const float K_p_front = 1.00f;
-    const float K_offset_front = 0.35f;
+    const float K_p_front = 0.70f;
+    const float K_offset_front = 0.25f;
 
     if (num_vectors_front > 0) {
         if (s_front_dropout_ticks > 0) {
@@ -70,7 +70,7 @@ front_filter_result_t process_front_frame(test_traj_t g_traj, unsigned num_vecto
     }
 
     if (res.front_plausible) {
-        res.delta_front = -(K_p_front * filtered_traj_angle + K_offset_front * g_traj.trajectory_offset_px);
+        res.delta_front = (K_p_front * filtered_traj_angle + K_offset_front * g_traj.trajectory_offset_px);
         s_last_valid_delta_front = res.delta_front;
         s_front_hold_ticks = 0;
     } else {
@@ -101,7 +101,7 @@ int main(void) {
     test_traj_t t2 = {15.0f, 8.0f};
     front_filter_result_t r2 = process_front_frame(t2, 2, 15.0f);
     assert(r2.front_plausible == true);
-    assert(r2.delta_front < -15.0f);
+    assert(r2.delta_front > 10.0f);
     printf("Test 2 (Smooth Turn): PASSED (FV=1, delta_front=%.1f)\n", r2.delta_front);
 
     // Case 3: Glitch Jump (+60 deg jump, offset jump 25px) -> Must be rejected (FV=0)

@@ -84,6 +84,13 @@
 #define DEFAULT_SHADOW_MODE          1U        // 1 = shadow mode (top steers, front logs for calibration)
 #define DEFAULT_MOTOR_ENABLE         1U        // 1 = drive motors active, 0 = drive motors disabled for push calibration
 
+// ---- Dual-Camera Steering Blend & Fallback ----
+#define FRONT_KP                     0.70f     // Calibrated front camera proportional steering gain (1:1 parity with top)
+#define FRONT_K_OFFSET               0.25f     // Calibrated front camera horizon lateral offset gain
+#define BLEND_FALL_SLEW_MAX          0.50f     // 2 ticks (40ms) fast transfer to front camera on top dropout
+#define BLEND_RISE_SLEW_MAX          0.08f     // ~12 ticks (240ms) smooth return to top camera on reacquisition
+#define BLEND_FALLBACK_SPEED_CAP     52.0f     // Max speed when front camera dominates (alpha < 0.30)
+
 // ---- State Machine & Macro States ----
 #define MACRO_STATE_NORMAL           0
 #define MACRO_STATE_INTERSECTION     1
