@@ -40,16 +40,14 @@ void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right)
     uint8_t duty_left, duty_right;
 
     /* Left Motor (Motor 2: IN3 on pwm2Channel/P0_26, IN4 on motor2DirPin/P0_27):
-     * The motors are physically mounted facing opposite directions on the chassis.
-     * To spin forward when speed_left >= 0, Motor 2 polarity is inverted relative to Motor 1:
-     * - Forward (speed_left >= 0): IN4 = 0U, IN3 = PWM (active-high duty = speed_left)
-     * - Reverse (speed_left < 0):  IN4 = 1U, IN3 = PWM (active-low duty = 100 + speed_left) */
+     * - Forward (speed_left >= 0): IN4 = 1U, IN3 = PWM (active-low duty = 100 - speed)
+     * - Reverse (speed_left < 0):  IN4 = 0U, IN3 = PWM (active-high duty = -speed) */
     if (speed_left >= 0) {
-        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
-        duty_left = (uint8_t)speed_left;
-    } else {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
-        duty_left = (uint8_t)(100 + speed_left);
+        duty_left = (uint8_t)(100 - speed_left);
+    } else {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+        duty_left = (uint8_t)(-speed_left);
     }
 
     /* Right Motor (Motor 1: IN1 on motor1DirPin/P0_24, IN2 on pwm1Channel/P0_25):
