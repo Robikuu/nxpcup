@@ -18,6 +18,7 @@ typedef struct {
     float   lookahead_urgency;     /* 0.0 to 1.0 urgency for pre-braking */
     uint8_t left_root_found;       /* 1 if left foreground root vector detected */
     uint8_t right_root_found;      /* 1 if right foreground root vector detected */
+    uint8_t has_transverse_tape;   /* 1 if horizontal crossing tape detected */
     uint8_t found;                 /* Total root boundary vectors found (0, 1, or 2) */
 } trajectory_result_t;
 

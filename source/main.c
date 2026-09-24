@@ -87,6 +87,16 @@ int main(void) {
     float    filtered_traj_angle      = 0.0f;
     float    lookahead_turn_factor    = 0.0f;
     uint32_t s_front_dropout_ticks    = 0;
+    float    s_last_front_angle       = 0.0f;
+    float    s_last_front_offset      = 0.0f;
+    uint32_t s_consecutive_rejections = 0;
+    float    s_last_valid_delta_front = 0.0f;
+    uint32_t s_front_hold_ticks       = 0;
+    float    s_blend_weight           = 1.0f;
+    float    delta_front              = 0.0f;
+    float    delta_top                = 0.0f;
+    bool     front_plausible          = false;
+    uint32_t s_curved_intersection_approaches = 0;
 
     uint8_t  macro_state              = MACRO_STATE_NORMAL;
     uint32_t intersection_ticks       = 0;
@@ -162,8 +172,58 @@ int main(void) {
             status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
             if (s_front == kStatus_Success && num_vectors_front > 0) {
                 g_traj = compute_lookahead_curvature(vectors_front, num_vectors_front);
-                s_front_dropout_ticks = 0;
-                filtered_traj_angle   = 0.50f * g_traj.trajectory_angle_deg + 0.50f * filtered_traj_angle;
+                filtered_traj_angle = 0.40f * g_traj.trajectory_angle_deg + 0.60f * filtered_traj_angle;
+
+                /* Temporal Plausibility Check with Self-Healing Reseed */
+                if (s_front_dropout_ticks > 0) {
+                    /* Immediate re-seed after recovery from 0 vectors */
+                    s_last_front_angle = g_traj.trajectory_angle_deg;
+                    s_last_front_offset = g_traj.trajectory_offset_px;
+                    s_consecutive_rejections = 0;
+                    s_front_dropout_ticks = 0;
+                    front_plausible = true;
+                } else {
+                    float angle_jump  = fabsf(g_traj.trajectory_angle_deg - s_last_front_angle);
+                    float offset_jump = fabsf(g_traj.trajectory_offset_px - s_last_front_offset);
+
+                    if (fabsf(g_traj.trajectory_angle_deg) <= 75.0f &&
+                        angle_jump <= 25.0f &&
+                        offset_jump <= 18.0f) {
+                        front_plausible = true;
+                        s_consecutive_rejections = 0;
+                        s_last_front_angle  = g_traj.trajectory_angle_deg;
+                        s_last_front_offset = g_traj.trajectory_offset_px;
+                    } else {
+                        s_consecutive_rejections++;
+                        if (s_consecutive_rejections >= 3) {
+                            /* Self-healing reseed: prevent permanent lockout in real sharp corners */
+                            front_plausible = true;
+                            s_consecutive_rejections = 0;
+                            s_last_front_angle  = g_traj.trajectory_angle_deg;
+                            s_last_front_offset = g_traj.trajectory_offset_px;
+                        } else {
+                            front_plausible = false;
+                        }
+                    }
+                }
+
+                /* Front steering calculation */
+                const float K_p_front = 1.00f;
+                const float K_offset_front = 0.35f;
+                if (front_plausible) {
+                    delta_front = -(K_p_front * filtered_traj_angle + K_offset_front * g_traj.trajectory_offset_px);
+                    s_last_valid_delta_front = delta_front;
+                    s_front_hold_ticks = 0;
+                } else {
+                    s_front_hold_ticks++;
+                    if (s_front_hold_ticks <= 3) {
+                        delta_front = s_last_valid_delta_front;
+                    } else {
+                        delta_front = s_last_valid_delta_front * 0.95f;
+                        s_last_valid_delta_front = delta_front;
+                    }
+                }
+
                 /* Asymmetric urgency filter: fast attack into corners, slow decay to prevent optical flicker acceleration surges */
                 if (g_traj.lookahead_urgency >= lookahead_turn_factor) {
                     lookahead_turn_factor = 0.70f * g_traj.lookahead_urgency + 0.30f * lookahead_turn_factor;
@@ -172,8 +232,16 @@ int main(void) {
                 }
             } else {
                 s_front_dropout_ticks++;
+                front_plausible = false;
                 filtered_traj_angle   *= 0.80f;
                 lookahead_turn_factor *= 0.85f;
+                s_front_hold_ticks++;
+                if (s_front_hold_ticks <= 3) {
+                    delta_front = s_last_valid_delta_front;
+                } else {
+                    delta_front = s_last_valid_delta_front * 0.95f;
+                    s_last_valid_delta_front = delta_front;
+                }
                 memset(&g_traj, 0, sizeof(g_traj));
                 g_traj.lookahead_x = (float)PIXY_CENTER_X;
             }
@@ -337,7 +405,14 @@ int main(void) {
                     pid_cte *= atten;
                 }
 
-                raw_steer = pid_cte + heading_ff + lookahead_ff;
+                delta_top = pid_cte + heading_ff + lookahead_ff;
+
+                if (g_params.shadow_mode_enable) {
+                    raw_steer = delta_top;
+                    s_blend_weight = 1.0f;
+                } else {
+                    raw_steer = s_blend_weight * delta_top + (1.0f - s_blend_weight) * delta_front;
+                }
             }
             else if (macro_state == MACRO_STATE_INTERSECTION) {
                 kappa        = 0.0f;
@@ -473,13 +548,26 @@ int main(void) {
                 s_telemetry_div = 0;
                 const char *st_str = (macro_state == MACRO_STATE_NORMAL) ? "N" :
                                      ((macro_state == MACRO_STATE_INTERSECTION) ? "I" : "L");
-                esp_printf("L:%u/%u R:%d F:%d H:%d TJ:%d S:%d LA:%d ST:%s VL:%d VR:%d\r\n",
+                char dom_char = g_params.shadow_mode_enable ? 'T' :
+                                ((s_blend_weight >= 0.70f) ? 'T' : ((s_blend_weight <= 0.30f) ? 'F' : 'B'));
+                bool is_roughly_straight = (fabsf(filtered_heading) <= 15.0f) && (fabsf(steer_cmd) <= 18.0f);
+                bool has_transverse_tape = (g_traj.has_transverse_tape || intersection_trigger);
+                uint8_t ix_flag = (has_transverse_tape && is_roughly_straight) ? 1 : 0;
+                if (has_transverse_tape && !is_roughly_straight) {
+                    s_curved_intersection_approaches++;
+                }
+
+                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
                            (unsigned)sr.found, (unsigned)num_vectors_front,
                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
                            (int)(filtered_heading * 10.0f),
-                           (int)(filtered_traj_angle * 10.0f),
+                           (int)(delta_top * 10.0f),
+                           (int)(delta_front * 10.0f),
                            (int)(steer_cmd * 10.0f),
-                           (int)(kappa * 100.0f),
+                           (int)(s_blend_weight * 100.0f),
+                           dom_char,
+                           front_plausible ? 1U : 0U,
+                           (unsigned)ix_flag,
                            st_str,
                            (int)applied_speed_left, (int)applied_speed_right);
             }
