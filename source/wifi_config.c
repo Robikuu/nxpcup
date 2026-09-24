@@ -32,6 +32,7 @@ void params_init(void) {
     g_params.accel_ramp          = ACCEL_RAMP_STEP;
     g_params.decel_ramp          = DECEL_RAMP_STEP;
     g_params.shadow_mode_enable  = DEFAULT_SHADOW_MODE;
+    g_params.motor_enable        = DEFAULT_MOTOR_ENABLE;
     g_params.state               = STATE_IDLE;
 }
 
@@ -198,6 +199,13 @@ static void command_execute(char *cmd) {
         g_params.shadow_mode_enable = (uint8_t)val;
         send_ack_dbl("shadow_mode=", val);
     }
+    else if ((!strcmp(keyword, "motor_enable") || !strcmp(keyword, "drive")) && has_val) {
+        g_params.motor_enable = (uint8_t)val;
+        if (!g_params.motor_enable) {
+            HbridgeBrake(&g_hbridge);
+        }
+        send_ack_dbl("motor_enable=", val);
+    }
     else if (!strcmp(keyword, "version")) {
         char vbuf[96];
         snprintf(vbuf, sizeof(vbuf), "BUILD: %s %s shadow-fusion-v1\r\n", __DATE__, __TIME__);
@@ -223,11 +231,12 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "shadow=%u\r\n", (unsigned)g_params.shadow_mode_enable);
+        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

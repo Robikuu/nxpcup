@@ -82,6 +82,7 @@
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
 #define DEFAULT_SHADOW_MODE          1U        // 1 = shadow mode (top steers, front logs for calibration)
+#define DEFAULT_MOTOR_ENABLE         1U        // 1 = drive motors active, 0 = drive motors disabled for push calibration
 
 // ---- State Machine & Macro States ----
 #define MACRO_STATE_NORMAL           0
@@ -134,6 +135,7 @@ typedef struct {
     float accel_ramp;
     float decel_ramp;
     uint8_t shadow_mode_enable; // 1 = shadow mode (steer on top, log front), 0 = active blend
+    uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
     uint8_t state;
 } robot_params_t;
 

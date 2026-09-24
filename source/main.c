@@ -536,7 +536,11 @@ int main(void) {
             }
 
             /* Actuate dual motors */
-            if (macro_state == MACRO_STATE_LINE_LOST && line_lost_ticks > (uint32_t)LINE_LOST_BRAKE_TICKS) {
+            if (!g_params.motor_enable) {
+                applied_speed_left  = 0.0f;
+                applied_speed_right = 0.0f;
+                HbridgeBrake(&g_hbridge);
+            } else if (macro_state == MACRO_STATE_LINE_LOST && line_lost_ticks > (uint32_t)LINE_LOST_BRAKE_TICKS) {
                 HbridgeBrake(&g_hbridge);
             } else {
                 HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
