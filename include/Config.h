@@ -76,7 +76,7 @@
 // ---- Error Weights & Decoupled Feedforward ----
 #define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight (strong centering authority)
 #define DEFAULT_K_HEADING            1.70f     // Direct base camera heading feedforward into curves (strong turn-in bite)
-#define DEFAULT_K_LOOKAHEAD          0.00f     // STRICTLY 0: Front camera never steers the servo
+#define DEFAULT_K_LOOKAHEAD          0.35f     // Predictive turn-in feedforward from front camera (bites 40-60ms early)
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
 // ---- Control Loop ----

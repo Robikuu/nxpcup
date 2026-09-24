@@ -195,7 +195,7 @@ static void command_execute(char *cmd) {
     }
     else if (!strcmp(keyword, "version")) {
         char vbuf[96];
-        snprintf(vbuf, sizeof(vbuf), "BUILD: %s %s clean-lowside\r\n", __DATE__, __TIME__);
+        snprintf(vbuf, sizeof(vbuf), "BUILD: %s %s gain-scheduled-v1\r\n", __DATE__, __TIME__);
         send_ack(vbuf);
     }
     else if (!strcmp(keyword, "status")) {

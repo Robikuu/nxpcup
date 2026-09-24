@@ -245,7 +245,7 @@ int main(void) {
 
             if (macro_state == MACRO_STATE_NORMAL) {
                 if (intersection_trigger) {
-                    if (++intersection_detect_streak >= 2) {
+                    if (++intersection_detect_streak >= 4) {
                         macro_state                = MACRO_STATE_INTERSECTION;
                         intersection_ticks         = 0;
                         intersection_detect_streak = 0;
@@ -298,26 +298,46 @@ int main(void) {
                 /* B. Continuous Target Speed */
                 target_speed = g_params.speed_straight - kappa * (g_params.speed_straight - g_params.speed_outside_corner);
 
-                /* C. Decoupled Steering Authority */
+                /* C. Dynamic PID Gain Scheduling (Straightaway vs Corner Regimes) */
+                steer_pid.kp = g_params.kp_straight + kappa * (g_params.kp_corner - g_params.kp_straight);
+                steer_pid.kd = g_params.kd_straight + kappa * (g_params.kd_corner - g_params.kd_straight);
+
+                /* D. Decoupled Steering Authority */
                 float effective_h = 0.0f;
                 if (abs_h > (float)HEADING_DEADBAND_DEG) {
                     effective_h = (abs_h - (float)HEADING_DEADBAND_DEG) * ((filtered_heading > 0.0f) ? 1.0f : -1.0f);
                 }
                 float heading_ff = g_params.k_heading * effective_h;
-                float pid_cte    = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
 
-                /* Smooth conditional apex protection:
-                 * When CTE opposes heading (car is hugging inside apex and CTE would try to push it away),
-                 * smoothly attenuate CTE authority between 8.0 deg and 25.0 deg heading.
-                 * When CTE is in the SAME direction as heading (car drifting toward outside wall),
-                 * keep 100% full centering authority to prevent hitting the outside boundary! */
-                if (filtered_cte * filtered_heading < 0.0f && abs_h >= 8.0f) {
-                    float fade = 1.0f - (abs_h - 8.0f) / ((float)GOVERNOR_HEADING_MAX_DEG - 8.0f);
-                    if (fade < 0.0f) fade = 0.0f;
-                    pid_cte *= fade;
+                /* E. Predictive Turn-in Feedforward from Front Camera */
+                float effective_traj = 0.0f;
+                float abs_traj = fabsf(filtered_traj_angle);
+                if (abs_traj > 3.0f) {
+                    effective_traj = (abs_traj - 3.0f) * ((filtered_traj_angle > 0.0f) ? 1.0f : -1.0f);
+                }
+                float lookahead_ff = g_params.k_lookahead * effective_traj;
+
+                /* F. PID CTE Centering Authority */
+                float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
+
+                /* G. Apex Protection: Suppress Counter-Steering CTE into Corners
+                 * When approaching or inside a curve (kappa > 0.15), if PID CTE opposes
+                 * the overall turn direction, attenuate CTE so the car bites into the apex
+                 * rather than pushing wide into the outside boundary. */
+                float turn_dir = 0.0f;
+                if (abs_h > 3.0f) {
+                    turn_dir = filtered_heading;
+                } else if (abs_traj > 5.0f) {
+                    turn_dir = filtered_traj_angle;
                 }
 
-                raw_steer = pid_cte + heading_ff;
+                if (turn_dir != 0.0f && (pid_cte * turn_dir < 0.0f)) {
+                    float atten = 1.0f - 0.75f * kappa;
+                    if (atten < 0.20f) atten = 0.20f;
+                    pid_cte *= atten;
+                }
+
+                raw_steer = pid_cte + heading_ff + lookahead_ff;
             }
             else if (macro_state == MACRO_STATE_INTERSECTION) {
                 kappa        = 0.0f;

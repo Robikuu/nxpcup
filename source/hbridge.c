@@ -39,27 +39,28 @@ void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right)
 
     uint8_t duty_left, duty_right;
 
-    /* Left Motor (Motor 2: IN3 on pwm2Channel/P0_26, IN4 on motor2DirPin/P0_27):
-     * Safe low-side freewheeling drive (ZERO inductive rail kickback):
-     * - Forward (speed_left >= 0): IN4 = 0U, IN3 = PWM (active-high duty = speed_left)
-     * - Reverse (speed_left < 0):  IN4 = 1U, IN3 = PWM (active-low duty = 100 + speed_left) */
-    if (speed_left >= 0) {
-        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
-        duty_left = (uint8_t)speed_left;
-    } else {
+    /* Left Motor (Motor 2: IN3 on pwm2Channel/P0_26, IN4 on motor2DirPin/P0_27) */
+    if (speed_left > 0) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
-        duty_left = (uint8_t)(100 + speed_left);
+        duty_left = (uint8_t)(100 - speed_left);
+    } else if (speed_left < 0) {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+        duty_left = (uint8_t)(-speed_left);
+    } else {
+        GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+        duty_left = 0U;
     }
 
-    /* Right Motor (Motor 1: IN1 on motor1DirPin/P0_24, IN2 on pwm1Channel/P0_25):
-     * - Forward (speed_right >= 0): IN1 = 1U, IN2 = PWM (active-low duty = 100 - speed)
-     * - Reverse (speed_right < 0):  IN1 = 0U, IN2 = PWM (active-high duty = -speed) */
-    if (speed_right >= 0) {
+    /* Right Motor (Motor 1: IN1 on pwm1Channel/P0_25, IN2 on motor1DirPin/P0_24) */
+    if (speed_right > 0) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
         duty_right = (uint8_t)(100 - speed_right);
-    } else {
+    } else if (speed_right < 0) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
         duty_right = (uint8_t)(-speed_right);
+    } else {
+        GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
+        duty_right = 0U;
     }
 
     /* Update PWM duty cycles independently to eliminate cross-motor coupling */
