@@ -24,14 +24,22 @@
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Race Profile) ----
-#define DEFAULT_DRIVE_SCALE          0.80f     // Output plant gain scale (starting guess: 0.76 - 0.84)
+#define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         78.0f     // Calibrated apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             62.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated DRV8871 apex outside wheel drive (%)
+#define SPEED_INSIDE_MIN             38.0f     // Calibrated inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
-#define DIFFERENTIAL_DEADZONE_DEG    12.0f     // Steer angle deadzone below which zero differential drag applies (eliminates straightaway drag)
+#define DIFFERENTIAL_DEADZONE_DEG    6.0f      // Steer angle deadzone below which zero differential drag applies (bites at 6°)
 #define STEER_FULL_BRAKE_DEG         45.0f     // Steer angle (deg) for 100% pivot drag ramp
+
+// ---- Straight-Line Active Threshold Pre-Braking ----
+#define PREBRAKE_PULSE_TICKS         3U        // 3 ticks @ 50Hz = 60ms active low-side brake pulse
+#define PREBRAKE_MIN_SPEED           80.0f     // Only brake if sprinting at or above 80%
+#define PREBRAKE_MAX_HEADING_DEG     10.0f     // Straight line alignment guard
+#define PREBRAKE_MAX_STEER_DEG       12.0f     // Wheels centered alignment guard
+#define PREBRAKE_LOOKAHEAD_THRESH    0.35f     // Front camera turn urgency threshold
+#define PREBRAKE_CONFIRM_TICKS       2U        // Consecutive ticks required to confirm turn
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              28.0f     // Rapid pre-braking ramp (~50ms from 100% to 78% at 12.6V)
