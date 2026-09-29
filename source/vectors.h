@@ -3,29 +3,26 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
+/* Top Camera Result: Centered between closest left and right lines */
 typedef struct {
-    float   cte;
-    float   heading_deg;
-    uint8_t found;
+    float   cte;             /* Cross-track error in pixels (center_x - 39.0f) */
+    float   heading_deg;     /* Road heading angle in degrees relative to vertical */
+    uint8_t left_found;      /* 1 if closest left line detected */
+    uint8_t right_found;     /* 1 if closest right line detected */
+    uint8_t found;           /* Total lines found (0, 1, or 2) */
 } steering_result_t;
 
+/* Front Camera Result: Lookahead horizon road angle */
 typedef struct {
-    float   trajectory_angle_deg;  /* Near path angle relative to vehicle axis (-45 to +45 deg, sampled at near horizon Y=38) */
-    float   trajectory_offset_px;  /* Near path lateral displacement from center line (sampled at near horizon Y=38) */
-    float   lookahead_x;           /* Projected centerline X coordinate at far horizon Y=20 */
-    float   curvature;             /* Path curvature indicator */
-    float   lookahead_urgency;     /* 0.0 to 1.0 urgency for pre-braking (evaluated at far horizon Y=20) */
-    uint8_t left_root_found;       /* 1 if left foreground root vector detected */
-    uint8_t right_root_found;      /* 1 if right foreground root vector detected */
-    uint8_t has_transverse_tape;   /* 1 if horizontal crossing tape detected */
-    uint8_t found;                 /* Total root boundary vectors found (0, 1, or 2) */
-} trajectory_result_t;
+    float   horizon_angle_deg; /* Length-weighted average forward road angle (-90 to +90 deg) */
+    uint8_t is_sharp_corner;   /* 1 if |horizon_angle_deg| > 30.0f */
+    uint8_t found;             /* Number of valid horizon vectors detected */
+} horizon_result_t;
 
 void reset_steering_tracking(void);
-void vector_filtering(uint16_t *vectors, size_t *num_vectors);
-steering_result_t compute_steering_error(const uint16_t *vectors, size_t num_vectors);
-trajectory_result_t compute_lookahead_trajectory(const uint16_t *vectors, size_t num_vectors);
-trajectory_result_t compute_lookahead_curvature(const uint16_t *vectors, size_t num_vectors);
+void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steering_result_t *out);
+void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, horizon_result_t *out);
 
 #endif // VECTORS_H
