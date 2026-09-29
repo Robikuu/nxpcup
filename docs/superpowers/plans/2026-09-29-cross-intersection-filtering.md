@@ -17,7 +17,7 @@
 **Files:**
 - Modify: [`source/vectors.h`](file:///d:/nxpcup/source/vectors.h)
 
-- [ ] **Step 1: Add `has_transverse_tape` field to `steering_result_t`**
+- [x] **Step 1: Add `has_transverse_tape` field to `steering_result_t`**
   ```c
   typedef struct {
       float   cte;
@@ -29,7 +29,7 @@
   } steering_result_t;
   ```
 
-- [ ] **Step 2: Commit `source/vectors.h`**
+- [x] **Step 2: Commit `source/vectors.h`**
   ```bash
   git add source/vectors.h
   git commit -m "feat: add has_transverse_tape to steering_result_t"
@@ -42,13 +42,13 @@
 **Files:**
 - Modify: [`source/vectors.c`](file:///d:/nxpcup/source/vectors.c)
 
-- [ ] **Step 1: Add angle filter in `compute_top_camera_lane()`**
+- [x] **Step 1: Add angle filter in `compute_top_camera_lane()`**
   Calculate `angle = atan2f(dx, dy) * (180.0f / M_PI)`.
   If `fabsf(angle) > 60.0f`:
   - Flag `out->has_transverse_tape = 1;` if `fabsf(dx) >= 12.0f && y_near >= 16.0f`.
   - Execute `continue;` to reject the vector from being chosen as left/right boundary line.
 
-- [ ] **Step 2: Commit `source/vectors.c`**
+- [x] **Step 2: Commit `source/vectors.c`**
   ```bash
   git add source/vectors.c
   git commit -m "feat: reject horizontal crossbar vectors in compute_top_camera_lane"
@@ -61,7 +61,7 @@
 **Files:**
 - Modify: [`source/main.c`](file:///d:/nxpcup/source/main.c)
 
-- [ ] **Step 1: Define macro states and tracking variables**
+- [x] **Step 1: Define macro states and tracking variables**
   ```c
   #define MACRO_STATE_NORMAL       0
   #define MACRO_STATE_INTERSECTION 1
@@ -70,15 +70,15 @@
   uint32_t intersection_reacquire_streak = 0;
   ```
 
-- [ ] **Step 2: Implement state transition and control logic**
+- [x] **Step 2: Implement state transition and control logic**
   - Trigger into `MACRO_STATE_INTERSECTION` on `sr.has_transverse_tape` with straight alignment.
   - In intersection: force `steer_cmd = 0.0f`, `target_speed = g_params.speed_straight` (100%), bypass corner braking.
   - Exit after min 8 ticks on `sr.found == 2` (streak $\ge 2$) or 22 ticks timeout.
 
-- [ ] **Step 3: Update telemetry stream**
+- [x] **Step 3: Update telemetry stream**
   Output `ST: I` when in intersection.
 
-- [ ] **Step 4: Commit `source/main.c`**
+- [x] **Step 4: Commit `source/main.c`**
   ```bash
   git add source/main.c
   git commit -m "feat: implement full speed straight through intersection transit in main.c"
@@ -91,6 +91,6 @@
 **Files:**
 - Output: `d:\nxpcup\Debug\nxpcup.axf`
 
-- [ ] **Step 1: Sync all files to MCUXpresso workspace**
-- [ ] **Step 2: Build with make tool and verify 0 errors, 0 warnings**
-- [ ] **Step 3: Copy binary back to `d:\nxpcup\Debug\`**
+- [x] **Step 1: Sync all files to MCUXpresso workspace**
+- [x] **Step 2: Build with make tool and verify 0 errors, 0 warnings**
+- [x] **Step 3: Copy binary back to `d:\nxpcup\Debug\`**
