@@ -108,6 +108,10 @@ int main(void) {
     uint32_t line_lost_ticks          = 0;
     uint32_t line_reacquire_streak    = 0;
 
+    uint8_t  s_prebrake_confirm_count = 0;
+    uint8_t  s_prebrake_active_ticks  = 0;
+    bool     s_prebrake_armed         = true;
+
     float    filtered_cte             = 0.0f;
     int      cte_filter_init          = 0;
     float    filtered_heading         = 0.0f;
@@ -163,6 +167,9 @@ int main(void) {
                 g_traj.lookahead_x       = (float)PIXY_CENTER_X;
                 applied_speed_left       = g_params.speed_straight;
                 applied_speed_right      = g_params.speed_straight;
+                s_prebrake_confirm_count = 0;
+                s_prebrake_active_ticks  = 0;
+                s_prebrake_armed         = true;
                 steer_cmd                = 0.0f;
                 last_steer_cmd           = 0.0f;
                 kappa                    = 0.0f;
@@ -559,6 +566,34 @@ int main(void) {
                 target_right = target_speed;
             }
 
+            /* --- 7b. Straight-Line Threshold Pre-Braking Trigger --- */
+            if (macro_state == MACRO_STATE_NORMAL) {
+                bool is_sprinting = (applied_speed_left >= (float)PREBRAKE_MIN_SPEED || applied_speed_right >= (float)PREBRAKE_MIN_SPEED);
+                bool is_straight  = (fabsf(filtered_heading) <= (float)PREBRAKE_MAX_HEADING_DEG) &&
+                                    (fabsf(steer_cmd) <= (float)PREBRAKE_MAX_STEER_DEG);
+
+                if (is_sprinting && is_straight) {
+                    if (lookahead_turn_factor >= (float)PREBRAKE_LOOKAHEAD_THRESH) {
+                        if (s_prebrake_confirm_count < (uint8_t)PREBRAKE_CONFIRM_TICKS) {
+                            s_prebrake_confirm_count++;
+                        }
+                        if (s_prebrake_confirm_count >= (uint8_t)PREBRAKE_CONFIRM_TICKS && s_prebrake_armed) {
+                            s_prebrake_active_ticks = (uint8_t)PREBRAKE_PULSE_TICKS;
+                            s_prebrake_armed        = false;
+                        }
+                    } else {
+                        s_prebrake_confirm_count = 0;
+                    }
+                } else {
+                    s_prebrake_confirm_count = 0;
+                    if (lookahead_turn_factor < 0.20f && fabsf(filtered_heading) < 8.0f) {
+                        s_prebrake_armed = true;
+                    }
+                }
+            } else {
+                s_prebrake_confirm_count = 0;
+            }
+
             /* --- 8. Bilateral Anti-Spin Traction Guard & Speed Slew Limiter --- */
             bool yaw_conflict = false;
             if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
@@ -567,8 +602,8 @@ int main(void) {
                     applied_speed_left < applied_speed_right) {
                     yaw_conflict = true;
                 } else if (steer_cmd < -(float)YAW_CONFLICT_DEADBAND &&
-                           (target_right - target_left) > 5.0f &&
-                           applied_speed_right < applied_speed_left) {
+                    (target_right - target_left) > 5.0f &&
+                    applied_speed_right < applied_speed_left) {
                     yaw_conflict = true;
                 }
             }
@@ -597,7 +632,14 @@ int main(void) {
             }
 
             /* Actuate dual motors */
-            if (!g_params.motor_enable) {
+            bool is_prebraking = (s_prebrake_active_ticks > 0);
+            if (is_prebraking) {
+                s_prebrake_active_ticks--;
+                HbridgeBrake(&g_hbridge);
+                /* Latch applied speeds directly to corner outside speed so exit has zero lag */
+                applied_speed_left  = g_params.speed_outside_corner;
+                applied_speed_right = g_params.speed_outside_corner;
+            } else if (!g_params.motor_enable) {
                 applied_speed_left  = 0.0f;
                 applied_speed_right = 0.0f;
                 HbridgeBrake(&g_hbridge);
@@ -611,8 +653,9 @@ int main(void) {
             static uint8_t s_telemetry_div = 0;
             if (++s_telemetry_div >= 4) {
                 s_telemetry_div = 0;
-                const char *st_str = (macro_state == MACRO_STATE_NORMAL) ? "N" :
-                                     ((macro_state == MACRO_STATE_INTERSECTION) ? "I" : "L");
+                const char *st_str = is_prebraking ? "B" :
+                                     ((macro_state == MACRO_STATE_NORMAL) ? "N" :
+                                     ((macro_state == MACRO_STATE_INTERSECTION) ? "I" : "L"));
                 char dom_char = g_params.shadow_mode_enable ? 'T' :
                                 ((s_blend_weight >= 0.70f) ? 'T' : ((s_blend_weight <= 0.30f) ? 'F' : 'B'));
                 bool is_roughly_straight = (fabsf(filtered_heading) <= 15.0f) && (fabsf(steer_cmd) <= 18.0f);
