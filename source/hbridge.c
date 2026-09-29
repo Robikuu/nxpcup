@@ -49,20 +49,16 @@ void HbridgeSpeed(Hbridge *h, float speed_left, float speed_right)
     if (speed_right >  100.0f) speed_right =  100.0f;
     if (speed_right < -100.0f) speed_right = -100.0f;
 
-    /* Plant gain scaling: normalizes DRV8871 output to match original driver baseline */
-    float scaled_left  = speed_left  * g_params.drive_scale;
-    float scaled_right = speed_right * g_params.drive_scale;
-
     float duty_left, duty_right;
 
     /* Left Motor (Motor 2: IN3 on pwm2Channel/P0_26, IN4 on motor2DirPin/P0_27) */
-    if (scaled_left > 0.0f) {
+    if (speed_left > 0.0f) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
-        duty_left = 100.0f - scaled_left;
-    } else if (scaled_left < 0.0f) {
+        duty_left = 100.0f - speed_left;
+    } else if (speed_left < 0.0f) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
         /* Quadratic compensation for DRV8871 Fast Decay (Coast) freewheeling */
-        float mag = -scaled_left;
+        float mag = -speed_left;
         duty_left = (mag * mag) / 100.0f;
     } else {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
@@ -70,13 +66,13 @@ void HbridgeSpeed(Hbridge *h, float speed_left, float speed_right)
     }
 
     /* Right Motor (Motor 1: IN1 on pwm1Channel/P0_25, IN2 on motor1DirPin/P0_24) */
-    if (scaled_right > 0.0f) {
+    if (speed_right > 0.0f) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
-        duty_right = 100.0f - scaled_right;
-    } else if (scaled_right < 0.0f) {
+        duty_right = 100.0f - speed_right;
+    } else if (speed_right < 0.0f) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
         /* Quadratic compensation for DRV8871 Fast Decay (Coast) freewheeling */
-        float mag = -scaled_right;
+        float mag = -speed_right;
         duty_right = (mag * mag) / 100.0f;
     } else {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
