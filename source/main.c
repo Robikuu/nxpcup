@@ -405,8 +405,9 @@ int main(void) {
                 kappa = (k_base > k_front) ? k_base : k_front;
                 if (kappa > 1.0f) kappa = 1.0f;
 
-                /* B. Continuous Target Speed */
-                target_speed = g_params.speed_straight - kappa * (g_params.speed_straight - g_params.speed_outside_corner);
+                /* B. Continuous Target Speed (quadratic kappa: stays fast in mild curves, brakes hard only at tight corners) */
+                float kappa_sq = kappa * kappa;
+                target_speed = g_params.speed_straight - kappa_sq * (g_params.speed_straight - g_params.speed_outside_corner);
                 if (s_blend_weight < 0.30f && target_speed > (float)BLEND_FALLBACK_SPEED_CAP) {
                     target_speed = (float)BLEND_FALLBACK_SPEED_CAP;
                 }
@@ -603,7 +604,7 @@ int main(void) {
             } else if (macro_state == MACRO_STATE_LINE_LOST && line_lost_ticks > (uint32_t)LINE_LOST_BRAKE_TICKS) {
                 HbridgeBrake(&g_hbridge);
             } else {
-                HbridgeSpeed(&g_hbridge, (int16_t)applied_speed_left, (int16_t)applied_speed_right);
+                HbridgeSpeed(&g_hbridge, applied_speed_left, applied_speed_right);
             }
 
             /* --- 9. Telemetry Output (Throttled to 12.5 Hz = Every 4th Tick) --- */
@@ -621,7 +622,7 @@ int main(void) {
                     s_curved_intersection_approaches++;
                 }
 
-                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
+                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d SC:%d\r\n",
                            (unsigned)sr.found, (unsigned)num_vectors_front,
                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
                            (int)(filtered_heading * 10.0f),
@@ -633,7 +634,8 @@ int main(void) {
                            front_plausible ? 1U : 0U,
                            (unsigned)ix_flag,
                            st_str,
-                           (int)applied_speed_left, (int)applied_speed_right);
+                           (int)applied_speed_left, (int)applied_speed_right,
+                           (int)(g_params.drive_scale * 100.0f));
             }
         }
     }
