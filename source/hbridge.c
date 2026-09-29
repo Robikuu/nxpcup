@@ -29,50 +29,72 @@ void HbridgeInit(Hbridge *h,
     g_hbridge           = *h;
 }
 
-void HbridgeSpeed(Hbridge *h, int16_t speed_left, int16_t speed_right)
+static inline void set_pwm_duty_float(CTIMER_Type *base, ctimer_match_t periodCh, ctimer_match_t matchCh, float duty_percent)
 {
-    /* Clamp to -100..+100 */
-    if (speed_left >  100) speed_left =  100;
-    if (speed_left < -100) speed_left = -100;
-    if (speed_right >  100) speed_right =  100;
-    if (speed_right < -100) speed_right = -100;
+    if (duty_percent <= 0.0f) {
+        base->MR[matchCh] = base->MR[periodCh] + 1U;
+    } else if (duty_percent >= 100.0f) {
+        base->MR[matchCh] = 0U;
+    } else {
+        uint32_t period = base->MR[periodCh];
+        base->MR[matchCh] = (uint32_t)((float)period * (100.0f - duty_percent) / 100.0f + 0.5f);
+    }
+}
 
-    uint8_t duty_left, duty_right;
+void HbridgeSpeed(Hbridge *h, float speed_left, float speed_right)
+{
+    /* Clamp to -100.0f..+100.0f */
+    if (speed_left >  100.0f) speed_left =  100.0f;
+    if (speed_left < -100.0f) speed_left = -100.0f;
+    if (speed_right >  100.0f) speed_right =  100.0f;
+    if (speed_right < -100.0f) speed_right = -100.0f;
+
+    /* Plant gain scaling: normalizes DRV8871 output to match original driver baseline */
+    float scaled_left  = speed_left  * g_params.drive_scale;
+    float scaled_right = speed_right * g_params.drive_scale;
+
+    float duty_left, duty_right;
 
     /* Left Motor (Motor 2: IN3 on pwm2Channel/P0_26, IN4 on motor2DirPin/P0_27) */
-    if (speed_left > 0) {
+    if (scaled_left > 0.0f) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
-        duty_left = (uint8_t)(100 - speed_left);
-    } else if (speed_left < 0) {
+        duty_left = 100.0f - scaled_left;
+    } else if (scaled_left < 0.0f) {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
-        duty_left = (uint8_t)(-speed_left);
+        /* Quadratic compensation for DRV8871 Fast Decay (Coast) freewheeling */
+        float mag = -scaled_left;
+        duty_left = (mag * mag) / 100.0f;
     } else {
         GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
-        duty_left = 0U;
+        duty_left = 0.0f;
     }
 
     /* Right Motor (Motor 1: IN1 on pwm1Channel/P0_25, IN2 on motor1DirPin/P0_24) */
-    if (speed_right > 0) {
+    if (scaled_right > 0.0f) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
-        duty_right = (uint8_t)(100 - speed_right);
-    } else if (speed_right < 0) {
+        duty_right = 100.0f - scaled_right;
+    } else if (scaled_right < 0.0f) {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
-        duty_right = (uint8_t)(-speed_right);
+        /* Quadratic compensation for DRV8871 Fast Decay (Coast) freewheeling */
+        float mag = -scaled_right;
+        duty_right = (mag * mag) / 100.0f;
     } else {
         GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
-        duty_right = 0U;
+        duty_right = 0.0f;
     }
 
-    /* Update PWM duty cycles independently to eliminate cross-motor coupling */
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, duty_left);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, duty_right);
+    /* Update PWM duty cycles independently to eliminate cross-motor coupling (float tick resolution) */
+    set_pwm_duty_float(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, duty_left);
+    set_pwm_duty_float(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, duty_right);
 }
 
 void HbridgeBrake(Hbridge *h)
 {
-    GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 0U);
-    GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 0U);
+    /* DRV8871 Active Low-Side Dynamic Brake: IN1=1, IN2=1 */
+    GPIO_PinWrite(h->motor1DirPort, h->motor1DirPin, 1U);
+    GPIO_PinWrite(h->motor2DirPort, h->motor2DirPin, 1U);
 
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, 0U);
-    CTIMER_UpdatePwmDutycycle(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, 0U);
+    set_pwm_duty_float(h->pwmPeripheral, h->periodChannel, h->pwm1Channel, 100.0f);
+    set_pwm_duty_float(h->pwmPeripheral, h->periodChannel, h->pwm2Channel, 100.0f);
 }
+
