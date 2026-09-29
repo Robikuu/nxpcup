@@ -31,6 +31,7 @@ void params_init(void) {
     g_params.steering_offset     = STEERING_OFFSET;
     g_params.accel_ramp          = ACCEL_RAMP_STEP;
     g_params.decel_ramp          = DECEL_RAMP_STEP;
+    g_params.drive_scale         = DEFAULT_DRIVE_SCALE;
     g_params.shadow_mode_enable  = DEFAULT_SHADOW_MODE;
     g_params.motor_enable        = DEFAULT_MOTOR_ENABLE;
     g_params.state               = STATE_IDLE;
@@ -150,21 +151,27 @@ static void command_execute(char *cmd) {
         HbridgeBrake(&g_hbridge);
         send_ack("OK state=IDLE\r\n");
     }
-    else if (!strcmp(keyword, "kp_straight") && has_val) { g_params.kp_straight = val; send_ack_dbl("kp_straight=", val); }
-    else if (!strcmp(keyword, "kp_corner") && has_val) { g_params.kp_corner = val; send_ack_dbl("kp_corner=", val); }
-    else if (!strcmp(keyword, "kd_straight") && has_val) { g_params.kd_straight = val; send_ack_dbl("kd_straight=", val); }
-    else if (!strcmp(keyword, "kd_corner") && has_val) { g_params.kd_corner = val; send_ack_dbl("kd_corner=", val); }
+    else if ((!strcmp(keyword, "kp_straight") || !strcmp(keyword, "kp_s")) && has_val) { g_params.kp_straight = val; send_ack_dbl("kp_straight=", val); }
+    else if ((!strcmp(keyword, "kp_corner") || !strcmp(keyword, "kp_c")) && has_val) { g_params.kp_corner = val; send_ack_dbl("kp_corner=", val); }
+    else if ((!strcmp(keyword, "kd_straight") || !strcmp(keyword, "kd_s")) && has_val) { g_params.kd_straight = val; send_ack_dbl("kd_straight=", val); }
+    else if ((!strcmp(keyword, "kd_corner") || !strcmp(keyword, "kd_c")) && has_val) { g_params.kd_corner = val; send_ack_dbl("kd_corner=", val); }
     else if (!strcmp(keyword, "ki") && has_val) { g_params.ki = val; send_ack_dbl("ki=", val); }
-    else if (!strcmp(keyword, "speed_straight") && has_val) { g_params.speed_straight = val; send_ack_dbl("speed_straight=", val); }
-    else if ((!strcmp(keyword, "speed_outside") || !strcmp(keyword, "speed_out")) && has_val) { g_params.speed_outside_corner = val; send_ack_dbl("speed_outside=", val); }
-    else if ((!strcmp(keyword, "speed_inside") || !strcmp(keyword, "speed_in") || !strcmp(keyword, "speed_corner")) && has_val) { g_params.speed_inside_min = val; send_ack_dbl("speed_inside=", val); }
+    else if ((!strcmp(keyword, "speed_straight") || !strcmp(keyword, "spd_s") || !strcmp(keyword, "speed_s")) && has_val) { g_params.speed_straight = val; send_ack_dbl("speed_straight=", val); }
+    else if ((!strcmp(keyword, "speed_outside") || !strcmp(keyword, "speed_out") || !strcmp(keyword, "spd_out")) && has_val) { g_params.speed_outside_corner = val; send_ack_dbl("speed_outside=", val); }
+    else if ((!strcmp(keyword, "speed_inside") || !strcmp(keyword, "speed_in") || !strcmp(keyword, "spd_in") || !strcmp(keyword, "speed_corner")) && has_val) { g_params.speed_inside_min = val; send_ack_dbl("speed_inside=", val); }
     else if (!strcmp(keyword, "alpha") && has_val) { g_params.alpha = val; send_ack_dbl("alpha=", val); }
     else if (!strcmp(keyword, "k_cte") && has_val) { g_params.k_cte = val; send_ack_dbl("k_cte=", val); }
-    else if (!strcmp(keyword, "k_heading") && has_val) { g_params.k_heading = val; send_ack_dbl("k_heading=", val); }
+    else if ((!strcmp(keyword, "k_heading") || !strcmp(keyword, "k_head")) && has_val) { g_params.k_heading = val; send_ack_dbl("k_heading=", val); }
     else if ((!strcmp(keyword, "k_lookahead") || !strcmp(keyword, "k_la")) && has_val) { g_params.k_lookahead = val; send_ack_dbl("k_lookahead=", val); }
-    else if (!strcmp(keyword, "steering_offset") && has_val) { g_params.steering_offset = val; send_ack_dbl("steering_offset=", val); }
-    else if (!strcmp(keyword, "accel_ramp") && has_val) { g_params.accel_ramp = val; send_ack_dbl("accel_ramp=", val); }
-    else if (!strcmp(keyword, "decel_ramp") && has_val) { g_params.decel_ramp = val; send_ack_dbl("decel_ramp=", val); }
+    else if ((!strcmp(keyword, "steering_offset") || !strcmp(keyword, "offset")) && has_val) { g_params.steering_offset = val; send_ack_dbl("steering_offset=", val); }
+    else if ((!strcmp(keyword, "accel_ramp") || !strcmp(keyword, "ramp_a")) && has_val) { g_params.accel_ramp = val; send_ack_dbl("accel_ramp=", val); }
+    else if ((!strcmp(keyword, "decel_ramp") || !strcmp(keyword, "ramp_d")) && has_val) { g_params.decel_ramp = val; send_ack_dbl("decel_ramp=", val); }
+    else if ((!strcmp(keyword, "scale") || !strcmp(keyword, "drive_scale")) && has_val) {
+        if (val < 0.10f) val = 0.10f;
+        if (val > 1.00f) val = 1.00f;
+        g_params.drive_scale = val;
+        send_ack_dbl("drive_scale=", val);
+    }
     else if (!strcmp(keyword, "steer") && has_val) {
         if (g_params.state == STATE_RUNNING) {
             send_ack("ERR steer only in IDLE. Send 'stop;' first.\r\n");
@@ -230,13 +237,14 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "alpha=", g_params.alpha);
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
+        n = append_flt(buf, n, sizeof(buf), "scale=", g_params.drive_scale);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "shadow=%u\r\n", (unsigned)g_params.shadow_mode_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], scale, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in, k_head, k_cte, k_la, offset, ramp_a, ramp_d\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");
