@@ -26,24 +26,21 @@
 // ---- Wheel Speeds & Asymmetric Differential Drag (Fast Race Profile) ----
 #define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         58.0f     // Calibrated DRV8871 apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             38.0f     // Calibrated inside wheel pivot anchor duty (%)
+#define SPEED_OUTSIDE_CORNER         50.0f     // Calibrated apex outside wheel drive (%)
+#define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
-#define DIFFERENTIAL_DEADZONE_DEG    6.0f      // Steer angle deadzone below which zero differential drag applies (bites at 6°)
-#define STEER_FULL_BRAKE_DEG         45.0f     // Steer angle (deg) for 100% pivot drag ramp
+#define DIFFERENTIAL_DEADZONE_DEG    5.0f      // Steer angle deadzone below which zero differential drag applies (bites at 5°)
+#define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
 
-// ---- Straight-Line Active Threshold Pre-Braking ----
-#define PREBRAKE_PULSE_TICKS         3U        // 3 ticks @ 50Hz = 60ms active low-side brake pulse
-#define PREBRAKE_MIN_SPEED           80.0f     // Only brake if sprinting at or above 80%
-#define PREBRAKE_MAX_HEADING_DEG     10.0f     // Straight line alignment guard
-#define PREBRAKE_MAX_STEER_DEG       12.0f     // Wheels centered alignment guard
-#define PREBRAKE_LOOKAHEAD_THRESH    0.35f     // Front camera turn urgency threshold
-#define PREBRAKE_CONFIRM_TICKS       2U        // Consecutive ticks required to confirm turn
+// ---- Clean Dual-Camera Horizon & Lane Constants ----
+#define FRONT_CORNER_ANGLE_THRESH_DEG 30.0f    // Horizon road angle threshold for sharp corner detection
+#define TRACK_HALF_WIDTH_PX          25.0f     // Nominal lane half-width (pixels) in top camera view
+#define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              28.0f     // Rapid pre-braking ramp (~50ms from 100% to 78% at 12.6V)
-#define ACCEL_RAMP_STEP              35.0f     // Crisp corner exit acceleration (~60ms to 100%, eliminates straightaway delay)
+#define DECEL_RAMP_STEP              45.0f     // Rapid pre-braking ramp (~2 ticks from 100% to 50%)
+#define ACCEL_RAMP_STEP              35.0f     // Crisp corner exit acceleration (~60ms to 100%)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
