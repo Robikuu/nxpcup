@@ -63,10 +63,23 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
 
         /* Must have minimum vertical length (reject horizontal crossbars/noise) */
         float dy = y_near - y_far;
-        if (dy < 4.0f) continue;
+        if (dy < 4.0f) {
+            if (fabsf(x_far - x_near) >= 12.0f && y_near >= 16.0f) {
+                out->has_transverse_tape = 1U;
+            }
+            continue;
+        }
 
         float dx = x_far - x_near;
         float angle = atan2f(dx, dy) * (180.0f / M_PI);
+
+        /* Reject predominantly horizontal lines (> 60 deg relative to forward road) */
+        if (fabsf(angle) > 60.0f) {
+            if (fabsf(dx) >= 12.0f && y_near >= 16.0f) {
+                out->has_transverse_tape = 1U;
+            }
+            continue; /* Do NOT select horizontal cross-line as a boundary! */
+        }
 
         /* Classify: Left of vehicle center */
         if (x_near < (float)PIXY_CENTER_X) {
