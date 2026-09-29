@@ -23,6 +23,9 @@
 
 #define MAX_VECTORS 10
 
+#define MACRO_STATE_NORMAL       0
+#define MACRO_STATE_INTERSECTION 1
+
 volatile bool g_tickFlag = false;
 robot_params_t g_params;
 
@@ -85,6 +88,10 @@ int main(void) {
     float    steer_cmd                = 0.0f;
     uint32_t s_rollout_ticks          = 0;
 
+    uint8_t  macro_state                   = MACRO_STATE_NORMAL;
+    uint32_t intersection_ticks           = 0;
+    uint32_t intersection_reacquire_streak = 0;
+
     PRINTF("Running. Waiting for Start.\r\n");
 
     while (1) {
@@ -109,13 +116,16 @@ int main(void) {
             /* Idle state handling */
             if (g_params.state != STATE_RUNNING) {
                 reset_steering_tracking();
-                filtered_cte         = 0.0f;
-                filtered_heading     = 0.0f;
-                filtered_front_angle = 0.0f;
-                applied_speed_left   = g_params.speed_straight;
-                applied_speed_right  = g_params.speed_straight;
-                steer_cmd            = 0.0f;
-                s_rollout_ticks      = 0;
+                filtered_cte                  = 0.0f;
+                filtered_heading              = 0.0f;
+                filtered_front_angle          = 0.0f;
+                applied_speed_left            = g_params.speed_straight;
+                applied_speed_right           = g_params.speed_straight;
+                steer_cmd                     = 0.0f;
+                s_rollout_ticks               = 0;
+                macro_state                   = MACRO_STATE_NORMAL;
+                intersection_ticks            = 0;
+                intersection_reacquire_streak = 0;
 
                 if (motor_test_is_active()) {
                     motor_test_tick();
@@ -148,14 +158,43 @@ int main(void) {
                 if (sr.found > 0) {
                     filtered_cte     = 0.50f * sr.cte + 0.50f * filtered_cte;
                     filtered_heading = 0.50f * sr.heading_deg + 0.50f * filtered_heading;
+                } else {
+                    filtered_cte     *= 0.85f;
+                    filtered_heading *= 0.85f;
                 }
             } else {
                 num_vectors_pid = 0;
+                filtered_cte     *= 0.85f;
+                filtered_heading *= 0.85f;
             }
 
             s_rollout_ticks++;
 
-            /* --- 3. Steering Calculation --- */
+            /* --- 3. Macro State Machine (Cross-Intersection Transit) --- */
+            if (macro_state == MACRO_STATE_NORMAL) {
+                if (sr.has_transverse_tape && fabsf(filtered_heading) <= 12.0f && fabsf(steer_cmd) <= 12.0f) {
+                    macro_state = MACRO_STATE_INTERSECTION;
+                    intersection_ticks = 0;
+                    intersection_reacquire_streak = 0;
+                }
+            } else if (macro_state == MACRO_STATE_INTERSECTION) {
+                intersection_ticks++;
+                if (intersection_ticks >= 8) {
+                    if (sr.found == 2 && fabsf(filtered_heading) <= 25.0f) {
+                        intersection_reacquire_streak++;
+                        if (intersection_reacquire_streak >= 2) {
+                            macro_state = MACRO_STATE_NORMAL;
+                        }
+                    } else {
+                        intersection_reacquire_streak = 0;
+                    }
+                }
+                if (intersection_ticks >= 22) {
+                    macro_state = MACRO_STATE_NORMAL;
+                }
+            }
+
+            /* --- 4. Steering Calculation --- */
             /* A. Top Camera Centering between closest lines */
             float steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * filtered_heading);
 
@@ -170,17 +209,27 @@ int main(void) {
                 steer_cmd = 0.0f;
             }
 
+            /* Dead-straight hold during intersection crossing */
+            if (macro_state == MACRO_STATE_INTERSECTION) {
+                steer_cmd = 0.0f;
+            }
+
             /* C. Servo Clamping & Actuation */
             if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
             if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
             Steer(steer_cmd + g_params.steering_offset);
 
-            /* --- 4. Speed & Differential Braking --- */
+            /* --- 5. Speed & Differential Braking --- */
             float target_speed = g_params.speed_straight;
             float target_left  = target_speed;
             float target_right = target_speed;
 
-            if (horizon.is_sharp_corner) {
+            if (macro_state == MACRO_STATE_INTERSECTION) {
+                /* INTERSECTION TRANSIT MODE: 100% full throttle sprint straight through */
+                target_speed = g_params.speed_straight;
+                target_left  = target_speed;
+                target_right = target_speed;
+            } else if (horizon.is_sharp_corner) {
                 /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot */
                 target_speed = g_params.speed_outside_corner;
                 if (steer_cmd > 0.0f) {
@@ -215,7 +264,7 @@ int main(void) {
                 }
             }
 
-            /* --- 5. Motor Slew Rate Limiting (Ramps) --- */
+            /* --- 6. Motor Slew Rate Limiting (Ramps) --- */
             /* Left Motor Ramp */
             if (target_left < applied_speed_left) {
                 applied_speed_left -= g_params.decel_ramp;
@@ -234,7 +283,7 @@ int main(void) {
                 if (applied_speed_right > target_right) applied_speed_right = target_right;
             }
 
-            /* --- 6. Motor Actuation --- */
+            /* --- 7. Motor Actuation --- */
             if (!g_params.motor_enable) {
                 applied_speed_left  = 0.0f;
                 applied_speed_right = 0.0f;
@@ -243,22 +292,24 @@ int main(void) {
                 HbridgeSpeed(&g_hbridge, applied_speed_left, applied_speed_right);
             }
 
-            /* --- 7. Telemetry Output (12.5 Hz = Every 4th Tick) --- */
+            /* --- 8. Telemetry Output (12.5 Hz = Every 4th Tick) --- */
             static uint8_t s_telemetry_div = 0;
             if (++s_telemetry_div >= 4) {
                 s_telemetry_div = 0;
-                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:0 ST:%s VL:%d VR:%d\r\n",
+                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d SC:%d\r\n",
                            (unsigned)sr.found, (unsigned)horizon.found,
                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
                            (int)(filtered_heading * 10.0f),
                            (int)(steer_top * 10.0f),
                            (int)(filtered_front_angle * 10.0f),
                            (int)(steer_cmd * 10.0f),
-                           (int)(horizon.is_sharp_corner ? 0 : 100),
-                           horizon.is_sharp_corner ? 'F' : 'T',
+                           (int)(macro_state == MACRO_STATE_INTERSECTION ? 100 : (horizon.is_sharp_corner ? 0 : 100)),
+                           (macro_state == MACRO_STATE_INTERSECTION ? 'I' : (horizon.is_sharp_corner ? 'F' : 'T')),
                            horizon.found > 0 ? 1U : 0U,
-                           horizon.is_sharp_corner ? "C" : "S",
-                           (int)applied_speed_left, (int)applied_speed_right);
+                           macro_state == MACRO_STATE_INTERSECTION ? 1U : 0U,
+                           (macro_state == MACRO_STATE_INTERSECTION ? "I" : (horizon.is_sharp_corner ? "C" : "S")),
+                           (int)applied_speed_left, (int)applied_speed_right,
+                           (int)(g_params.drive_scale * 100.0f));
             }
         }
     }
