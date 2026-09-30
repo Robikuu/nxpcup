@@ -9,10 +9,9 @@
 typedef struct {
     float   cte;             /* Cross-track error in pixels (center_x - 39.0f) */
     float   heading_deg;     /* Road heading angle in degrees relative to vertical */
-    uint8_t left_found;          /* 1 if closest left line detected */
-    uint8_t right_found;         /* 1 if closest right line detected */
-    uint8_t has_transverse_tape; /* 1 if horizontal crossing line detected */
-    uint8_t found;               /* Total lines found (0, 1, or 2) */
+    uint8_t left_found;      /* 1 if closest left line detected */
+    uint8_t right_found;     /* 1 if closest right line detected */
+    uint8_t found;           /* Total lines found (0, 1, or 2) */
 } steering_result_t;
 
 /* Front Camera Result: Lookahead horizon road angle */
