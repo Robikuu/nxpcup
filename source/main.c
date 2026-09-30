@@ -149,7 +149,7 @@ int main(void) {
                 compute_top_camera_lane(vectors_pid, num_vectors_pid, &sr);
                 if (sr.found > 0) {
                     filtered_cte     = 0.50f * sr.cte + 0.50f * filtered_cte;
-                    filtered_heading = 0.50f * sr.heading_deg + 0.50f * filtered_heading;
+                    filtered_heading = 0.35f * sr.heading_deg + 0.65f * filtered_heading;
                 }
             } else {
                 num_vectors_pid = 0;

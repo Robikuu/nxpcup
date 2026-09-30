@@ -30,7 +30,7 @@
 #define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
-#define DIFFERENTIAL_DEADZONE_DEG    5.0f      // Steer angle deadzone below which zero differential drag applies (bites at 5°)
+#define DIFFERENTIAL_DEADZONE_DEG    10.0f     // Steer angle deadzone below which zero differential drag applies (prevents straightaway torque-steer weave)
 #define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
 
 // ---- Clean Dual-Camera Horizon & Lane Constants ----
@@ -68,7 +68,7 @@
 
 // ---- Error Weights & Decoupled Feedforward ----
 #define DEFAULT_K_CTE                0.55f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.80f     // Direct base camera heading feedforward into curves (strong turn-in bite)
+#define DEFAULT_K_HEADING            1.20f     // Direct base camera heading damping (calibrated to eliminate straightaway weave)
 #define DEFAULT_K_LOOKAHEAD          0.0f      // Lookahead steering injection disabled (eliminates premature turn-in)
 #define HEADING_DEADBAND_DEG         5.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
