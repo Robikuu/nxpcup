@@ -263,9 +263,10 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         }
     }
 
-    /* Pass 2: Forward Exit Pair Test with Vanishing-Point Convergence */
-    bool has_exit_pair = false;
+    /* Pass 2: Forward Exit Recognition (Pair or Single Forward Exit Line) */
+    bool has_exit_line = false;
     if (out->has_transverse_tape) {
+        bool found_diverging_pair = false;
         for (size_t j = 0; j < count; j++) {
             if (parsed[j].is_transverse || parsed[j].dy < 3.0f) continue;
             if (fabsf(parsed[j].angle) > 45.0f) continue;
@@ -314,6 +315,7 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
 
                 /* Forward diverging lines (s_l < s_r) cannot form a converging exit pair */
                 if (denom < -1e-3f) {
+                    found_diverging_pair = true;
                     continue;
                 }
 
@@ -333,38 +335,55 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
 
                 /* Convergence: vanishing point above image (Y_v <= 5.0f) and in [15.0f, 60.0f] */
                 if (y_v <= 5.0f && x_v >= 15.0f && x_v <= 60.0f) {
-                    has_exit_pair = true;
+                    has_exit_line = true;
                     break;
                 }
             }
-            if (has_exit_pair) break;
+            if (has_exit_line) break;
+        }
+
+        /* Check 2: Single forward exit line aligned through central corridor
+         * Only permitted if no diverging pair was detected!
+         */
+        if (!has_exit_line && !found_diverging_pair) {
+            for (size_t j = 0; j < count; j++) {
+                if (parsed[j].is_transverse || parsed[j].dy < 4.0f) continue;
+                if (fabsf(parsed[j].angle) > 22.0f) continue;
+                if (parsed[j].y_far >= trans_y_far_min) continue;
+                if (parsed[j].y_near > (trans_y_near_max + 5.0f)) continue;
+
+                float mid_x = (parsed[j].x_near + parsed[j].x_far) * 0.5f;
+                if (mid_x >= 20.0f && mid_x <= 58.0f) {
+                    has_exit_line = true;
+                    break;
+                }
+            }
         }
     }
 
     /* Strategic Decision */
     if (out->has_transverse_tape) {
-        if (out->transverse_crosses_center == 0U && has_exit_pair) {
+        if (out->transverse_crosses_center == 0U && has_exit_line) {
             out->is_intersection_ahead = 1U;
             out->is_sharp_corner       = 0U; /* Open intersection -> do not brake or trigger pivot drag */
         } else {
             out->is_intersection_ahead = 0U;
             out->is_sharp_corner       = 1U; /* Fail-safe default to corner, pre-brake! */
         }
+        /* Transverse tape detected: do NOT allow crossroad or side branch lines to tilt horizon! */
+        out->horizon_angle_deg = 0.0f;
+        out->found             = (uint8_t)count;
     } else {
         out->is_intersection_ahead = 0U;
         if (sum_length > 0.1f && valid_count > 0) {
             float avg_angle = sum_weighted_angle / sum_length;
-            out->is_sharp_corner = (fabsf(avg_angle) > (float)FRONT_CORNER_ANGLE_THRESH_DEG) ? 1U : 0U;
+            out->is_sharp_corner   = (fabsf(avg_angle) > (float)FRONT_CORNER_ANGLE_THRESH_DEG) ? 1U : 0U;
+            out->horizon_angle_deg = avg_angle;
+            out->found             = valid_count;
         } else {
-            out->is_sharp_corner = 0U;
+            out->is_sharp_corner   = 0U;
+            out->horizon_angle_deg = 0.0f;
+            out->found             = 0;
         }
-    }
-
-    if (sum_length > 0.1f && valid_count > 0) {
-        out->horizon_angle_deg = sum_weighted_angle / sum_length;
-        out->found             = valid_count;
-    } else if (out->has_transverse_tape) {
-        out->horizon_angle_deg = 0.0f;
-        out->found             = (uint8_t)count;
     }
 }
