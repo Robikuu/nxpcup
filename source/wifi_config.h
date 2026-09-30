@@ -13,4 +13,6 @@ void motor_test_stop(void);
 bool motor_test_is_active(void);
 void motor_test_tick(void);
 
+extern volatile uint8_t g_dump_vectors;
+
 #endif

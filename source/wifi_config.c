@@ -13,6 +13,7 @@
 
 static char   s_cmd_buf[CMD_BUF_SIZE];
 static size_t s_cmd_idx = 0;
+volatile uint8_t g_dump_vectors = 0;
 
 void params_init(void) {
     g_params.kp_straight         = KP_STRAIGHT;
@@ -213,6 +214,14 @@ static void command_execute(char *cmd) {
         }
         send_ack_dbl("motor_enable=", val);
     }
+    else if (!strcmp(keyword, "dump_vectors") || !strcmp(keyword, "dump")) {
+        if (has_val) {
+            g_dump_vectors = (uint8_t)val;
+        } else {
+            g_dump_vectors = (g_dump_vectors == 0) ? 2 : 0;
+        }
+        send_ack_dbl("dump_vectors=", (float)g_dump_vectors);
+    }
     else if (!strcmp(keyword, "version")) {
         char vbuf[96];
         snprintf(vbuf, sizeof(vbuf), "BUILD: %s %s shadow-fusion-v1\r\n", __DATE__, __TIME__);
@@ -240,11 +249,12 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "scale=", g_params.drive_scale);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "shadow=%u\r\n", (unsigned)g_params.shadow_mode_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
+        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "dump=%u\r\n", (unsigned)g_dump_vectors);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], scale, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in, k_head, k_cte, k_la, offset, ramp_a, ramp_d\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], dump [0/1], scale, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in, k_head, k_cte, k_la, offset, ramp_a, ramp_d\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

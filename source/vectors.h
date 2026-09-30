@@ -7,18 +7,24 @@
 
 /* Top Camera Result: Centered between closest left and right lines */
 typedef struct {
-    float   cte;             /* Cross-track error in pixels (center_x - 39.0f) */
-    float   heading_deg;     /* Road heading angle in degrees relative to vertical */
-    uint8_t left_found;      /* 1 if closest left line detected */
-    uint8_t right_found;     /* 1 if closest right line detected */
-    uint8_t found;           /* Total lines found (0, 1, or 2) */
+    float   cte;                        /* Cross-track error in pixels (center_x - 39.0f) */
+    float   heading_deg;                /* Road heading angle in degrees relative to vertical */
+    uint8_t left_found;                 /* 1 if closest left line detected */
+    uint8_t right_found;                /* 1 if closest right line detected */
+    uint8_t found;                      /* Total lines found (0, 1, or 2) */
+    uint8_t has_transverse_tape;        /* 1 if transverse tape detected */
+    uint8_t transverse_crosses_center;  /* 1 if transverse tape spans center corridor [32, 46] */
+    uint8_t is_intersection_ahead;      /* Reserved / detection flag */
 } steering_result_t;
 
 /* Front Camera Result: Lookahead horizon road angle */
 typedef struct {
-    float   horizon_angle_deg; /* Length-weighted average forward road angle (-90 to +90 deg) */
-    uint8_t is_sharp_corner;   /* 1 if |horizon_angle_deg| > 30.0f */
-    uint8_t found;             /* Number of valid horizon vectors detected */
+    float   horizon_angle_deg;          /* Length-weighted average forward road angle (-90 to +90 deg) */
+    uint8_t is_sharp_corner;            /* 1 if |horizon_angle_deg| > 30.0f or corner fail-safe */
+    uint8_t found;                      /* Number of valid horizon vectors detected */
+    uint8_t is_intersection_ahead;      /* 1 if confirmed intersection ahead (gap + exit pair) */
+    uint8_t has_transverse_tape;        /* 1 if transverse tape detected */
+    uint8_t transverse_crosses_center;  /* 1 if transverse tape spans center corridor */
 } horizon_result_t;
 
 void reset_steering_tracking(void);
