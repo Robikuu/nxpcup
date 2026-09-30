@@ -88,9 +88,9 @@ int main(void) {
     float    steer_cmd                = 0.0f;
     uint32_t s_rollout_ticks          = 0;
 
-    uint8_t  macro_state                   = MACRO_STATE_NORMAL;
-    uint32_t intersection_ticks           = 0;
-    uint32_t intersection_reacquire_streak = 0;
+    uint8_t  macro_state                  = MACRO_STATE_NORMAL;
+    uint32_t intersection_ticks          = 0;
+    uint32_t intersection_cooldown_ticks = 0;
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -123,9 +123,9 @@ int main(void) {
                 applied_speed_right           = g_params.speed_straight;
                 steer_cmd                     = 0.0f;
                 s_rollout_ticks               = 0;
-                macro_state                   = MACRO_STATE_NORMAL;
-                intersection_ticks            = 0;
-                intersection_reacquire_streak = 0;
+                macro_state                 = MACRO_STATE_NORMAL;
+                intersection_ticks          = 0;
+                intersection_cooldown_ticks = 0;
 
                 if (motor_test_is_active()) {
                     motor_test_tick();
@@ -169,28 +169,28 @@ int main(void) {
             }
 
             s_rollout_ticks++;
+            if (intersection_cooldown_ticks > 0) {
+                intersection_cooldown_ticks--;
+            }
 
             /* --- 3. Macro State Machine (Cross-Intersection Transit) --- */
             if (macro_state == MACRO_STATE_NORMAL) {
-                if (sr.has_transverse_tape && fabsf(filtered_heading) <= 12.0f && fabsf(steer_cmd) <= 12.0f) {
+                if (sr.has_transverse_tape &&
+                    !horizon.is_sharp_corner &&
+                    intersection_cooldown_ticks == 0 &&
+                    fabsf(filtered_heading) <= 12.0f &&
+                    fabsf(steer_cmd) <= 12.0f) {
                     macro_state = MACRO_STATE_INTERSECTION;
                     intersection_ticks = 0;
-                    intersection_reacquire_streak = 0;
                 }
             } else if (macro_state == MACRO_STATE_INTERSECTION) {
                 intersection_ticks++;
-                if (intersection_ticks >= 8) {
-                    if (sr.found == 2 && fabsf(filtered_heading) <= 25.0f) {
-                        intersection_reacquire_streak++;
-                        if (intersection_reacquire_streak >= 2) {
-                            macro_state = MACRO_STATE_NORMAL;
-                        }
-                    } else {
-                        intersection_reacquire_streak = 0;
-                    }
-                }
-                if (intersection_ticks >= 22) {
+                if (intersection_ticks >= 4 && sr.found >= 1 && fabsf(filtered_heading) <= 25.0f) {
                     macro_state = MACRO_STATE_NORMAL;
+                    intersection_cooldown_ticks = 60;
+                } else if (intersection_ticks >= 10) {
+                    macro_state = MACRO_STATE_NORMAL;
+                    intersection_cooldown_ticks = 60;
                 }
             }
 

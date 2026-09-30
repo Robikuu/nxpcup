@@ -63,21 +63,19 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
 
         /* Must have minimum vertical length (reject horizontal crossbars/noise) */
         float dy = y_near - y_far;
-        if (dy < 4.0f) {
-            if (fabsf(x_far - x_near) >= 12.0f && y_near >= 16.0f) {
-                out->has_transverse_tape = 1U;
-            }
-            continue;
-        }
-
         float dx = x_far - x_near;
         float angle = atan2f(dx, dy) * (180.0f / M_PI);
 
+        /* Detect transverse tape (near-horizontal crossbar at intersection) */
+        if (fabsf(angle) >= 72.0f && dy <= 6.0f && fabsf(dx) >= 16.0f && y_near >= 16.0f) {
+            out->has_transverse_tape = 1U;
+        }
+
+        /* Must have minimum vertical length (reject horizontal crossbars/noise) */
+        if (dy < 4.0f) continue;
+
         /* Reject predominantly horizontal lines (> 60 deg relative to forward road) */
         if (fabsf(angle) > 60.0f) {
-            if (fabsf(dx) >= 12.0f && y_near >= 16.0f) {
-                out->has_transverse_tape = 1U;
-            }
             continue; /* Do NOT select horizontal cross-line as a boundary! */
         }
 
