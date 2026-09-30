@@ -310,16 +310,22 @@ int main(void) {
             float target_right = target_speed;
 
             if (horizon.is_sharp_corner) {
-                /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot */
+                /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot ONLY if steering past deadzone */
                 target_speed = g_params.speed_outside_corner;
-                if (steer_cmd > 0.0f) {
-                    /* Turning Right: Left is outside, Right is inside pivot */
-                    target_left  = g_params.speed_outside_corner;
-                    target_right = g_params.speed_inside_min;
+                if (fabsf(steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                    if (steer_cmd > 0.0f) {
+                        /* Turning Right: Left is outside, Right is inside pivot */
+                        target_left  = g_params.speed_outside_corner;
+                        target_right = g_params.speed_inside_min;
+                    } else {
+                        /* Turning Left: Right is outside, Left is inside pivot */
+                        target_left  = g_params.speed_inside_min;
+                        target_right = g_params.speed_outside_corner;
+                    }
                 } else {
-                    /* Turning Left: Right is outside, Left is inside pivot */
-                    target_left  = g_params.speed_inside_min;
-                    target_right = g_params.speed_outside_corner;
+                    /* Wheels are straight (|steer| <= 10 deg): equal duty, zero yaw torque induced! */
+                    target_left  = target_speed;
+                    target_right = target_speed;
                 }
             } else {
                 /* STRAIGHT / INTERSECTION / MILD CURVE MODE: 100% full throttle */

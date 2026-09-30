@@ -155,14 +155,20 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
     car->target_right = car->target_speed;
 
     if (horizon->is_sharp_corner) {
-        /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot */
+        /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot ONLY if steering past deadzone */
         car->target_speed = SPEED_OUTSIDE_CORNER;
-        if (car->steer_cmd > 0.0f) {
-            car->target_left  = SPEED_OUTSIDE_CORNER;
-            car->target_right = SPEED_INSIDE_MIN;
+        if (fabsf(car->steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
+            if (car->steer_cmd > 0.0f) {
+                car->target_left  = SPEED_OUTSIDE_CORNER;
+                car->target_right = SPEED_INSIDE_MIN;
+            } else {
+                car->target_left  = SPEED_INSIDE_MIN;
+                car->target_right = SPEED_OUTSIDE_CORNER;
+            }
         } else {
-            car->target_left  = SPEED_INSIDE_MIN;
-            car->target_right = SPEED_OUTSIDE_CORNER;
+            /* Wheels are straight (|steer| <= 10 deg): equal duty, zero yaw torque induced! */
+            car->target_left  = car->target_speed;
+            car->target_right = car->target_speed;
         }
     } else {
         /* STRAIGHT / INTERSECTION / MILD CURVE MODE: 100% full throttle */
@@ -566,6 +572,249 @@ void test_case_10_dead_end_approach_lines_only(void) {
     printf("PASS\n");
 }
 
+void test_case_11_top_camera_chord_and_chassis_rejection(void) {
+    printf("[Case 11] Top camera chassis exclusion & diagonal chord rejection... ");
+
+    /* 1. Chassis exclusion: tie rod / bumper reflection (40, 51, 40, 45) */
+    uint16_t bumper_vec[4] = { 40, 51, 40, 45 }; /* x=40 in [36,44], y=51 >= 45, dy=6 <= 8 */
+    steering_result_t sr_chassis;
+    compute_top_camera_lane(bumper_vec, 1, &sr_chassis);
+    assert(sr_chassis.found == 0); /* Bumper reflection successfully excluded! */
+
+    /* 2. Diagonal chord rejection:
+       Genuine line: (71, 51, 69, 37) -> dy=14 >= 12, heading = -8.1 deg.
+       Diagonal chord: (69, 37, 78, 33) -> dx=9, dy=4, |dx| >= dy, dy < 10, angle = +66 deg.
+       Left genuine line: (14, 51, 14, 30) -> dy=21.
+    */
+    uint16_t chord_test_vecs[12] = {
+        14, 51, 14, 30,    /* Genuine left line */
+        71, 51, 69, 37,    /* Genuine right line */
+        69, 37, 78, 33     /* Pixy corner-merged diagonal chord */
+    };
+    steering_result_t sr_chord;
+    compute_top_camera_lane(chord_test_vecs, 3, &sr_chord);
+
+    assert(sr_chord.found == 2);
+    assert(sr_chord.left_found == 1U);
+    assert(sr_chord.right_found == 1U);
+    /* Right line MUST be selected from genuine line (x=71), NOT diagonal chord (x=69)! */
+    /* And heading must NOT be contaminated by the +66 deg chord */
+    assert(sr_chord.heading_deg < 10.0f); /* Genuine average heading is ~ -4 deg, NOT +30 deg */
+
+    /* 3. Chord with |angle| > 55 deg and dy < 12 */
+    uint16_t steep_chord_vec[4] = { 65, 30, 78, 24 }; /* dx=13, dy=6, angle=65.2 deg, dy=6 < 12 */
+    steering_result_t sr_steep;
+    compute_top_camera_lane(steep_chord_vec, 1, &sr_steep);
+    assert(sr_steep.found == 0); /* Steep diagonal chord rejected! */
+
+    printf("PASS\n");
+}
+
+void test_case_12_vanishing_point_perspective_convergence(void) {
+    printf("[Case 12] Real track data vanishing-point perspective convergence... ");
+
+    /* Frame 123 from scratch/real_intersection_dump.txt:
+       Left crossbar: (0, 29, 16, 26) -> dx=16, dy=3, dy <= 0.27*dx
+       Right crossbar: (62, 24, 78, 24) -> dx=16, dy=0
+       Left exit line: (9, 27, 18, 6) -> dx=9, dy=21
+       Right exit line: (51, 22, 35, 2) -> dx=-16, dy=20
+    */
+    uint16_t real_frn_vectors[16] = {
+        0, 29, 16, 26,     /* Left crossbar: min_x=0, max_x=16 (< 35) */
+        62, 24, 78, 24,    /* Right crossbar: min_x=62, max_x=78 (> 43) */
+        9, 27, 18, 6,      /* Converging left exit line: heading = +23.2 deg */
+        51, 22, 35, 2      /* Converging right exit line: heading = -38.7 deg */
+    };
+
+    horizon_result_t hz;
+    compute_front_camera_horizon(real_frn_vectors, 4, &hz);
+
+    assert(hz.has_transverse_tape == 1U);
+    assert(hz.transverse_crosses_center == 0U);
+    assert(hz.is_intersection_ahead == 1U);
+    assert(hz.is_sharp_corner == 0U);
+
+    printf("PASS\n");
+}
+
+void test_case_13_diverging_exit_lines_rejected(void) {
+    printf("[Case 13] Diverging exit lines rejected by vanishing point test... ");
+
+    /* Exit lines diverging upward:
+       Left line: (20, 22) to (15, 6) -> dx=-5, dy=16
+       Right line: (50, 22) to (55, 6) -> dx=+5, dy=16
+       Intersection is downwards (Y_v > 5.0) -> must be rejected!
+    */
+    uint16_t div_vectors[16] = {
+        4, 25, 20, 25,     /* Left crossbar */
+        58, 25, 74, 25,    /* Right crossbar */
+        20, 22, 15, 6,     /* Diverging left line */
+        50, 22, 55, 6      /* Diverging right line */
+    };
+
+    horizon_result_t hz;
+    compute_front_camera_horizon(div_vectors, 4, &hz);
+
+    assert(hz.has_transverse_tape == 1U);
+    assert(hz.transverse_crosses_center == 0U);
+    assert(hz.is_intersection_ahead == 0U); /* MUST REJECT diverging exit pair! */
+    assert(hz.is_sharp_corner == 1U);       /* Fail-safe pre-brake! */
+
+    printf("PASS\n");
+}
+
+void test_case_14_vanishing_point_outside_corridor_rejected(void) {
+    printf("[Case 14] Exit lines converging outside track corridor [15, 60] rejected... ");
+
+    /* Lines converging far to the right (X_v > 60) */
+    uint16_t off_vp_vectors[16] = {
+        4, 25, 20, 25,     /* Left crossbar */
+        58, 25, 74, 25,    /* Right crossbar */
+        25, 22, 45, 6,     /* Left line: dx=20, dy=16 */
+        52, 22, 60, 6      /* Right line: dx=8, dy=16 */
+    };
+
+    horizon_result_t hz;
+    compute_front_camera_horizon(off_vp_vectors, 4, &hz);
+
+    assert(hz.has_transverse_tape == 1U);
+    assert(hz.transverse_crosses_center == 0U);
+    assert(hz.is_intersection_ahead == 0U); /* Vanishing point outside corridor -> rejected! */
+    assert(hz.is_sharp_corner == 1U);
+
+    printf("PASS\n");
+}
+
+void test_case_15_center_gap_straddle_vs_non_straddle(void) {
+    printf("[Case 15] Center gap straddle condition & segmented union... ");
+
+    /* 1. Left crossbar only reaching x=34 (min_x=5, max_x=34): does NOT straddle [35, 43] */
+    uint16_t left_bar[8] = {
+        5, 25, 34, 25,
+        50, 22, 50, 6
+    };
+    horizon_result_t hz1;
+    compute_front_camera_horizon(left_bar, 2, &hz1);
+    assert(hz1.has_transverse_tape == 1U);
+    assert(hz1.transverse_crosses_center == 0U); /* Does NOT straddle! */
+
+    /* 2. Right crossbar only reaching x=44 (min_x=44, max_x=75): does NOT straddle [35, 43] */
+    uint16_t right_bar[8] = {
+        44, 25, 75, 25,
+        50, 22, 50, 6
+    };
+    horizon_result_t hz2;
+    compute_front_camera_horizon(right_bar, 2, &hz2);
+    assert(hz2.has_transverse_tape == 1U);
+    assert(hz2.transverse_crosses_center == 0U); /* Does NOT straddle! */
+
+    /* 3. Broken / segmented wall union: segment 1 [15, 38], segment 2 [36, 62] at y=25 */
+    uint16_t broken_wall[8] = {
+        15, 25, 38, 25,   /* min=15, max=38: does not individually straddle [35, 43] */
+        36, 25, 62, 25    /* min=36, max=62: does not individually straddle [35, 43] */
+    };
+    horizon_result_t hz3;
+    compute_front_camera_horizon(broken_wall, 2, &hz3);
+    assert(hz3.has_transverse_tape == 1U);
+    assert(hz3.transverse_crosses_center == 1U); /* Union spans [15, 62], crosses center! */
+
+    printf("PASS\n");
+}
+
+void test_case_16_differential_pivot_drag_decoupling(void) {
+    printf("[Case 16] Decoupled differential pivot drag in sharp corner mode... ");
+    sim_car_t car;
+    sim_car_init(&car);
+
+    horizon_result_t hz_corner;
+    memset(&hz_corner, 0, sizeof(hz_corner));
+    hz_corner.is_sharp_corner = 1U;
+
+    steering_result_t sr_straight;
+    memset(&sr_straight, 0, sizeof(sr_straight));
+    sr_straight.found = 2;
+    sr_straight.cte = 0.0f;
+    sr_straight.heading_deg = 0.0f;
+
+    /* A. Wheels straight (|steer| = 0.0 <= 10 deg deadzone):
+       Must reduce speed to SPEED_OUTSIDE_CORNER, but left and right MUST BE EQUAL!
+    */
+    car.filtered_cte = 0.0f;
+    car.filtered_heading = 0.0f;
+    sr_straight.cte = 0.0f;
+    sr_straight.heading_deg = 0.0f;
+    sim_control_tick(&car, &hz_corner, &sr_straight);
+    assert(car.target_speed == SPEED_OUTSIDE_CORNER);
+    assert(car.target_left == SPEED_OUTSIDE_CORNER);
+    assert(car.target_right == SPEED_OUTSIDE_CORNER); /* ZERO yaw torque! */
+
+    /* B. Wheels mild steer (|steer| ~ 6.0 <= 10 deg deadzone):
+       Must still have ZERO differential pivot drag!
+    */
+    car.filtered_heading = 5.0f;
+    sr_straight.heading_deg = 5.0f;
+    sim_control_tick(&car, &hz_corner, &sr_straight);
+    assert(fabsf(car.steer_cmd) <= (float)DIFFERENTIAL_DEADZONE_DEG);
+    assert(car.target_left == SPEED_OUTSIDE_CORNER);
+    assert(car.target_right == SPEED_OUTSIDE_CORNER); /* ZERO yaw torque! */
+
+    /* C. Wheels sharp steer right (steer > 10 deg deadzone):
+       Active differential pivot drag kicks in!
+    */
+    steering_result_t sr_right;
+    memset(&sr_right, 0, sizeof(sr_right));
+    sr_right.found = 2;
+    sr_right.heading_deg = 25.0f;
+    car.filtered_heading = 25.0f;
+    sim_control_tick(&car, &hz_corner, &sr_right);
+    assert(car.steer_cmd > (float)DIFFERENTIAL_DEADZONE_DEG);
+    assert(car.target_left == SPEED_OUTSIDE_CORNER);
+    assert(car.target_right == SPEED_INSIDE_MIN); /* Inside wheel braked to 25%! */
+
+    /* D. Wheels sharp steer left (steer < -10 deg deadzone):
+       Active differential pivot drag on left wheel!
+    */
+    steering_result_t sr_left;
+    memset(&sr_left, 0, sizeof(sr_left));
+    sr_left.found = 2;
+    sr_left.heading_deg = -25.0f;
+    car.filtered_heading = -25.0f;
+    sim_control_tick(&car, &hz_corner, &sr_left);
+    assert(car.steer_cmd < -(float)DIFFERENTIAL_DEADZONE_DEG);
+    assert(car.target_left == SPEED_INSIDE_MIN); /* Inside wheel braked to 25%! */
+    assert(car.target_right == SPEED_OUTSIDE_CORNER);
+
+    printf("PASS\n");
+}
+
+void test_case_17_near_parallel_sensor_jitter_convergence(void) {
+    printf("[Case 17] Near-parallel exit lines with 1-pixel sensor jitter (dy=17 vs dy=18)... ");
+
+    /* Realistic Pixy sensor quantization:
+       Left exit line: (22, 24) to (25, 7) -> dx=3, dy=17 (angle = 10.0 deg)
+       Right exit line: (52, 24) to (55, 6) -> dx=3, dy=18 (angle = 9.46 deg)
+       Notice: 1-pixel difference in length! denom = s_l - s_r = 0.009804 > 1e-3.
+       In unrefined vanishing point math, y_v = -3036, x_v = +562 -> rejected!
+       Refined parallel corridor test recognizes this valid straight exit pair!
+    */
+    uint16_t jitter_vectors[16] = {
+        2, 27, 19, 24,    /* Left crossbar at 10 deg yaw */
+        58, 24, 75, 21,   /* Right crossbar at 10 deg yaw */
+        22, 24, 25, 7,    /* Left exit line: dy=17 */
+        52, 24, 55, 6     /* Right exit line: dy=18 (1-px length jitter) */
+    };
+
+    horizon_result_t hz;
+    compute_front_camera_horizon(jitter_vectors, 4, &hz);
+
+    assert(hz.has_transverse_tape == 1U);
+    assert(hz.transverse_crosses_center == 0U);
+    assert(hz.is_intersection_ahead == 1U); /* MUST detect intersection despite 1-px jitter! */
+    assert(hz.is_sharp_corner == 0U);
+
+    printf("PASS\n");
+}
+
 int main(void) {
     printf("=====================================================\n");
     printf("  RUNNING ADVERSARIAL INTERSECTION & CORNER TEST SUITE\n");
@@ -581,9 +830,16 @@ int main(void) {
     test_case_8_corner_apex_dropout();
     test_case_9_distance_window_scaling();
     test_case_10_dead_end_approach_lines_only();
+    test_case_11_top_camera_chord_and_chassis_rejection();
+    test_case_12_vanishing_point_perspective_convergence();
+    test_case_13_diverging_exit_lines_rejected();
+    test_case_14_vanishing_point_outside_corridor_rejected();
+    test_case_15_center_gap_straddle_vs_non_straddle();
+    test_case_16_differential_pivot_drag_decoupling();
+    test_case_17_near_parallel_sensor_jitter_convergence();
 
     printf("=====================================================\n");
-    printf("  ALL 10 ADVERSARIAL TEST CASES PASSED SUCCESSFULLY!\n");
+    printf("  ALL 17 ADVERSARIAL TEST CASES PASSED SUCCESSFULLY!\n");
     printf("=====================================================\n");
 
     return 0;

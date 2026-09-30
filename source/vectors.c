@@ -62,12 +62,17 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         float dx = x_far - x_near;
         float abs_dx = fabsf(dx);
 
+        /* Chassis Exclusion: tie rod / bumper reflection vectors near vehicle center bottom */
+        if (x_near >= 36.0f && x_near <= 44.0f && y_near >= 45.0f && dy <= 8.0f) {
+            continue;
+        }
+
         /* Stateless transverse tape filtering (ratio test) */
         if (dy <= 0.27f * abs_dx && abs_dx >= 16.0f) {
             out->has_transverse_tape = 1U;
             float min_x = (x_near < x_far) ? x_near : x_far;
             float max_x = (x_near > x_far) ? x_near : x_far;
-            if (min_x <= 46.0f && max_x >= 32.0f) {
+            if (min_x < 35.0f && max_x > 43.0f) {
                 out->transverse_crosses_center = 1U;
             }
             continue; /* Discard from left/right boundary selection */
@@ -79,7 +84,15 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         /* Must have minimum vertical length (reject horizontal crossbars/noise) */
         if (dy < 4.0f) continue;
 
+        /* Diagonal Chord Filter: reject short corner-merged diagonal chords */
+        if (abs_dx >= dy && dy < 10.0f) {
+            continue;
+        }
+
         float angle = atan2f(dx, dy) * (180.0f / M_PI);
+        if (fabsf(angle) > 55.0f && dy < 12.0f) {
+            continue;
+        }
 
         /* Classify: Left of vehicle center */
         if (x_near < (float)PIXY_CENTER_X) {
@@ -208,10 +221,10 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
                 trans_y_far_min = y_far;
             }
 
-            /* Center Gap Test: check if transverse tape enters center band |x - 39| <= 14.0 (x in [25, 53]) */
+            /* Center Gap Test: a transverse wall crosses center only if it actually straddles the centerline */
             float min_x = (x_near < x_far) ? x_near : x_far;
             float max_x = (x_near > x_far) ? x_near : x_far;
-            if (min_x <= 53.0f && max_x >= 25.0f) {
+            if (min_x < 35.0f && max_x > 43.0f) {
                 out->transverse_crosses_center = 1U;
             }
         } else {
@@ -226,42 +239,106 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         }
     }
 
-    /* Pass 2: Forward Exit Pair Test beyond transverse tape */
-    bool has_exit_pair = false;
+    /* Transverse tape union check for segmented/broken walls crossing center */
     for (size_t j = 0; j < count; j++) {
-        if (parsed[j].is_transverse || parsed[j].dy < 3.0f) continue;
-        if (fabsf(parsed[j].angle) > 20.0f) continue;
+        if (!parsed[j].is_transverse) continue;
+        float min_j = (parsed[j].x_near < parsed[j].x_far) ? parsed[j].x_near : parsed[j].x_far;
+        float max_j = (parsed[j].x_near > parsed[j].x_far) ? parsed[j].x_near : parsed[j].x_far;
+        float y_mid_j = (parsed[j].y_near + parsed[j].y_far) * 0.5f;
+        for (size_t k = j + 1; k < count; k++) {
+            if (!parsed[k].is_transverse) continue;
+            float y_mid_k = (parsed[k].y_near + parsed[k].y_far) * 0.5f;
+            if (fabsf(y_mid_j - y_mid_k) <= 6.0f) {
+                float min_k = (parsed[k].x_near < parsed[k].x_far) ? parsed[k].x_near : parsed[k].x_far;
+                float max_k = (parsed[k].x_near > parsed[k].x_far) ? parsed[k].x_near : parsed[k].x_far;
+                /* Check if intervals overlap or touch within 4 pixels */
+                if (min_k <= (max_j + 4.0f) && min_j <= (max_k + 4.0f)) {
+                    float union_min = (min_j < min_k) ? min_j : min_k;
+                    float union_max = (max_j > max_k) ? max_j : max_k;
+                    if (union_min < 35.0f && union_max > 43.0f) {
+                        out->transverse_crosses_center = 1U;
+                    }
+                }
+            }
+        }
+    }
 
-        float x_mid_j = (parsed[j].x_near + parsed[j].x_far) * 0.5f;
-        if (x_mid_j < 15.0f || x_mid_j > 36.0f) continue;
+    /* Pass 2: Forward Exit Pair Test with Vanishing-Point Convergence */
+    bool has_exit_pair = false;
+    if (out->has_transverse_tape) {
+        for (size_t j = 0; j < count; j++) {
+            if (parsed[j].is_transverse || parsed[j].dy < 3.0f) continue;
+            if (fabsf(parsed[j].angle) > 45.0f) continue;
 
-        /* Exit line must extend beyond transverse tape into distance (y_far < trans_y_far_min)
-           and must not start back on the entrance side (y_near <= trans_y_near_max + 3.0f) */
-        if (out->has_transverse_tape) {
+            /* Exit line must extend beyond transverse tape into distance */
             if (parsed[j].y_far >= trans_y_far_min) continue;
-            if (parsed[j].y_near > (trans_y_near_max + 3.0f)) continue;
-        }
+            if (parsed[j].y_near > (trans_y_near_max + 5.0f)) continue;
 
-        for (size_t k = 0; k < count; k++) {
-            if (j == k) continue;
-            if (parsed[k].is_transverse || parsed[k].dy < 3.0f) continue;
-            if (fabsf(parsed[k].angle) > 20.0f) continue;
+            float mid_j = (parsed[j].x_near + parsed[j].x_far) * 0.5f;
 
-            float x_mid_k = (parsed[k].x_near + parsed[k].x_far) * 0.5f;
-            if (x_mid_k < 42.0f || x_mid_k > 65.0f) continue;
+            for (size_t k = j + 1; k < count; k++) {
+                if (parsed[k].is_transverse || parsed[k].dy < 3.0f) continue;
+                if (fabsf(parsed[k].angle) > 45.0f) continue;
 
-            if (out->has_transverse_tape) {
                 if (parsed[k].y_far >= trans_y_far_min) continue;
-                if (parsed[k].y_near > (trans_y_near_max + 3.0f)) continue;
-            }
+                if (parsed[k].y_near > (trans_y_near_max + 5.0f)) continue;
 
-            float sep = x_mid_k - x_mid_j;
-            if (sep >= 22.0f && sep <= 48.0f) {
-                has_exit_pair = true;
-                break;
+                float mid_k = (parsed[k].x_near + parsed[k].x_far) * 0.5f;
+
+                /* Order left and right: idx_left on left, idx_right on right */
+                size_t idx_left  = (mid_j <= mid_k) ? j : k;
+                size_t idx_right = (mid_j <= mid_k) ? k : j;
+                float left_mid   = (mid_j <= mid_k) ? mid_j : mid_k;
+                float right_mid  = (mid_j <= mid_k) ? mid_k : mid_j;
+
+                float sep = right_mid - left_mid;
+                float pair_center = (left_mid + right_mid) * 0.5f;
+
+                /* Separation between 20.0f and 45.0f, pair midpoint in [24.0f, 54.0f] */
+                if (sep < 20.0f || sep > 45.0f) continue;
+                if (pair_center < 24.0f || pair_center > 54.0f) continue;
+
+                /* Vanishing-Point Convergence Test:
+                 * Line equation: x(y) = x_near + s * (y_near - y)
+                 * At y = 0: x(0) = x_near + s * y_near
+                 */
+                float s_l = parsed[idx_left].dx / parsed[idx_left].dy;
+                float s_r = parsed[idx_right].dx / parsed[idx_right].dy;
+                float x0_l = parsed[idx_left].x_near + s_l * parsed[idx_left].y_near;
+                float x0_r = parsed[idx_right].x_near + s_r * parsed[idx_right].y_near;
+
+                float denom = s_l - s_r;
+                float x_v, y_v;
+                float ang_l = fabsf(parsed[idx_left].angle);
+                float ang_r = fabsf(parsed[idx_right].angle);
+
+                /* Forward diverging lines (s_l < s_r) cannot form a converging exit pair */
+                if (denom < -1e-3f) {
+                    continue;
+                }
+
+                if (denom < 0.10f) {
+                    /* Nearly parallel lines: converge at infinity, valid if forward-facing corridor */
+                    if (ang_l <= 20.0f && ang_r <= 20.0f) {
+                        y_v = -999.0f;
+                        x_v = pair_center;
+                    } else {
+                        continue;
+                    }
+                } else {
+                    y_v = (x0_l - x0_r) / denom;
+                    /* For far vanishing points above the image, use horizon center to prevent lateral divergence */
+                    x_v = (y_v >= -60.0f) ? (x0_l - s_l * y_v) : ((x0_l + x0_r) * 0.5f);
+                }
+
+                /* Convergence: vanishing point above image (Y_v <= 5.0f) and in [15.0f, 60.0f] */
+                if (y_v <= 5.0f && x_v >= 15.0f && x_v <= 60.0f) {
+                    has_exit_pair = true;
+                    break;
+                }
             }
+            if (has_exit_pair) break;
         }
-        if (has_exit_pair) break;
     }
 
     /* Strategic Decision */
