@@ -84,6 +84,7 @@ int main(void) {
     float    applied_speed_right      = g_params.speed_straight;
     float    steer_cmd                = 0.0f;
     uint32_t s_rollout_ticks          = 0;
+    uint32_t s_off_track_ticks        = 0;
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -116,6 +117,7 @@ int main(void) {
                 applied_speed_right  = g_params.speed_straight;
                 steer_cmd            = 0.0f;
                 s_rollout_ticks      = 0;
+                s_off_track_ticks    = 0;
 
                 if (motor_test_is_active()) {
                     motor_test_tick();
@@ -154,6 +156,25 @@ int main(void) {
             }
 
             s_rollout_ticks++;
+
+            /* --- Failsafe Guard: Emergency stop if off-track for 2.5 seconds (125 ticks @ 50Hz) --- */
+            if (sr.found == 0) {
+                s_off_track_ticks++;
+                if (s_off_track_ticks >= (uint32_t)OFF_TRACK_FAILSAFE_TICKS) {
+                    g_params.state      = STATE_IDLE;
+                    HbridgeBrake(&g_hbridge);
+                    Steer(g_params.steering_offset);
+                    applied_speed_left  = 0.0f;
+                    applied_speed_right = 0.0f;
+                    steer_cmd           = 0.0f;
+                    s_off_track_ticks   = 0;
+                    PRINTF("FAILSAFE: Off track for 2.5s -> STOPPED\r\n");
+                    esp_printf("ALERT: FAILSAFE OFF TRACK STOP\r\n");
+                    continue;
+                }
+            } else {
+                s_off_track_ticks = 0;
+            }
 
             /* --- 3. Steering Calculation --- */
             /* A. Top Camera Centering between closest lines */

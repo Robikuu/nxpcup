@@ -17,7 +17,7 @@
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit
 #define STEERING_LIMIT_LEFT         -65.0f     // Physical servo left mechanical limit
-#define STEERING_OFFSET              10.00f    // Straight-line trim offset (trimmed to eliminate rightward lane drift)
+#define STEERING_OFFSET              0.00f    // Straight-line trim offset (trimmed to eliminate rightward lane drift)
 
 // Relative command limits (steer_cmd relative to center trim)
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
@@ -96,6 +96,7 @@
 #define LINE_LOST_DEBOUNCE_TICKS      3U       // 3 ticks (60ms) optical dropout debounce before entering LINE_LOST
 #define LINE_LOST_BRAKE_TICKS         18U      // 18 ticks (360ms) coast window before active braking
 #define LINE_LOST_STOP_TICKS          50U      // 50 ticks (1000ms) before full emergency stop
+#define OFF_TRACK_FAILSAFE_TICKS     125U      // 125 ticks (2.5 seconds @ 50Hz) off-track emergency stop
 #define LINE_REACQUIRE_TICKS          3U       // 3 consecutive valid frames required to return to NORMAL
 
 // ---- Geometric Boundary Validation ----
