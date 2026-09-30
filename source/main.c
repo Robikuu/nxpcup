@@ -195,17 +195,17 @@ int main(void) {
             }
 
             /* --- Corner Priority Preemption & Tactical Intersection State --- */
-            if (horizon.is_sharp_corner || sr.transverse_crosses_center) {
-                /* Corner always preempts intersection immediately! */
+            if (sr.transverse_crosses_center || (horizon.is_sharp_corner && horizon.transverse_crosses_center)) {
+                /* True corner outer wall crossing center always preempts intersection immediately! */
                 s_intersection_ahead      = 0;
                 s_intersection_timer      = 0;
                 s_intersection_gap_ticks  = 0;
                 s_was_in_intersection_gap = 0;
                 s_reacquire_ticks         = 0; /* Clear reacquisition slew limit for immediate cornering response */
-            } else if (horizon.is_intersection_ahead) {
-                /* Intersection Latching & Lifetime: refresh persistence timer (~15 ticks) */
+            } else if (horizon.is_intersection_ahead || (sr.has_transverse_tape && !sr.transverse_crosses_center)) {
+                /* Intersection Latching & Lifetime: latch for 20 ticks (~400ms = 48cm at 1.2m/s) */
                 s_intersection_ahead = 1;
-                s_intersection_timer = 15;
+                s_intersection_timer = 20;
             } else if (s_intersection_timer > 0) {
                 s_intersection_timer--;
                 if (s_intersection_timer == 0 && s_intersection_gap_ticks == 0) {
@@ -213,8 +213,34 @@ int main(void) {
                 }
             }
 
-            /* --- Blind Gap Policy (sr.found == 0) & Failsafe Guard --- */
-            if (sr.found == 0) {
+            /* --- Blind Gap Policy & Intersection Transit Guard --- */
+            if (s_intersection_ahead) {
+                s_was_in_intersection_gap = 1;
+                s_intersection_gap_ticks++;
+
+                /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed, 30) * 50 */
+                float current_spd = fmaxf(applied_speed_left, applied_speed_right);
+                uint32_t gap_window = (uint32_t)(1.5f * 25.0f / fmaxf(current_spd, 30.0f) * 50.0f);
+                if (s_intersection_gap_ticks > gap_window) {
+                    s_intersection_ahead     = 0;
+                    s_intersection_gap_ticks = 0;
+                    s_intersection_timer     = 0;
+                }
+
+                /* Decay CTE and heading across the intersection gap */
+                filtered_cte     *= 0.70f;
+                filtered_heading *= 0.70f;
+
+                /* Early exit: once car has crossed at least 5 ticks (100ms) and reacquires a straight forward lane pair */
+                if (s_intersection_gap_ticks >= 5 && sr.found == 2 &&
+                    fabsf(sr.heading_deg) <= 15.0f && fabsf(sr.cte) <= 15.0f) {
+                    s_reacquire_ticks         = 3;
+                    s_was_in_intersection_gap = 0;
+                    s_intersection_gap_ticks  = 0;
+                    s_intersection_ahead      = 0;
+                    s_intersection_timer      = 0;
+                }
+            } else if (sr.found == 0) {
                 s_off_track_ticks++;
                 if (s_off_track_ticks >= (uint32_t)OFF_TRACK_FAILSAFE_TICKS) {
                     g_params.state      = STATE_IDLE;
@@ -228,24 +254,6 @@ int main(void) {
                     PRINTF("FAILSAFE: Off track for 2.5s -> STOPPED\r\n");
                     esp_printf("ALERT: FAILSAFE OFF TRACK STOP\r\n");
                     continue;
-                }
-
-                if (s_intersection_ahead) {
-                    /* Intersection Blind Gap Active */
-                    s_was_in_intersection_gap = 1;
-                    s_intersection_gap_ticks++;
-
-                    /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed, 30) * 50 */
-                    float current_spd = fmaxf(applied_speed_left, applied_speed_right);
-                    uint32_t gap_window = (uint32_t)(1.5f * 25.0f / fmaxf(current_spd, 30.0f) * 50.0f);
-                    if (s_intersection_gap_ticks > gap_window) {
-                        s_intersection_ahead     = 0;
-                        s_intersection_gap_ticks = 0;
-                    }
-
-                    /* Decay CTE and heading across the intersection gap */
-                    filtered_cte     *= 0.70f;
-                    filtered_heading *= 0.70f;
                 }
                 /* If s_intersection_ahead == 0: Corner apex dropout -> zero decay! */
             } else {
@@ -262,7 +270,13 @@ int main(void) {
 
             /* --- 3. Steering Calculation --- */
             float steer_top = 0.0f;
-            if (sr.found == 0 && !s_intersection_ahead) {
+            if (s_intersection_ahead) {
+                /* INTERSECTION MODE: Hold steering straight (+-3.0 deg), zero feedforward */
+                steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * filtered_heading);
+                steer_cmd = steer_top;
+                if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
+                if (steer_cmd < -3.0f) steer_cmd = -3.0f;
+            } else if (sr.found == 0) {
                 /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
                 steer_cmd = last_steer_cmd;
                 steer_top = last_steer_cmd;
@@ -273,12 +287,6 @@ int main(void) {
                 steer_cmd = steer_top;
                 if (horizon.is_sharp_corner) {
                     steer_cmd += (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
-                }
-
-                if (s_intersection_ahead && sr.found == 0) {
-                    /* Intersection blind gap: clamp held steering to +-3.0 deg immediately after PID calculation */
-                    if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
-                    if (steer_cmd < -3.0f) steer_cmd = -3.0f;
                 }
 
                 /* Re-Acquisition Slew-Rate Limiter: <= 4.0 deg/tick for 3 ticks */
@@ -309,7 +317,12 @@ int main(void) {
             float target_left  = target_speed;
             float target_right = target_speed;
 
-            if (horizon.is_sharp_corner) {
+            if (s_intersection_ahead) {
+                /* INTERSECTION MODE: 100% full straight drive, zero differential yaw kick! */
+                target_speed = g_params.speed_straight;
+                target_left  = target_speed;
+                target_right = target_speed;
+            } else if (horizon.is_sharp_corner) {
                 /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot ONLY if steering past deadzone */
                 target_speed = g_params.speed_outside_corner;
                 if (fabsf(steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
@@ -328,7 +341,7 @@ int main(void) {
                     target_right = target_speed;
                 }
             } else {
-                /* STRAIGHT / INTERSECTION / MILD CURVE MODE: 100% full throttle */
+                /* STRAIGHT / MILD CURVE MODE: 100% full throttle */
                 target_speed = g_params.speed_straight;
                 float abs_steer = fabsf(steer_cmd);
                 if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
