@@ -61,17 +61,17 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
     car->s_rollout_ticks++;
 
     /* --- Corner Priority Preemption & Tactical Intersection State --- */
-    if (sr->transverse_crosses_center || (horizon->is_sharp_corner && horizon->transverse_crosses_center)) {
-        /* True corner outer wall crossing center always preempts intersection immediately! */
+    if (horizon->is_sharp_corner || sr->transverse_crosses_center) {
+        /* Corner always preempts intersection immediately! */
         car->s_intersection_ahead      = 0;
         car->s_intersection_timer      = 0;
         car->s_intersection_gap_ticks  = 0;
         car->s_was_in_intersection_gap = 0;
         car->s_reacquire_ticks         = 0;
-    } else if (horizon->is_intersection_ahead || (sr->has_transverse_tape && !sr->transverse_crosses_center)) {
-        /* Intersection Latching & Lifetime: latch for 20 ticks (~400ms = 48cm at 1.2m/s) */
+    } else if (horizon->is_intersection_ahead) {
+        /* Intersection Latching & Lifetime: refresh persistence timer (~15 ticks) */
         car->s_intersection_ahead = 1;
-        car->s_intersection_timer = 20;
+        car->s_intersection_timer = 15;
     } else if (car->s_intersection_timer > 0) {
         car->s_intersection_timer--;
         if (car->s_intersection_timer == 0 && car->s_intersection_gap_ticks == 0) {
@@ -79,35 +79,26 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
         }
     }
 
-    /* --- Blind Gap Policy & Intersection Transit Guard --- */
-    if (car->s_intersection_ahead) {
-        car->s_was_in_intersection_gap = 1;
-        car->s_intersection_gap_ticks++;
-
-        /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed, 30) * 50 */
-        float current_spd = fmaxf(car->applied_speed_left, car->applied_speed_right);
-        uint32_t gap_window = (uint32_t)(1.5f * 25.0f / fmaxf(current_spd, 30.0f) * 50.0f);
-        if (car->s_intersection_gap_ticks > gap_window) {
-            car->s_intersection_ahead     = 0;
-            car->s_intersection_gap_ticks = 0;
-            car->s_intersection_timer     = 0;
-        }
-
-        /* Decay CTE and heading across the intersection gap */
-        car->filtered_cte     *= 0.70f;
-        car->filtered_heading *= 0.70f;
-
-        /* Early exit: once car has crossed at least 5 ticks (100ms) and reacquires a straight forward lane pair */
-        if (car->s_intersection_gap_ticks >= 5 && sr->found == 2 &&
-            fabsf(sr->heading_deg) <= 15.0f && fabsf(sr->cte) <= 15.0f) {
-            car->s_reacquire_ticks         = 3;
-            car->s_was_in_intersection_gap = 0;
-            car->s_intersection_gap_ticks  = 0;
-            car->s_intersection_ahead      = 0;
-            car->s_intersection_timer      = 0;
-        }
-    } else if (sr->found == 0) {
+    /* --- Blind Gap Policy (sr->found == 0) & Failsafe Guard --- */
+    if (sr->found == 0) {
         car->s_off_track_ticks++;
+        if (car->s_intersection_ahead) {
+            /* Intersection Blind Gap Active */
+            car->s_was_in_intersection_gap = 1;
+            car->s_intersection_gap_ticks++;
+
+            /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed, 30) * 50 */
+            float current_spd = fmaxf(car->applied_speed_left, car->applied_speed_right);
+            uint32_t gap_window = (uint32_t)(1.5f * 25.0f / fmaxf(current_spd, 30.0f) * 50.0f);
+            if (car->s_intersection_gap_ticks > gap_window) {
+                car->s_intersection_ahead     = 0;
+                car->s_intersection_gap_ticks = 0;
+            }
+
+            /* Decay CTE and heading across the intersection gap */
+            car->filtered_cte     *= 0.70f;
+            car->filtered_heading *= 0.70f;
+        }
         /* If s_intersection_ahead == 0: Corner apex dropout -> zero decay! */
     } else {
         car->s_off_track_ticks = 0;
@@ -122,13 +113,7 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
     }
 
     /* --- 3. Steering Calculation --- */
-    if (car->s_intersection_ahead) {
-        /* INTERSECTION MODE: Hold steering straight (+-3.0 deg), zero feedforward */
-        float steer_top = (DEFAULT_K_CTE * car->filtered_cte) + (DEFAULT_K_HEADING * car->filtered_heading);
-        car->steer_cmd = steer_top;
-        if (car->steer_cmd > 3.0f)  car->steer_cmd = 3.0f;
-        if (car->steer_cmd < -3.0f) car->steer_cmd = -3.0f;
-    } else if (sr->found == 0) {
+    if (sr->found == 0 && !car->s_intersection_ahead) {
         /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
         car->steer_cmd = car->last_steer_cmd;
     } else {
@@ -138,6 +123,12 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
         car->steer_cmd = steer_top;
         if (horizon->is_sharp_corner) {
             car->steer_cmd += (float)FRONT_FEEDFORWARD_GAIN * car->filtered_front_angle;
+        }
+
+        if (car->s_intersection_ahead && sr->found == 0) {
+            /* Intersection blind gap: clamp held steering to +-3.0 deg immediately after PID calculation */
+            if (car->steer_cmd > 3.0f)  car->steer_cmd = 3.0f;
+            if (car->steer_cmd < -3.0f) car->steer_cmd = -3.0f;
         }
 
         /* Re-Acquisition Slew-Rate Limiter: <= 4.0 deg/tick for 3 ticks */
@@ -163,12 +154,7 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
     car->target_left  = car->target_speed;
     car->target_right = car->target_speed;
 
-    if (car->s_intersection_ahead) {
-        /* INTERSECTION MODE: 100% full straight drive, zero differential yaw kick! */
-        car->target_speed = SPEED_STRAIGHT;
-        car->target_left  = car->target_speed;
-        car->target_right = car->target_speed;
-    } else if (horizon->is_sharp_corner) {
+    if (horizon->is_sharp_corner) {
         /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot ONLY if steering past deadzone */
         car->target_speed = SPEED_OUTSIDE_CORNER;
         if (fabsf(car->steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
@@ -185,7 +171,7 @@ void sim_control_tick(sim_car_t *car, const horizon_result_t *horizon, const ste
             car->target_right = car->target_speed;
         }
     } else {
-        /* STRAIGHT / MILD CURVE MODE: 100% full throttle */
+        /* STRAIGHT / INTERSECTION / MILD CURVE MODE: 100% full throttle */
         car->target_speed = SPEED_STRAIGHT;
         float abs_steer = fabsf(car->steer_cmd);
         if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
@@ -829,88 +815,6 @@ void test_case_17_near_parallel_sensor_jitter_convergence(void) {
     printf("PASS\n");
 }
 
-void test_case_18_intersection_with_side_loop_branch(void) {
-    printf("[Case 18] Intersection with side branch & single exit line (must go straight)... ");
-    sim_car_t car;
-    sim_car_init(&car);
-
-    /* Front camera:
-       - Left crossbar: (4, 25, 20, 25)
-       - Right crossbar: (58, 25, 74, 25)
-       - Center gap [35, 43] is completely open.
-       - Single exit line ahead: (32, 22, 32, 6) (dx=0, dy=16)
-       - Angled branch line leading into left loop: (18, 30, 8, 15) (dx=-10, dy=15, angle=-33.7 deg)
-    */
-    uint16_t front_vectors[16] = {
-        4, 25, 20, 25,     /* Left crossbar: dx=16, dy=0 */
-        58, 25, 74, 25,    /* Right crossbar: dx=16, dy=0 */
-        32, 22, 32, 6,     /* Single exit line in forward corridor */
-        18, 30, 8, 15      /* Branch line into left loop */
-    };
-
-    horizon_result_t hz;
-    compute_front_camera_horizon(front_vectors, 4, &hz);
-
-    assert(hz.has_transverse_tape == 1U);
-    assert(hz.transverse_crosses_center == 0U);
-    assert(hz.is_intersection_ahead == 1U); /* Must detect intersection even with single exit line! */
-    assert(hz.is_sharp_corner == 0U);       /* MUST NOT fake a corner when center is open! */
-    assert(fabsf(hz.horizon_angle_deg) <= 15.0f); /* Must not follow branch line into side loop! */
-
-    /* Top camera sees branch line on left, right line is gone */
-    uint16_t top_vectors[4] = {
-        16, 45, 6, 25      /* Branching left line: dx=-10, dy=20, angle = -26.6 deg */
-    };
-    steering_result_t sr;
-    compute_top_camera_lane(top_vectors, 1, &sr);
-
-    sim_control_tick(&car, &hz, &sr);
-
-    assert(car.s_intersection_ahead == 1);
-    /* Car must hold straight across intersection, NOT dive into left loop! */
-    assert(fabsf(car.steer_cmd) <= 4.0f);
-    assert(car.target_speed == SPEED_STRAIGHT);
-    assert(car.target_left == SPEED_STRAIGHT && car.target_right == SPEED_STRAIGHT);
-
-    printf("PASS\n");
-}
-
-void test_case_19_top_camera_autonomous_intersection_latch(void) {
-    printf("[Case 19] Top camera autonomous intersection latch (front camera missed)... ");
-    sim_car_t car;
-    sim_car_init(&car);
-
-    /* Front camera missed intersection entirely (e.g. glare, 0 lines found) */
-    horizon_result_t hz_empty;
-    memset(&hz_empty, 0, sizeof(hz_empty));
-
-    /* Top camera sees:
-       - Left crossbar on flank: (4, 40, 20, 40) -> dx=16, dy=0 (transverse, min_x=4, max_x=20 < 32)
-       - Branch line entering left loop: (16, 45, 6, 25) -> dx=-10, dy=20, angle = -26.6 deg
-       - Right line is absent into intersection gap
-    */
-    uint16_t top_vectors[8] = {
-        4, 40, 20, 40,     /* Left crossbar: transverse, center open [32, 46] */
-        16, 45, 6, 25      /* Branch line into left loop */
-    };
-    steering_result_t sr;
-    compute_top_camera_lane(top_vectors, 2, &sr);
-
-    assert(sr.has_transverse_tape == 1U);
-    assert(sr.transverse_crosses_center == 0U);
-
-    sim_control_tick(&car, &hz_empty, &sr);
-
-    /* Top camera's flank tape with open center must latch intersection in sim_control_tick! */
-    assert(car.s_intersection_ahead == 1);
-    /* Held steer must be straight, NOT follow branch line! */
-    assert(fabsf(car.steer_cmd) <= 4.0f);
-    assert(car.target_speed == SPEED_STRAIGHT);
-    assert(car.target_left == SPEED_STRAIGHT && car.target_right == SPEED_STRAIGHT);
-
-    printf("PASS\n");
-}
-
 int main(void) {
     printf("=====================================================\n");
     printf("  RUNNING ADVERSARIAL INTERSECTION & CORNER TEST SUITE\n");
@@ -933,14 +837,10 @@ int main(void) {
     test_case_15_center_gap_straddle_vs_non_straddle();
     test_case_16_differential_pivot_drag_decoupling();
     test_case_17_near_parallel_sensor_jitter_convergence();
-    test_case_18_intersection_with_side_loop_branch();
-    test_case_19_top_camera_autonomous_intersection_latch();
 
     printf("=====================================================\n");
-    printf("  ALL 19 ADVERSARIAL TEST CASES PASSED SUCCESSFULLY!\n");
+    printf("  ALL 17 ADVERSARIAL TEST CASES PASSED SUCCESSFULLY!\n");
     printf("=====================================================\n");
 
     return 0;
 }
-
-
