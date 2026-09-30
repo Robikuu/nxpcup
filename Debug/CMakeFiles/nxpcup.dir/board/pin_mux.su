@@ -2,4 +2,4 @@ C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_clock.h:1496:20:CLOCK_Enabl
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_port.h:360:20:PORT_SetPinConfig	32	static
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_port.h:463:20:PORT_SetPinMux	24	static
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/pin_mux.c:38:6:BOARD_InitBootPins	8	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/pin_mux.c:77:6:BOARD_InitPins	32	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/pin_mux.c:79:6:BOARD_InitPins	32	static

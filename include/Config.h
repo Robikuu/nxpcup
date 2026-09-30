@@ -17,36 +17,36 @@
 
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit
-#define STEERING_LIMIT_LEFT         -65.0f     // Physical servo left mechanical limit
-#define STEERING_OFFSET              12.5f     // Straight-line trim offset (trimmed to eliminate rightward lane drift)
+#define STEERING_LIMIT_LEFT         -85.0f     // Physical servo left mechanical limit
+#define STEERING_OFFSET              0.0f     // Straight-line trim offset (trimmed to eliminate rightward lane drift)
 
 // Relative command limits (steer_cmd relative to center trim)
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
 
 // ---- Wheel Speeds & Asymmetric Differential Drag (Testing & Race Profile) ----
-#define SPEED_STRAIGHT               60.0f     // Straight line testing speed (%) (reduced from 100% to decouple steering from traction/lag)
-#define SPEED_OUTSIDE_CORNER         48.0f     // Calibrated apex outside wheel drive (%) (provides decisive pre-braking from 60%)
-#define SPEED_INSIDE_MIN             38.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_STRAIGHT               100.0f     // Straight line testing speed (%) (reduced from 100% to decouple steering from traction/lag)
+#define SPEED_OUTSIDE_CORNER         43.0f     // Calibrated apex outside wheel drive (%) (provides decisive pre-braking from 60%)
+#define SPEED_INSIDE_MIN             22.0f     // Inside wheel pivot anchor duty (%)
 #define SPEED_CORNER_AVG_MIN         ((SPEED_OUTSIDE_CORNER + SPEED_INSIDE_MIN) * 0.5f) // 43.0%
 
 #define SPEED_RIGHT                  SPEED_STRAIGHT
 #define SPEED_LEFT                   SPEED_STRAIGHT
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              25.0f     // Rapid pre-braking ramp (~60ms from 100% to 58% at 12.6V)
-#define ACCEL_RAMP_STEP              18.0f     // Crisp corner exit acceleration (~100ms to 100%, maintains front tire grip)
+#define DECEL_RAMP_STEP              45.0f     // Decisive threshold pre-braking ramp into corners
+#define ACCEL_RAMP_STEP              25.0f     // Fast corner-exit acceleration (~48ms from corner speed to straight speed)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
 #define REVERSAL_DECEL_STEP          18.0f     // Rapidly locks new inside wheel into pivot drag
 #define YAW_CONFLICT_DEADBAND        3.0f      // Steer angle deadband to trigger yaw conflict logic
-#define DIFFERENTIAL_DEADZONE_DEG    3.5f      // Steer angle deadzone below which zero differential drag applies (crisp turn-in bite)
+#define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies (crisp turn-in bite)
 
 // ---- Corner Urgency & Predictive Lookahead Gating ----
 #define CTE_URGENCY_PX               24.0f     // |filtered_cte| (px) at which corner gains engage (prevents straight hunting)
 #define CORNER_URGENCY_STREAK        1         // Immediate engagement on rising corner urgency
-#define STEER_FULL_BRAKE_DEG         45.0f     // Steer angle (deg) for 100% pivot drag (wider ramp, smoother chicane transitions)
+#define STEER_FULL_BRAKE_DEG         30.0f     // Steer angle (deg) for 100% pivot drag (wider ramp, smoother chicane transitions)
 #define HEADING_FULL_BRAKE_DEG       22.0f     // Heading angle (deg) for full corner intensity scaling
 #define APEX_CUT_RATIO               0.20f     // Fraction of half-lane-width to shift target inside corners (0.0=center, 0.30=aggressive)
 
@@ -59,26 +59,26 @@
 #define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
 #define STRAIGHT_SANITY_HEADING_MAX_DEG 4.0f   // Max heading angle (deg) to confirm vehicle is parallel to track
 #define STRAIGHT_SANITY_CTE_MAX_PX      10.0f  // Max CTE (px) to confirm vehicle is safely within straight lane bounds
-#define LOOKAHEAD_DEADBAND_PX        3.5f      // Neutral straightaway curvature margin (+/- 3.5px)
-#define LOOKAHEAD_FULL_URGENCY_PX    12.0f     // Lateral offset/curvature for 100% lookahead urgency
+#define LOOKAHEAD_DEADBAND_PX        5.0f      // Neutral straightaway curvature margin — absorbs perspective convergence noise
+#define LOOKAHEAD_FULL_URGENCY_PX    13.0f     // Lateral offset/curvature for 100% lookahead urgency (wider range, smoother ramp)
 #define LOOKAHEAD_HYSTERESIS_ENTER_PX 7.5f     // Lookahead offset threshold to trigger DRIVE_TURNING
 #define LOOKAHEAD_HYSTERESIS_EXIT_PX  4.5f     // Lookahead offset threshold to return to DRIVE_FORWARD
-#define LOOKAHEAD_DROPOUT_HOLD_TICKS 3U        // 3 ticks (60ms) hold-last-valid window for optical flicker
+#define LOOKAHEAD_DROPOUT_HOLD_TICKS  3U        // 3 ticks (60ms) hold-last-valid window for optical flicker
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
-#define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    2.60f     // Crisp cornering authority (decisive bite into 90 deg turns)
-#define KD_STRAIGHT                  0.180f    // Lateral velocity damping
-#define KD_CORNER                    0.180f    // Lateral velocity damping
-#define DEFAULT_KI                   0.0f
-#define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
+#define KP_STRAIGHT                  0.50f     // Strong straight-line centering (eliminates drift that triggers governor)
+#define KP_CORNER                    2.70f     // Cornering authority (2:1 ratio — smooth gain transitions)
+#define KD_STRAIGHT                  0.120f    // Straight damping (now effective — D-term phase is correct after cascaded filter fix)
+#define KD_CORNER                    0.180f    // Corner damping (lower — allows faster turn-in bite)
+#define DEFAULT_KI                   0.0f     // Small integral to eliminate steady-state CTE drift on straights
+#define DEFAULT_ALPHA                0.250f     // Low-pass filter coefficient on derivative term
 #define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) -> 13.0 deg/tick
 
 // ---- Error Weights & Decoupled Feedforward ----
-#define DEFAULT_K_CTE                0.60f     // Calibrated CTE weight (strong centering authority)
-#define DEFAULT_K_HEADING            1.70f     // Direct base camera heading feedforward into curves (strong turn-in bite)
-#define DEFAULT_K_LOOKAHEAD          0.35f     // Predictive turn-in feedforward from front camera (bites 40-60ms early)
-#define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
+#define DEFAULT_K_CTE                0.50f     // Tight CTE weight — fast centering reduces heading drift that slows straight speed
+#define DEFAULT_K_HEADING            0.9f     // Direct base camera heading feedforward into curves (strong turn-in bite)
+#define DEFAULT_K_LOOKAHEAD          0.35f     // Predictive turn-in feedforward from front camera (proven smooth baseline)
+#define HEADING_DEADBAND_DEG         4.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
@@ -98,7 +98,7 @@
 #define MACRO_STATE_LINE_LOST        2
 
 // ---- Continuous Curvature Governor (Noise Deadbands & Saturation) ----
-#define GOVERNOR_HEADING_DEADBAND_DEG 2.5f     // Noise floor below which base heading curvature is 0.0
+#define GOVERNOR_HEADING_DEADBAND_DEG 5.0f     // Noise floor — absorbs ±3-4° heading jitter on straights from CTE corrections
 #define GOVERNOR_HEADING_MAX_DEG      25.0f    // Heading angle corresponding to 100% corner intensity
 #define GOVERNOR_CURVATURE_DEADBAND_PX 4.0f    // Noise floor below which front lookahead mid_dx is 0.0
 #define GOVERNOR_CURVATURE_MAX_PX     14.0f    // Horizon lateral curvature displacement for 100% urgency

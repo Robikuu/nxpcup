@@ -1,2 +1,5 @@
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:16:6:vector_filtering	128	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:109:19:compute_steering_error	200	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:21:6:reset_steering_tracking	4	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:33:6:vector_filtering	752	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:256:19:compute_steering_error	160	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:390:21:compute_lookahead_trajectory	904	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/source/vectors.c:683:21:compute_lookahead_curvature	952	static

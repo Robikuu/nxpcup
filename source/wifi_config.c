@@ -236,7 +236,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in\r\n");
+        send_ack("Commands: start, stop, steer, drive [0/1], shadow [0/1], motor_left, motor_right, version, status, kp_straight, kp_corner, kd_straight, kd_corner, ki, alpha, k_cte, k_heading, k_lookahead, speed_straight, speed_outside, speed_inside, steering_offset, accel_ramp, decel_ramp\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

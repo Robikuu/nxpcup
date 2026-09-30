@@ -231,11 +231,14 @@ int main(void) {
                     }
                 }
 
-                /* Asymmetric urgency filter: fast attack into corners, slow decay to prevent optical flicker acceleration surges */
+                /* Asymmetric urgency filter: fast attack into corners, adaptive decay based on straight confirmation */
                 if (g_traj.lookahead_urgency >= lookahead_turn_factor) {
                     lookahead_turn_factor = 0.80f * g_traj.lookahead_urgency + 0.20f * lookahead_turn_factor;
                 } else {
-                    lookahead_turn_factor = 0.15f * g_traj.lookahead_urgency + 0.85f * lookahead_turn_factor;
+                    /* Fast decay when top camera confirms straight — prevents residual curve urgency from throttling straight speed */
+                    bool top_confirms_straight = (fabsf(filtered_heading) < 5.0f && fabsf(filtered_cte) < 10.0f);
+                    float decay_alpha = top_confirms_straight ? 0.40f : 0.15f;
+                    lookahead_turn_factor = decay_alpha * g_traj.lookahead_urgency + (1.0f - decay_alpha) * lookahead_turn_factor;
                 }
             } else {
                 s_front_dropout_ticks++;
@@ -399,21 +402,31 @@ int main(void) {
                     if (k_base > 1.0f) k_base = 1.0f;
                 }
 
-                float k_front = lookahead_turn_factor * 1.25f;
+                float k_front = lookahead_turn_factor;
                 if (k_front > 1.0f) k_front = 1.0f;
 
                 kappa = (k_base > k_front) ? k_base : k_front;
                 if (kappa > 1.0f) kappa = 1.0f;
 
-                /* B. Continuous Target Speed */
-                target_speed = g_params.speed_straight - kappa * (g_params.speed_straight - g_params.speed_outside_corner);
-                if (s_blend_weight < 0.30f && target_speed > (float)BLEND_FALLBACK_SPEED_CAP) {
+                /* B. Progressive Threshold Speed Governor:
+                 * Keeps the car pinned at 100% flat-out throttle across the straightaway.
+                 * Absorbs distant horizon curvature (kappa <= 0.20) without lifting throttle.
+                 * Applies progressive quadratic deceleration into the braking zone. */
+                float speed_kappa = 0.0f;
+                if (kappa > 0.20f) {
+                    float norm_k = (kappa - 0.20f) / 0.80f;
+                    speed_kappa = norm_k * norm_k; // Quadratic progressive profile
+                }
+                target_speed = g_params.speed_straight - speed_kappa * (g_params.speed_straight - g_params.speed_outside_corner);
+                if (s_blend_weight < 0.30f && kappa > 0.15f && target_speed > (float)BLEND_FALLBACK_SPEED_CAP) {
                     target_speed = (float)BLEND_FALLBACK_SPEED_CAP;
                 }
 
                 /* C. Dynamic PID Gain Scheduling (Straightaway vs Corner Regimes) */
-                steer_pid.kp = g_params.kp_straight + kappa * (g_params.kp_corner - g_params.kp_straight);
-                steer_pid.kd = g_params.kd_straight + kappa * (g_params.kd_corner - g_params.kd_straight);
+                steer_pid.kp    = g_params.kp_straight + kappa * (g_params.kp_corner - g_params.kp_straight);
+                steer_pid.kd    = g_params.kd_straight + kappa * (g_params.kd_corner - g_params.kd_straight);
+                steer_pid.ki    = g_params.ki;
+                steer_pid.alpha = g_params.alpha;
 
                 /* D. Decoupled Steering Authority */
                 float effective_h = 0.0f;
@@ -435,9 +448,14 @@ int main(void) {
                     lookahead_ff = -15.0f;
                 }
 
-                /* F. PID CTE Centering Authority & Reseed */
+                /* F. PID CTE Centering Authority & Reseed
+                 * IMPORTANT: PID receives RAW sr.cte, NOT filtered_cte.
+                 * Feeding pre-filtered CTE into the PID cascades two low-pass filters
+                 * on the derivative path, introducing >90° phase lag at ≥5Hz which
+                 * INVERTS the D-term from damping into oscillation excitation.
+                 * The PID's own derivative filter (alpha) is the ONLY filter needed. */
                 if (c_top > 0.0f) {
-                    float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * filtered_cte, g_params.dt);
+                    float pid_cte = -pid_update(&steer_pid, 0.0f, g_params.k_cte * sr.cte, g_params.dt);
 
                     /* G. Apex Protection: Suppress Counter-Steering CTE into Corners
                      * When approaching or inside a curve (kappa > 0.15), if PID CTE opposes

@@ -196,11 +196,11 @@ instance:
       - mode: 'kCTIMER_TimerMode'
       - clockSource: 'FunctionClock'
       - clockSourceFreq: 'ClocksTool_DefaultInit'
-      - timerPrescaler: '64'
+      - timerPrescaler: '1'
     - EnableTimerInInit: 'true'
     - pwmConfig:
       - pwmPeriodChannel: 'kCTIMER_Match_0'
-      - pwmPeriodValueStr: '1khz'
+      - pwmPeriodValueStr: '20khz'
       - enableInterrupt: 'false'
       - pwmChannels:
         - 0:
@@ -224,7 +224,7 @@ instance:
 const ctimer_config_t CTIMER0_config = {
   .mode = kCTIMER_TimerMode,
   .input = kCTIMER_Capture_0,
-  .prescale = 63
+  .prescale = 0
 };
 
 static void CTIMER0_init(void) {

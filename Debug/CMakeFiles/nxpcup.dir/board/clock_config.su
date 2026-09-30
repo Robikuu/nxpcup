@@ -1,12 +1,7 @@
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/drivers/fsl_clock.h:1496:20:CLOCK_EnableClock	24	static
 C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:47:6:BOARD_InitBootClocks	8	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:79:6:BOARD_BootClockFRO12M_InitClockModule	16	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:306:6:BOARD_BootClockFRO12M	24	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:421:6:BOARD_BootClockFROHF48M_InitClockModule	16	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:649:6:BOARD_BootClockFROHF48M	24	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:769:6:BOARD_BootClockFROHF144M_InitClockModule	16	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:997:6:BOARD_BootClockFROHF144M	24	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:1149:6:BOARD_BootClockPLL150M_InitClockModule	48	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:1390:6:BOARD_BootClockPLL150M	24	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:1515:6:BOARD_BootClockPLL100M_InitClockModule	48	static
-C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:1762:6:BOARD_BootClockPLL100M	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:83:6:BOARD_BootClockFRO12M	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:151:6:BOARD_BootClockFROHF48M	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:225:6:BOARD_BootClockFROHF144M	24	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:334:6:BOARD_BootClockPLL150M	48	static
+C:/Users/becbu/Desktop/nxpcupnoi/nxpcup2/board/clock_config.c:447:6:BOARD_BootClockPLL100M	48	static
