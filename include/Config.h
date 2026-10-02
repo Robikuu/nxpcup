@@ -17,7 +17,7 @@
 
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit
-#define STEERING_LIMIT_LEFT         -85.0f     // Physical servo left mechanical limit
+#define STEERING_LIMIT_LEFT         -65.0f     // Physical servo left mechanical limit
 #define STEERING_OFFSET              0.0f     // Straight-line trim offset (trimmed to eliminate rightward lane drift)
 
 // Relative command limits (steer_cmd relative to center trim)
