@@ -14,6 +14,8 @@
 static char   s_cmd_buf[CMD_BUF_SIZE];
 static size_t s_cmd_idx = 0;
 volatile uint8_t g_dump_vectors = 0;
+static uint8_t s_k_cte_corner_overridden = 0;
+static uint8_t s_k_heading_corner_overridden = 0;
 
 void params_init(void) {
     g_params.kp_straight         = KP_STRAIGHT;
@@ -26,6 +28,14 @@ void params_init(void) {
     g_params.speed_inside_min     = SPEED_INSIDE_MIN;
     g_params.k_cte               = DEFAULT_K_CTE;
     g_params.k_heading           = DEFAULT_K_HEADING;
+    g_params.k_cte_corner        = DEFAULT_K_CTE_CORNER;
+    g_params.k_heading_corner    = DEFAULT_K_HEADING_CORNER;
+    g_params.h_lo                = DEFAULT_H_LO;
+    g_params.h_hi                = DEFAULT_H_HI;
+    g_params.blend_attack        = DEFAULT_BLEND_ATTACK;
+    g_params.blend_release       = DEFAULT_BLEND_RELEASE;
+    g_params.front_angle_thresh  = DEFAULT_FRONT_ANGLE_THRESH;
+    g_params.blend_enable        = DEFAULT_BLEND_ENABLE;
     g_params.k_lookahead         = DEFAULT_K_LOOKAHEAD;
     g_params.dt                  = DEFAULT_DT;
     g_params.alpha               = DEFAULT_ALPHA;
@@ -152,17 +162,81 @@ static void command_execute(char *cmd) {
         HbridgeBrake(&g_hbridge);
         send_ack("OK state=IDLE\r\n");
     }
-    else if ((!strcmp(keyword, "kp_straight") || !strcmp(keyword, "kp_s")) && has_val) { g_params.kp_straight = val; send_ack_dbl("kp_straight=", val); }
-    else if ((!strcmp(keyword, "kp_corner") || !strcmp(keyword, "kp_c")) && has_val) { g_params.kp_corner = val; send_ack_dbl("kp_corner=", val); }
-    else if ((!strcmp(keyword, "kd_straight") || !strcmp(keyword, "kd_s")) && has_val) { g_params.kd_straight = val; send_ack_dbl("kd_straight=", val); }
-    else if ((!strcmp(keyword, "kd_corner") || !strcmp(keyword, "kd_c")) && has_val) { g_params.kd_corner = val; send_ack_dbl("kd_corner=", val); }
-    else if (!strcmp(keyword, "ki") && has_val) { g_params.ki = val; send_ack_dbl("ki=", val); }
+    else if ((!strcmp(keyword, "kp_straight") || !strcmp(keyword, "kp_s") ||
+              !strcmp(keyword, "kp_corner")   || !strcmp(keyword, "kp_c") ||
+              !strcmp(keyword, "kd_straight") || !strcmp(keyword, "kd_s") ||
+              !strcmp(keyword, "kd_corner")   || !strcmp(keyword, "kd_c") ||
+              !strcmp(keyword, "ki")) && has_val) {
+        send_ack("ERR inactive PID param; steering uses k_head and k_cte\r\n");
+    }
     else if ((!strcmp(keyword, "speed_straight") || !strcmp(keyword, "spd_s") || !strcmp(keyword, "speed_s")) && has_val) { g_params.speed_straight = val; send_ack_dbl("speed_straight=", val); }
     else if ((!strcmp(keyword, "speed_outside") || !strcmp(keyword, "speed_out") || !strcmp(keyword, "spd_out")) && has_val) { g_params.speed_outside_corner = val; send_ack_dbl("speed_outside=", val); }
     else if ((!strcmp(keyword, "speed_inside") || !strcmp(keyword, "speed_in") || !strcmp(keyword, "spd_in") || !strcmp(keyword, "speed_corner")) && has_val) { g_params.speed_inside_min = val; send_ack_dbl("speed_inside=", val); }
     else if (!strcmp(keyword, "alpha") && has_val) { g_params.alpha = val; send_ack_dbl("alpha=", val); }
-    else if (!strcmp(keyword, "k_cte") && has_val) { g_params.k_cte = val; send_ack_dbl("k_cte=", val); }
-    else if ((!strcmp(keyword, "k_heading") || !strcmp(keyword, "k_head")) && has_val) { g_params.k_heading = val; send_ack_dbl("k_heading=", val); }
+    else if (!strcmp(keyword, "k_cte") && has_val) {
+        g_params.k_cte = val;
+        if (!s_k_cte_corner_overridden) g_params.k_cte_corner = val;
+        send_ack_dbl("k_cte=", val);
+    }
+    else if ((!strcmp(keyword, "k_heading") || !strcmp(keyword, "k_head")) && has_val) {
+        g_params.k_heading = val;
+        if (!s_k_heading_corner_overridden) g_params.k_heading_corner = val;
+        send_ack_dbl("k_heading=", val);
+    }
+    else if ((!strcmp(keyword, "k_cte_c") || !strcmp(keyword, "k_cte_corner")) && has_val) {
+        g_params.k_cte_corner = val;
+        s_k_cte_corner_overridden = 1;
+        send_ack_dbl("k_cte_corner=", val);
+    }
+    else if ((!strcmp(keyword, "k_head_c") || !strcmp(keyword, "k_heading_c") || !strcmp(keyword, "k_heading_corner")) && has_val) {
+        g_params.k_heading_corner = val;
+        s_k_heading_corner_overridden = 1;
+        send_ack_dbl("k_heading_corner=", val);
+    }
+    else if (!strcmp(keyword, "h_lo") && has_val) {
+        if (val >= 0.0f && val < g_params.h_hi - 1.0f) {
+            g_params.h_lo = val;
+            send_ack_dbl("h_lo=", val);
+        } else {
+            send_ack("ERR h_lo must be >= 0 and < (h_hi - 1.0)\r\n");
+        }
+    }
+    else if (!strcmp(keyword, "h_hi") && has_val) {
+        if (val > g_params.h_lo + 1.0f && val <= 90.0f) {
+            g_params.h_hi = val;
+            send_ack_dbl("h_hi=", val);
+        } else {
+            send_ack("ERR h_hi must be > (h_lo + 1.0) and <= 90\r\n");
+        }
+    }
+    else if ((!strcmp(keyword, "rel") || !strcmp(keyword, "blend_rel")) && has_val) {
+        if (val >= 0.01f && val <= 0.50f) {
+            g_params.blend_release = val;
+            send_ack_dbl("blend_release=", val);
+        } else {
+            send_ack("ERR rel range: 0.01 to 0.50\r\n");
+        }
+    }
+    else if ((!strcmp(keyword, "att") || !strcmp(keyword, "blend_att")) && has_val) {
+        if (val >= 0.05f && val <= 1.00f) {
+            g_params.blend_attack = val;
+            send_ack_dbl("blend_attack=", val);
+        } else {
+            send_ack("ERR att range: 0.05 to 1.00\r\n");
+        }
+    }
+    else if ((!strcmp(keyword, "fa_th") || !strcmp(keyword, "fa_thresh")) && has_val) {
+        if (val >= 5.0f && val <= 45.0f) {
+            g_params.front_angle_thresh = val;
+            send_ack_dbl("front_angle_thresh=", val);
+        } else {
+            send_ack("ERR fa_th range: 5 to 45\r\n");
+        }
+    }
+    else if (!strcmp(keyword, "blend") && has_val) {
+        g_params.blend_enable = (uint8_t)(val > 0.5f ? 1U : 0U);
+        send_ack_dbl("blend_enable=", (float)g_params.blend_enable);
+    }
     else if ((!strcmp(keyword, "k_lookahead") || !strcmp(keyword, "k_la")) && has_val) { g_params.k_lookahead = val; send_ack_dbl("k_lookahead=", val); }
     else if ((!strcmp(keyword, "steering_offset") || !strcmp(keyword, "offset")) && has_val) { g_params.steering_offset = val; send_ack_dbl("steering_offset=", val); }
     else if ((!strcmp(keyword, "accel_ramp") || !strcmp(keyword, "ramp_a")) && has_val) { g_params.accel_ramp = val; send_ack_dbl("accel_ramp=", val); }
@@ -241,12 +315,20 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "offset=", g_params.steering_offset);
         n = append_flt(buf, n, sizeof(buf), "k_cte=", g_params.k_cte);
         n = append_flt(buf, n, sizeof(buf), "k_head=", g_params.k_heading);
+        n = append_flt(buf, n, sizeof(buf), "k_cte_c=", g_params.k_cte_corner);
+        n = append_flt(buf, n, sizeof(buf), "k_head_c=", g_params.k_heading_corner);
+        n = append_flt(buf, n, sizeof(buf), "h_lo=", g_params.h_lo);
+        n = append_flt(buf, n, sizeof(buf), "h_hi=", g_params.h_hi);
+        n = append_flt(buf, n, sizeof(buf), "rel=", g_params.blend_release);
+        n = append_flt(buf, n, sizeof(buf), "att=", g_params.blend_attack);
+        n = append_flt(buf, n, sizeof(buf), "fa_th=", g_params.front_angle_thresh);
         n = append_flt(buf, n, sizeof(buf), "k_la=", g_params.k_lookahead);
         n = append_flt(buf, n, sizeof(buf), "dt=", g_params.dt);
         n = append_flt(buf, n, sizeof(buf), "alpha=", g_params.alpha);
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
         n = append_flt(buf, n, sizeof(buf), "scale=", g_params.drive_scale);
+        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "blend=%u\r\n", (unsigned)g_params.blend_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "shadow=%u\r\n", (unsigned)g_params.shadow_mode_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "dump=%u\r\n", (unsigned)g_dump_vectors);
@@ -254,7 +336,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], shadow [0/1], dump [0/1], scale, kp_s, kp_c, kd_s, kd_c, spd_s, spd_out, spd_in, k_head, k_cte, k_la, offset, ramp_a, ramp_d\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], blend [0/1], dump [0/1], scale, spd_s, spd_out, spd_in, k_head, k_cte, k_head_c, k_cte_c, h_lo, h_hi, rel, att, fa_th, offset, ramp_a, ramp_d\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

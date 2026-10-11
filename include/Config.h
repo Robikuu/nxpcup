@@ -30,7 +30,7 @@
 #define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
-#define DIFFERENTIAL_DEADZONE_DEG    10.0f     // Steer angle deadzone below which zero differential drag applies (prevents straightaway torque-steer weave)
+#define DIFFERENTIAL_DEADZONE_DEG   8.0f     // Steer angle deadzone below which zero differential drag applies (prevents straightaway torque-steer weave)
 #define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
 
 // ---- Clean Dual-Camera Horizon & Lane Constants ----
@@ -54,13 +54,13 @@
 #define FORWARD_CAM_SAMPLE_NEAR_Y    38.0f     // Near steering horizon (~0.45m ahead) for fallback steering & feedforward
 #define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
 #define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
-#define LOOKAHEAD_DEADBAND_PX        3.5f      // Neutral straightaway curvature margin (+/- 3.5px)
-#define LOOKAHEAD_FULL_URGENCY_PX    12.0f     // Lateral offset/curvature for 100% lookahead urgency
+#define LOOKAHEAD_DEADBAND_PX        5.0f      // Neutral straightaway curvature margin (+/- 3.5px)
+#define LOOKAHEAD_FULL_URGENCY_PX    13.0f     // Lateral offset/curvature for 100% lookahead urgency
 
 // ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
-#define KP_STRAIGHT                  0.75f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    2.60f     // Crisp cornering authority (decisive bite into 90 deg turns)
-#define KD_STRAIGHT                  0.200f    // Lateral velocity damping (calibrated to damp straightaway weave)
+#define KP_STRAIGHT                  0.50f     // Damped straight-line centering (no twitch)
+#define KP_CORNER                    3.8f     // Crisp cornering authority (decisive bite into 90 deg turns)
+#define KD_STRAIGHT                  0.120f    // Lateral velocity damping (calibrated to damp straightaway weave)
 #define KD_CORNER                    0.180f    // Lateral velocity damping
 #define DEFAULT_KI                   0.0f
 #define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
@@ -68,7 +68,7 @@
 
 // ---- Error Weights & Decoupled Feedforward ----
 #define DEFAULT_K_CTE                0.55f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.20f     // Direct base camera heading damping (calibrated to eliminate straightaway weave)
+#define DEFAULT_K_HEADING            1.3f     // Direct base camera heading damping (calibrated to eliminate straightaway weave)
 #define DEFAULT_K_LOOKAHEAD          0.0f      // Lookahead steering injection disabled (eliminates premature turn-in)
 #define HEADING_DEADBAND_DEG         5.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
@@ -91,7 +91,7 @@
 
 // ---- Continuous Curvature Governor (Noise Deadbands & Saturation) ----
 #define GOVERNOR_HEADING_DEADBAND_DEG 5.0f     // Noise floor below which base heading curvature is 0.0 (stops phantom braking)
-#define GOVERNOR_HEADING_MAX_DEG      30.0f    // Heading angle corresponding to 100% corner intensity
+#define GOVERNOR_HEADING_MAX_DEG      25.0f    // Heading angle corresponding to 100% corner intensity
 #define INTERSECTION_TIMEOUT_TICKS    18U      // 18 ticks (360ms) fixed crossing timeout
 #define LINE_LOST_DEBOUNCE_TICKS      3U       // 3 ticks (60ms) optical dropout debounce before entering LINE_LOST
 #define LINE_LOST_BRAKE_TICKS         18U      // 18 ticks (360ms) coast window before active braking
@@ -103,6 +103,16 @@
 #define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width (rejects center-dash at 25px, preserves tight curves at 34px)
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
 #define CONNECT_DIST_PX              15.0f     // Endpoint distance threshold to reject split curve fragments
+
+// ---- Continuous Asymmetric Corner Blend Governor ----
+#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0 (prevents straight drag)
+#define DEFAULT_H_HI                 25.0f     // Heading saturation ceiling (deg): above this, hold = 1.0 (full corner hold)
+#define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
+#define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
+#define DEFAULT_FRONT_ANGLE_THRESH   15.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
+#define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE      // Start equal to straight gains (0.55f)
+#define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING  // Start equal to straight gains (1.30f)
 
 // ---- Robot States ----
 #define STATE_IDLE                   0
@@ -122,11 +132,19 @@ typedef struct {
     float steering_offset;
     float k_cte;
     float k_heading;
+    float k_cte_corner;
+    float k_heading_corner;
+    float h_lo;
+    float h_hi;
+    float blend_attack;
+    float blend_release;
+    float front_angle_thresh;
     float k_lookahead;
     float dt;
     float accel_ramp;
     float decel_ramp;
     float drive_scale;           // Output plant gain scale
+    uint8_t blend_enable;        // 1 = continuous blend active, 0 = legacy discrete mode
     uint8_t shadow_mode_enable; // 1 = shadow mode (steer on top, log front), 0 = active blend
     uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
     uint8_t state;
