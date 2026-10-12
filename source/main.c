@@ -217,22 +217,11 @@ int main(void) {
                 }
             }
 
-            /* --- Blind Gap Policy (sr.found == 0) & Failsafe Guard --- */
+            /* --- Blind Gap Policy (sr.found == 0) & Off-Track Dynamic Braking Guard --- */
+            bool is_off_track_braking = false;
+
             if (sr.found == 0) {
                 s_off_track_ticks++;
-                if (s_off_track_ticks >= (uint32_t)OFF_TRACK_FAILSAFE_TICKS) {
-                    g_params.state      = STATE_IDLE;
-                    HbridgeBrake(&g_hbridge);
-                    Steer(g_params.steering_offset);
-                    applied_speed_left  = 0.0f;
-                    applied_speed_right = 0.0f;
-                    steer_cmd           = 0.0f;
-                    last_steer_cmd      = 0.0f;
-                    s_off_track_ticks   = 0;
-                    PRINTF("FAILSAFE: Off track for 2.5s -> STOPPED\r\n");
-                    esp_printf("ALERT: FAILSAFE OFF TRACK STOP\r\n");
-                    continue;
-                }
 
                 if (s_intersection_ahead) {
                     /* Intersection Blind Gap Active */
@@ -250,8 +239,33 @@ int main(void) {
                     /* Decay CTE and heading across the intersection gap */
                     filtered_cte     *= 0.70f;
                     filtered_heading *= 0.70f;
+                } else {
+                    /* Off-track condition (not in intersection):
+                     * Fast trigger (3 ticks = 60ms) if dual-blind (neither camera sees lines),
+                     * or off_track_brake_ticks (default 5 ticks = 100ms) for top camera dropout */
+                    uint32_t brake_threshold = (uint32_t)g_params.off_track_brake_ticks;
+                    if (horizon.found == 0 && brake_threshold > (uint32_t)OFF_TRACK_DUAL_BLIND_TICKS) {
+                        brake_threshold = (uint32_t)OFF_TRACK_DUAL_BLIND_TICKS;
+                    }
+
+                    if (s_off_track_ticks >= brake_threshold) {
+                        is_off_track_braking = true;
+                    }
                 }
-                /* If s_intersection_ahead == 0: Corner apex dropout -> zero decay! */
+
+                if (s_off_track_ticks >= (uint32_t)OFF_TRACK_STOP_TICKS) {
+                    g_params.state      = STATE_IDLE;
+                    HbridgeBrake(&g_hbridge);
+                    Steer(g_params.steering_offset);
+                    applied_speed_left  = 0.0f;
+                    applied_speed_right = 0.0f;
+                    steer_cmd           = 0.0f;
+                    last_steer_cmd      = 0.0f;
+                    s_off_track_ticks   = 0;
+                    PRINTF("FAILSAFE: Off track for 500ms -> STOPPED\r\n");
+                    esp_printf("ALERT: FAILSAFE OFF TRACK STOP\r\n");
+                    continue;
+                }
             } else {
                 s_off_track_ticks = 0;
                 if (s_was_in_intersection_gap) {
@@ -278,7 +292,10 @@ int main(void) {
                 s_blend_target = s_corner_blend;
 
                 /* Steering Calculation */
-                if (sr.found == 0 && !s_intersection_ahead) {
+                if (is_off_track_braking) {
+                    steer_cmd = 0.0f;
+                    steer_top = 0.0f;
+                } else if (sr.found == 0 && !s_intersection_ahead) {
                     steer_cmd = last_steer_cmd;
                     steer_top = last_steer_cmd;
                 } else {
@@ -313,7 +330,11 @@ int main(void) {
                 last_steer_cmd = steer_cmd;
 
                 /* Speed & Differential Braking */
-                if (horizon.is_sharp_corner) {
+                if (is_off_track_braking) {
+                    target_speed = 0.0f;
+                    target_left  = 0.0f;
+                    target_right = 0.0f;
+                } else if (horizon.is_sharp_corner) {
                     target_speed = g_params.speed_outside_corner;
                     if (fabsf(steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
                         if (steer_cmd > 0.0f) {
@@ -392,7 +413,10 @@ int main(void) {
                 }
 
                 /* 2. Steering Calculation */
-                if (sr.found == 0 && !s_intersection_ahead) {
+                if (is_off_track_braking) {
+                    steer_cmd = 0.0f;
+                    steer_top = 0.0f;
+                } else if (sr.found == 0 && !s_intersection_ahead) {
                     /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
                     steer_cmd = last_steer_cmd;
                     steer_top = last_steer_cmd;
@@ -438,57 +462,70 @@ int main(void) {
                 last_steer_cmd = steer_cmd;
 
                 /* 3. Speed & Differential Braking */
-                /* Continuous blend smoothly lowers speed target from straight to outside corner */
-                target_speed = g_params.speed_straight - s_corner_blend * (g_params.speed_straight - g_params.speed_outside_corner);
-                target_left  = target_speed;
-                target_right = target_speed;
-
-                float abs_steer = fabsf(steer_cmd);
-                if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
-                    float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
-                                       ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
-                    if (steer_norm > 1.0f) steer_norm = 1.0f;
-
-                    /* Differential drag: full pivot drag restored when corner blend is active */
-                    float diff_mult = steer_norm + s_corner_blend * (1.0f - steer_norm);
-                    float diff_drag = diff_mult * (target_speed - g_params.speed_inside_min);
-
-                    if (steer_cmd > 0.0f) {
-                        /* Turning Right: Left is outside, Right is inside pivot */
-                        target_left  = target_speed;
-                        target_right = target_speed - diff_drag;
-                    } else {
-                        /* Turning Left: Right is outside, Left is inside pivot */
-                        target_left  = target_speed - diff_drag;
-                        target_right = target_speed;
-                    }
+                if (is_off_track_braking) {
+                    target_speed = 0.0f;
+                    target_left  = 0.0f;
+                    target_right = 0.0f;
                 } else {
+                    /* Continuous blend smoothly lowers speed target from straight to outside corner */
+                    target_speed = g_params.speed_straight - s_corner_blend * (g_params.speed_straight - g_params.speed_outside_corner);
                     target_left  = target_speed;
                     target_right = target_speed;
+
+                    float abs_steer = fabsf(steer_cmd);
+                    if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                        float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
+                                           ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
+                        if (steer_norm > 1.0f) steer_norm = 1.0f;
+
+                        /* Differential drag: full pivot drag restored when corner blend is active */
+                        float diff_mult = steer_norm + s_corner_blend * (1.0f - steer_norm);
+                        float diff_drag = diff_mult * (target_speed - g_params.speed_inside_min);
+
+                        if (steer_cmd > 0.0f) {
+                            /* Turning Right: Left is outside, Right is inside pivot */
+                            target_left  = target_speed;
+                            target_right = target_speed - diff_drag;
+                        } else {
+                            /* Turning Left: Right is outside, Left is inside pivot */
+                            target_left  = target_speed - diff_drag;
+                            target_right = target_speed;
+                        }
+                    } else {
+                        target_left  = target_speed;
+                        target_right = target_speed;
+                    }
                 }
             }
 
             /* --- 5. Motor Slew Rate Limiting (Ramps) --- */
-            /* Left Motor Ramp */
-            if (target_left < applied_speed_left) {
-                applied_speed_left -= g_params.decel_ramp;
-                if (applied_speed_left < target_left) applied_speed_left = target_left;
+            if (is_off_track_braking) {
+                applied_speed_left  = 0.0f;
+                applied_speed_right = 0.0f;
             } else {
-                applied_speed_left += g_params.accel_ramp;
-                if (applied_speed_left > target_left) applied_speed_left = target_left;
-            }
+                /* Left Motor Ramp */
+                if (target_left < applied_speed_left) {
+                    applied_speed_left -= g_params.decel_ramp;
+                    if (applied_speed_left < target_left) applied_speed_left = target_left;
+                } else {
+                    applied_speed_left += g_params.accel_ramp;
+                    if (applied_speed_left > target_left) applied_speed_left = target_left;
+                }
 
-            /* Right Motor Ramp */
-            if (target_right < applied_speed_right) {
-                applied_speed_right -= g_params.decel_ramp;
-                if (applied_speed_right < target_right) applied_speed_right = target_right;
-            } else {
-                applied_speed_right += g_params.accel_ramp;
-                if (applied_speed_right > target_right) applied_speed_right = target_right;
+                /* Right Motor Ramp */
+                if (target_right < applied_speed_right) {
+                    applied_speed_right -= g_params.decel_ramp;
+                    if (applied_speed_right < target_right) applied_speed_right = target_right;
+                } else {
+                    applied_speed_right += g_params.accel_ramp;
+                    if (applied_speed_right > target_right) applied_speed_right = target_right;
+                }
             }
 
             /* --- 6. Motor Actuation --- */
-            if (!g_params.motor_enable) {
+            if (is_off_track_braking) {
+                HbridgeBrake(&g_hbridge);
+            } else if (!g_params.motor_enable) {
                 applied_speed_left  = 0.0f;
                 applied_speed_right = 0.0f;
                 HbridgeBrake(&g_hbridge);
@@ -499,6 +536,8 @@ int main(void) {
             /* --- 7. Telemetry Output (12.5 Hz = Every 4th Tick) --- */
             if (++s_telemetry_div >= 4) {
                 s_telemetry_div = 0;
+                const char *st_str = is_off_track_braking ? "B" :
+                                     (s_intersection_ahead ? "I" : (s_corner_blend > 0.30f ? "C" : "S"));
                 esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BL:%d BT:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
                            (unsigned)sr.found, (unsigned)horizon.found,
                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
@@ -511,7 +550,7 @@ int main(void) {
                            s_corner_blend > 0.30f ? 'F' : 'T',
                            horizon.found > 0 ? 1U : 0U,
                            (unsigned)s_intersection_ahead,
-                           s_intersection_ahead ? "I" : (s_corner_blend > 0.30f ? "C" : "S"),
+                           st_str,
                            (int)applied_speed_left, (int)applied_speed_right);
             }
         }

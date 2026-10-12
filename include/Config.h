@@ -96,8 +96,13 @@
 #define LINE_LOST_DEBOUNCE_TICKS      3U       // 3 ticks (60ms) optical dropout debounce before entering LINE_LOST
 #define LINE_LOST_BRAKE_TICKS         18U      // 18 ticks (360ms) coast window before active braking
 #define LINE_LOST_STOP_TICKS          50U      // 50 ticks (1000ms) before full emergency stop
-#define OFF_TRACK_FAILSAFE_TICKS     125U      // 125 ticks (2.5 seconds @ 50Hz) off-track emergency stop
 #define LINE_REACQUIRE_TICKS          3U       // 3 consecutive valid frames required to return to NORMAL
+
+// ---- Off-Track Dynamic Braking & Failsafe Safeguards (50 Hz / 20ms ticks) ----
+#define OFF_TRACK_BRAKE_TICKS        5U       // 5 ticks (100ms) off-track dropout before active dynamic braking
+#define OFF_TRACK_DUAL_BLIND_TICKS   3U       // 3 ticks (60ms) if neither camera sees track
+#define OFF_TRACK_STOP_TICKS         25U      // 25 ticks (500ms) sustained off-track before latching STATE_IDLE
+#define OFF_TRACK_FAILSAFE_TICKS     OFF_TRACK_STOP_TICKS
 
 // ---- Geometric Boundary Validation ----
 #define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width (rejects center-dash at 25px, preserves tight curves at 34px)
@@ -147,6 +152,7 @@ typedef struct {
     uint8_t blend_enable;        // 1 = continuous blend active, 0 = legacy discrete mode
     uint8_t shadow_mode_enable; // 1 = shadow mode (steer on top, log front), 0 = active blend
     uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
+    uint8_t off_track_brake_ticks; // Ticks off-track before active dynamic braking (e.g. 5 ticks = 100ms)
     uint8_t state;
 } robot_params_t;
 

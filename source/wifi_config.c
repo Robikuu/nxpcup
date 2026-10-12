@@ -45,6 +45,7 @@ void params_init(void) {
     g_params.drive_scale         = DEFAULT_DRIVE_SCALE;
     g_params.shadow_mode_enable  = DEFAULT_SHADOW_MODE;
     g_params.motor_enable        = DEFAULT_MOTOR_ENABLE;
+    g_params.off_track_brake_ticks = OFF_TRACK_BRAKE_TICKS;
     g_params.state               = STATE_IDLE;
 }
 
@@ -288,6 +289,14 @@ static void command_execute(char *cmd) {
         }
         send_ack_dbl("motor_enable=", val);
     }
+    else if ((!strcmp(keyword, "off_brake") || !strcmp(keyword, "brake_ticks")) && has_val) {
+        if (val >= 1.0f && val <= 50.0f) {
+            g_params.off_track_brake_ticks = (uint8_t)val;
+            send_ack_dbl("off_track_brake_ticks=", (float)g_params.off_track_brake_ticks);
+        } else {
+            send_ack("ERR off_brake range: 1 to 50\r\n");
+        }
+    }
     else if (!strcmp(keyword, "dump_vectors") || !strcmp(keyword, "dump")) {
         if (has_val) {
             g_dump_vectors = (uint8_t)val;
@@ -331,12 +340,13 @@ static void command_execute(char *cmd) {
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "blend=%u\r\n", (unsigned)g_params.blend_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "shadow=%u\r\n", (unsigned)g_params.shadow_mode_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
+        n += snprintf(buf + n, sizeof(buf) - (size_t)n, "off_brake=%u\r\n", (unsigned)g_params.off_track_brake_ticks);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "dump=%u\r\n", (unsigned)g_dump_vectors);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "state=%s\r\n", g_params.state ? "RUNNING" : "IDLE");
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], blend [0/1], dump [0/1], scale, spd_s, spd_out, spd_in, k_head, k_cte, k_head_c, k_cte_c, h_lo, h_hi, rel, att, fa_th, offset, ramp_a, ramp_d\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], blend [0/1], off_brake <N>, dump [0/1], scale, spd_s, spd_out, spd_in, k_head, k_cte, k_head_c, k_cte_c, h_lo, h_hi, rel, att, fa_th, offset, ramp_a, ramp_d\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");

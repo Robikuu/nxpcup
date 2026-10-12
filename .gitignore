@@ -9,3 +9,4 @@ user_override.cmake
 armgcc.cmake
 nxpcup_Debug.ld
 linkerScripts
+/Debug/
