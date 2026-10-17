@@ -9,14 +9,27 @@
     #define M_PI 3.14159265358979323846f
 #endif
 
-/* Temporal memory for loss of line continuity */
-static float s_last_center_x = (float)PIXY_CENTER_X;
-static float s_last_heading  = 0.0f;
+#define TOP_CAM_LOOKAHEAD_Y_REF      35.0f
+#define TOP_CAM_TRACK_GATE_PX        22.0f
+#define TOP_CAM_MAX_BLIND_TRACK_TICKS 8U
+#define FRONT_SINGLE_LINE_PERSP_DEG  18.0f
+
+/* Stateful temporal memory for lane continuity and left/right boundary tracking */
+static float   s_last_center_x = (float)PIXY_CENTER_X;
+static float   s_last_heading  = 0.0f;
+static uint8_t s_has_tracking  = 0U;
+static float   s_last_left_x   = (float)PIXY_CENTER_X - (float)TRACK_HALF_WIDTH_PX;
+static float   s_last_right_x  = (float)PIXY_CENTER_X + (float)TRACK_HALF_WIDTH_PX;
+static uint8_t s_blind_frames  = 0U;
 
 void reset_steering_tracking(void)
 {
     s_last_center_x = (float)PIXY_CENTER_X;
     s_last_heading  = 0.0f;
+    s_has_tracking  = 0U;
+    s_last_left_x   = (float)PIXY_CENTER_X - (float)TRACK_HALF_WIDTH_PX;
+    s_last_right_x  = (float)PIXY_CENTER_X + (float)TRACK_HALF_WIDTH_PX;
+    s_blind_frames  = 0U;
 }
 
 /* ------------------------------------------------------------------ */
@@ -29,6 +42,9 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
     memset(out, 0, sizeof(steering_result_t));
 
     if (num_vectors == 0 || vectors == NULL) {
+        if (s_blind_frames < 255U) {
+            s_blind_frames++;
+        }
         out->cte         = s_last_center_x - (float)PIXY_CENTER_X;
         out->heading_deg = s_last_heading;
         out->found       = 0;
@@ -37,10 +53,16 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
 
     bool  left_found       = false;
     bool  right_found      = false;
-    float best_left_x      = -1000.0f; /* We want max x < 39 (closest to center from left) */
+    float best_left_x      = -1000.0f;
     float best_left_angle  = 0.0f;
-    float best_right_x     = 1000.0f;  /* We want min x > 39 (closest to center from right) */
+    float best_left_dy     = 0.0f;
+    float best_left_dist   = 1000.0f;
+    float best_right_x     = 1000.0f;
     float best_right_angle = 0.0f;
+    float best_right_dy    = 0.0f;
+    float best_right_dist  = 1000.0f;
+
+    bool use_tracking = (s_has_tracking != 0U) && (s_blind_frames < TOP_CAM_MAX_BLIND_TRACK_TICKS);
 
     for (size_t i = 0; i < num_vectors; i++) {
         uint16_t x0 = vectors[4 * i + 0];
@@ -62,8 +84,14 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         float dx = x_far - x_near;
         float abs_dx = fabsf(dx);
 
-        /* Chassis Exclusion: tie rod / bumper reflection vectors near vehicle center bottom */
-        if (x_near >= 36.0f && x_near <= 44.0f && y_near >= 45.0f && dy <= 8.0f) {
+        /* Chassis / Wheel / Tie-Rod Exclusion Zone at bottom of top camera frame:
+         * Rejects short/medium reflections starting in the lower exclusion box unless the vector
+         * is a genuine long lane boundary extending into the upper half of the view.
+         */
+        if (y_near >= (float)TOP_CAM_EXCLUDE_Y_MIN &&
+            x_near >= (float)TOP_CAM_EXCLUDE_X_MIN &&
+            x_near <= (float)TOP_CAM_EXCLUDE_X_MAX &&
+            (y_far >= 28.0f || dy < 16.0f)) {
             continue;
         }
 
@@ -94,21 +122,61 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
             continue;
         }
 
-        /* Classify: Left of vehicle center */
-        if (x_near < (float)PIXY_CENTER_X) {
-            if (x_near > best_left_x) {
-                best_left_x     = x_near;
+        /* Project candidate along its slope to fixed lookahead reference row Y_REF = 35.0f */
+        float slope  = dx / dy;
+        float x_proj = x_near + slope * (y_near - TOP_CAM_LOOKAHEAD_Y_REF);
+        if (x_proj < -20.0f) x_proj = -20.0f;
+        if (x_proj > 100.0f) x_proj = 100.0f;
+
+        /* Classify candidate into Left or Right boundary using temporal tracking when available */
+        bool is_left_candidate = false;
+        if (use_tracking) {
+            float d_left  = fabsf(x_proj - s_last_left_x);
+            float d_right = fabsf(x_proj - s_last_right_x);
+            if (d_left <= d_right && d_left <= TOP_CAM_TRACK_GATE_PX) {
+                is_left_candidate = true;
+            } else if (d_right < d_left && d_right <= TOP_CAM_TRACK_GATE_PX) {
+                is_left_candidate = false;
+            } else {
+                is_left_candidate = (x_proj < (float)PIXY_CENTER_X);
+            }
+        } else {
+            is_left_candidate = (x_proj < (float)PIXY_CENTER_X);
+        }
+
+        if (is_left_candidate) {
+            float ref_dist = use_tracking ? fabsf(x_proj - s_last_left_x) : fabsf((float)PIXY_CENTER_X - x_proj);
+            if (!left_found || ref_dist < best_left_dist) {
+                best_left_x     = x_proj;
                 best_left_angle = angle;
+                best_left_dy    = dy;
+                best_left_dist  = ref_dist;
                 left_found      = true;
             }
-        }
-        /* Classify: Right of vehicle center */
-        else if (x_near > (float)PIXY_CENTER_X) {
-            if (x_near < best_right_x) {
-                best_right_x     = x_near;
+        } else {
+            float ref_dist = use_tracking ? fabsf(x_proj - s_last_right_x) : fabsf(x_proj - (float)PIXY_CENTER_X);
+            if (!right_found || ref_dist < best_right_dist) {
+                best_right_x     = x_proj;
                 best_right_angle = angle;
+                best_right_dy    = dy;
+                best_right_dist  = ref_dist;
                 right_found      = true;
             }
+        }
+    }
+
+    /* Minimum Lane Width Validation: reject duplicate split segments of the same line */
+    if (left_found && right_found && (best_right_x - best_left_x) < (float)MIN_LANE_WIDTH_PX) {
+        if (use_tracking) {
+            if (best_left_dist <= best_right_dist) {
+                right_found = false;
+            } else {
+                left_found = false;
+            }
+        } else if (best_left_dy >= best_right_dy) {
+            right_found = false;
+        } else {
+            left_found = false;
         }
     }
 
@@ -116,20 +184,41 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
     float heading;
 
     if (left_found && right_found) {
-        center_x = (best_left_x + best_right_x) * 0.5f;
-        heading  = (best_left_angle + best_right_angle) * 0.5f;
-        out->found = 2;
+        center_x       = (best_left_x + best_right_x) * 0.5f;
+        heading        = (best_left_angle + best_right_angle) * 0.5f;
+        out->found     = 2;
+        s_last_left_x  = best_left_x;
+        s_last_right_x = best_right_x;
+        s_has_tracking = 1U;
+        s_blind_frames = 0U;
     } else if (left_found) {
-        center_x = best_left_x + (float)TRACK_HALF_WIDTH_PX;
-        heading  = best_left_angle;
-        out->found = 1;
+        heading = best_left_angle;
+        float cos_h = cosf(heading * (M_PI / 180.0f));
+        if (cos_h < 0.55f) cos_h = 0.55f;
+        float perp_offset = (float)TRACK_HALF_WIDTH_PX / cos_h;
+        center_x       = best_left_x + perp_offset;
+        out->found     = 1;
+        s_last_left_x  = best_left_x;
+        s_last_right_x = best_left_x + 2.0f * perp_offset;
+        s_has_tracking = 1U;
+        s_blind_frames = 0U;
     } else if (right_found) {
-        center_x = best_right_x - (float)TRACK_HALF_WIDTH_PX;
-        heading  = best_right_angle;
-        out->found = 1;
+        heading = best_right_angle;
+        float cos_h = cosf(heading * (M_PI / 180.0f));
+        if (cos_h < 0.55f) cos_h = 0.55f;
+        float perp_offset = (float)TRACK_HALF_WIDTH_PX / cos_h;
+        center_x       = best_right_x - perp_offset;
+        out->found     = 1;
+        s_last_right_x = best_right_x;
+        s_last_left_x  = best_right_x - 2.0f * perp_offset;
+        s_has_tracking = 1U;
+        s_blind_frames = 0U;
     } else {
-        center_x = s_last_center_x;
-        heading  = s_last_heading;
+        if (s_blind_frames < 255U) {
+            s_blind_frames++;
+        }
+        center_x   = s_last_center_x;
+        heading    = s_last_heading;
         out->found = 0;
     }
 
@@ -175,6 +264,7 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
     float sum_weighted_angle = 0.0f;
     float sum_length         = 0.0f;
     uint8_t valid_count      = 0;
+    size_t last_valid_idx    = 0;
     float trans_y_near_max   = 0.0f;
     float trans_y_far_min    = 999.0f;
 
@@ -235,6 +325,7 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
                 sum_weighted_angle += angle * len;
                 sum_length         += len;
                 valid_count++;
+                last_valid_idx = i;
             }
         }
     }
@@ -366,17 +457,37 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         if (out->transverse_crosses_center == 0U && has_exit_line) {
             out->is_intersection_ahead = 1U;
             out->is_sharp_corner       = 0U; /* Open intersection -> do not brake or trigger pivot drag */
+            out->horizon_angle_deg     = 0.0f;
         } else {
             out->is_intersection_ahead = 0U;
             out->is_sharp_corner       = 1U; /* Fail-safe default to corner, pre-brake! */
+            /* Preserve longitudinal turn direction for feedforward pre-steer on 90-deg corners */
+            if (sum_length > 0.1f && valid_count > 0) {
+                out->horizon_angle_deg = sum_weighted_angle / sum_length;
+            } else {
+                out->horizon_angle_deg = 0.0f;
+            }
         }
-        /* Transverse tape detected: do NOT allow crossroad or side branch lines to tilt horizon! */
-        out->horizon_angle_deg = 0.0f;
-        out->found             = (uint8_t)count;
+        out->found = (uint8_t)count;
     } else {
         out->is_intersection_ahead = 0U;
         if (sum_length > 0.1f && valid_count > 0) {
             float avg_angle = sum_weighted_angle / sum_length;
+
+            /* Single-line perspective convergence compensation:
+             * Only subtract the natural ~18 deg straight-line convergence when a single vector
+             * stays on its own side of PIXY_CENTER_X (not curving across the track center).
+             */
+            if (valid_count == 1) {
+                float sx_near = parsed[last_valid_idx].x_near;
+                float sx_far  = parsed[last_valid_idx].x_far;
+                if (sx_near < (float)PIXY_CENTER_X && sx_far < (float)PIXY_CENTER_X && avg_angle > 0.0f) {
+                    avg_angle = (avg_angle > FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle - FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+                } else if (sx_near >= (float)PIXY_CENTER_X && sx_far >= (float)PIXY_CENTER_X && avg_angle < 0.0f) {
+                    avg_angle = (avg_angle < -FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle + FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+                }
+            }
+
             out->is_sharp_corner   = (fabsf(avg_angle) > (float)FRONT_CORNER_ANGLE_THRESH_DEG) ? 1U : 0U;
             out->horizon_angle_deg = avg_angle;
             out->found             = valid_count;

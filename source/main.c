@@ -36,7 +36,14 @@ int main(void) {
     BOARD_InitBootPins();
     BOARD_InitBootPeripherals();
 
-    /* Ensure all DMA & Flexcomm interrupts for LP_FLEXCOMM3 are enabled in NVIC */
+    /* Ensure all DMA & Flexcomm interrupts for both cameras (LP_FLEXCOMM2 & LP_FLEXCOMM3) are enabled in NVIC */
+    NVIC_SetPriority(EDMA_0_CH0_IRQn, 3);
+    EnableIRQ(EDMA_0_CH0_IRQn);
+    NVIC_SetPriority(EDMA_0_CH1_IRQn, 3);
+    EnableIRQ(EDMA_0_CH1_IRQn);
+    NVIC_SetPriority(LP_FLEXCOMM2_IRQn, 3);
+    EnableIRQ(LP_FLEXCOMM2_IRQn);
+
     NVIC_SetPriority(EDMA_0_CH2_IRQn, 3);
     EnableIRQ(EDMA_0_CH2_IRQn);
     NVIC_SetPriority(EDMA_0_CH3_IRQn, 3);
@@ -77,6 +84,8 @@ int main(void) {
     size_t   num_vectors_front        = 0;
 
     float    filtered_cte             = 0.0f;
+    float    prev_filtered_cte        = 0.0f;
+    float    filtered_d_cte           = 0.0f;
     float    filtered_heading         = 0.0f;
     float    filtered_front_angle     = 0.0f;
 
@@ -84,6 +93,7 @@ int main(void) {
     float    applied_speed_right      = g_params.speed_straight;
     float    steer_cmd                = 0.0f;
     float    last_steer_cmd           = 0.0f;
+    float    last_valid_steer_top     = 0.0f;
     uint32_t s_rollout_ticks          = 0;
     uint32_t s_off_track_ticks        = 0;
 
@@ -93,9 +103,10 @@ int main(void) {
     uint32_t s_intersection_gap_ticks  = 0; /* Elapsed ticks in blind gap */
     uint8_t  s_was_in_intersection_gap = 0; /* Flag set during intersection blind gap */
     uint32_t s_reacquire_ticks         = 0; /* Slew-rate limiter ticks after blind gap */
-    uint8_t  s_telemetry_div          = 0; /* 12.5 Hz telemetry divider */
-    float    s_corner_blend           = 0.0f; /* 0.0 = straight, 1.0 = sharp corner */
-    float    s_blend_target           = 0.0f; /* Debug target holding blend */
+    uint8_t  s_sharp_cancel_count      = 0; /* 3-tick hysteresis before canceling intersection latch */
+    uint8_t  s_telemetry_div           = 0; /* 12.5 Hz telemetry divider */
+    float    s_corner_blend            = 0.0f; /* 0.0 = straight, 1.0 = sharp corner */
+    float    s_blend_target            = 0.0f; /* Debug target holding blend */
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -122,12 +133,15 @@ int main(void) {
             if (g_params.state != STATE_RUNNING) {
                 reset_steering_tracking();
                 filtered_cte              = 0.0f;
+                prev_filtered_cte         = 0.0f;
+                filtered_d_cte            = 0.0f;
                 filtered_heading          = 0.0f;
                 filtered_front_angle      = 0.0f;
                 applied_speed_left        = g_params.speed_straight;
                 applied_speed_right       = g_params.speed_straight;
                 steer_cmd                 = 0.0f;
                 last_steer_cmd            = 0.0f;
+                last_valid_steer_top      = 0.0f;
                 s_rollout_ticks           = 0;
                 s_off_track_ticks         = 0;
                 s_intersection_ahead      = 0;
@@ -135,6 +149,7 @@ int main(void) {
                 s_intersection_gap_ticks  = 0;
                 s_was_in_intersection_gap = 0;
                 s_reacquire_ticks         = 0;
+                s_sharp_cancel_count      = 0;
                 s_corner_blend            = 0.0f;
                 s_blend_target            = 0.0f;
 
@@ -152,9 +167,9 @@ int main(void) {
             memset(&horizon, 0, sizeof(horizon));
             if (s_front == kStatus_Success && num_vectors_front > 0) {
                 compute_front_camera_horizon(vectors_front, num_vectors_front, &horizon);
-                if (horizon.found > 0) {
+                if (horizon.found > 0 && (!horizon.has_transverse_tape || fabsf(horizon.horizon_angle_deg) > 0.01f)) {
                     filtered_front_angle = 0.40f * horizon.horizon_angle_deg + 0.60f * filtered_front_angle;
-                } else {
+                } else if (!horizon.is_sharp_corner) {
                     filtered_front_angle *= 0.85f;
                 }
             } else {
@@ -169,11 +184,18 @@ int main(void) {
             if (s_pid == kStatus_Success && num_vectors_pid > 0) {
                 compute_top_camera_lane(vectors_pid, num_vectors_pid, &sr);
                 if (sr.found > 0) {
-                    filtered_cte     = 0.50f * sr.cte + 0.50f * filtered_cte;
-                    filtered_heading = 0.50f * sr.heading_deg + 0.50f * filtered_heading;
+                    filtered_cte      = 0.75f * sr.cte + 0.25f * filtered_cte;
+                    filtered_heading  = 0.75f * sr.heading_deg + 0.25f * filtered_heading;
+                    float dt_safe     = (g_params.dt > 0.005f) ? g_params.dt : 0.02f;
+                    float raw_d_cte   = (filtered_cte - prev_filtered_cte) / dt_safe;
+                    prev_filtered_cte = filtered_cte;
+                    filtered_d_cte    = g_params.alpha * raw_d_cte + (1.0f - g_params.alpha) * filtered_d_cte;
+                } else {
+                    filtered_d_cte *= 0.50f;
                 }
             } else {
                 num_vectors_pid = 0;
+                filtered_d_cte *= 0.50f;
             }
 
             s_rollout_ticks++;
@@ -199,21 +221,42 @@ int main(void) {
             }
 
             /* --- Corner Priority Preemption & Tactical Intersection State --- */
-            if (horizon.is_sharp_corner || sr.transverse_crosses_center) {
-                /* Corner always preempts intersection immediately! */
+            if (sr.transverse_crosses_center) {
+                /* Top camera confirms wall across center right in front of car -> immediate corner preempt */
                 s_intersection_ahead      = 0;
                 s_intersection_timer      = 0;
                 s_intersection_gap_ticks  = 0;
                 s_was_in_intersection_gap = 0;
-                s_reacquire_ticks         = 0; /* Clear reacquisition slew limit for immediate cornering response */
+                s_reacquire_ticks         = 0;
+                s_sharp_cancel_count      = 0;
             } else if (horizon.is_intersection_ahead) {
                 /* Intersection Latching & Lifetime: refresh persistence timer (~15 ticks) */
                 s_intersection_ahead = 1;
                 s_intersection_timer = 15;
-            } else if (s_intersection_timer > 0) {
-                s_intersection_timer--;
-                if (s_intersection_timer == 0 && s_intersection_gap_ticks == 0) {
-                    s_intersection_ahead = 0;
+                s_sharp_cancel_count = 0;
+            } else if (horizon.is_sharp_corner) {
+                if (s_intersection_ahead) {
+                    /* Require 3 consecutive ticks of sharp corner to cancel an active intersection latch */
+                    s_sharp_cancel_count++;
+                    if (s_sharp_cancel_count >= 3U) {
+                        s_intersection_ahead      = 0;
+                        s_intersection_timer      = 0;
+                        s_intersection_gap_ticks  = 0;
+                        s_was_in_intersection_gap = 0;
+                        s_reacquire_ticks         = 0;
+                        s_sharp_cancel_count      = 0;
+                    }
+                } else {
+                    s_reacquire_ticks    = 0;
+                    s_sharp_cancel_count = 0;
+                }
+            } else {
+                s_sharp_cancel_count = 0;
+                if (s_intersection_timer > 0) {
+                    s_intersection_timer--;
+                    if (s_intersection_timer == 0 && s_intersection_gap_ticks == 0) {
+                        s_intersection_ahead = 0;
+                    }
                 }
             }
 
@@ -221,14 +264,16 @@ int main(void) {
             if (sr.found == 0) {
                 s_off_track_ticks++;
                 if (s_off_track_ticks >= (uint32_t)OFF_TRACK_FAILSAFE_TICKS) {
-                    g_params.state      = STATE_IDLE;
+                    g_params.state       = STATE_IDLE;
                     HbridgeBrake(&g_hbridge);
                     Steer(g_params.steering_offset);
-                    applied_speed_left  = 0.0f;
-                    applied_speed_right = 0.0f;
-                    steer_cmd           = 0.0f;
-                    last_steer_cmd      = 0.0f;
-                    s_off_track_ticks   = 0;
+                    applied_speed_left   = 0.0f;
+                    applied_speed_right  = 0.0f;
+                    steer_cmd            = 0.0f;
+                    last_steer_cmd       = 0.0f;
+                    last_valid_steer_top = 0.0f;
+                    filtered_d_cte       = 0.0f;
+                    s_off_track_ticks    = 0;
                     PRINTF("FAILSAFE: Off track for 2.5s -> STOPPED\r\n");
                     esp_printf("ALERT: FAILSAFE OFF TRACK STOP\r\n");
                     continue;
@@ -239,8 +284,8 @@ int main(void) {
                     s_was_in_intersection_gap = 1;
                     s_intersection_gap_ticks++;
 
-                    /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed, 30) * 50 */
-                    float current_spd = fmaxf(applied_speed_left, applied_speed_right);
+                    /* Distance-scaled window: gap_ticks = 1.5 * 25 / max(speed * drive_scale, 30) * 50 */
+                    float current_spd = fmaxf(applied_speed_left, applied_speed_right) * g_params.drive_scale;
                     uint32_t gap_window = (uint32_t)(1.5f * 25.0f / fmaxf(current_spd, 30.0f) * 50.0f);
                     if (s_intersection_gap_ticks > gap_window) {
                         s_intersection_ahead     = 0;
@@ -249,6 +294,8 @@ int main(void) {
 
                     /* Decay CTE and heading across the intersection gap */
                     filtered_cte     *= 0.70f;
+                    prev_filtered_cte = filtered_cte;
+                    filtered_d_cte    = 0.0f;
                     filtered_heading *= 0.70f;
                 }
                 /* If s_intersection_ahead == 0: Corner apex dropout -> zero decay! */
@@ -264,25 +311,44 @@ int main(void) {
                 }
             }
 
-            float steer_top    = 0.0f;
-            float target_speed = g_params.speed_straight;
-            float target_left  = target_speed;
-            float target_right = target_speed;
+            float steer_top       = 0.0f;
+            float target_speed    = g_params.speed_straight;
+            float target_left     = target_speed;
+            float target_right    = target_speed;
+            float max_right_delta = (float)STEERING_LIMIT_RIGHT - g_params.steering_offset;
+            float max_left_delta  = (float)STEERING_LIMIT_LEFT  - g_params.steering_offset;
 
             if (!g_params.blend_enable) {
                 /* =========================================================================
                  * LEGACY DISCRETE MODE BYPASS (blend 0)
-                 * Exact baseline behavior for instant A/B validation without reflashing
                  * ========================================================================= */
                 s_corner_blend = horizon.is_sharp_corner ? 1.0f : 0.0f;
                 s_blend_target = s_corner_blend;
 
                 /* Steering Calculation */
                 if (sr.found == 0 && !s_intersection_ahead) {
-                    steer_cmd = last_steer_cmd;
-                    steer_top = last_steer_cmd;
+                    float active_ff = horizon.is_sharp_corner ? ((float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle) : 0.0f;
+                    float candidate_steer = last_valid_steer_top + active_ff;
+                    if (fabsf(candidate_steer) > fabsf(last_steer_cmd) &&
+                        (candidate_steer * last_steer_cmd >= 0.0f || fabsf(last_steer_cmd) < 5.0f)) {
+                        steer_cmd = candidate_steer;
+                    } else {
+                        steer_cmd = last_steer_cmd;
+                    }
+                    steer_top = last_valid_steer_top;
                 } else {
-                    steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * filtered_heading);
+                    float eff_heading = filtered_heading;
+                    if (!horizon.is_sharp_corner && fabsf(eff_heading) < (float)HEADING_DEADBAND_DEG) {
+                        eff_heading = 0.0f;
+                    }
+                    float active_kd = horizon.is_sharp_corner ? g_params.kd_corner : g_params.kd_straight;
+                    steer_top = (g_params.k_cte * filtered_cte) +
+                                (g_params.k_heading * eff_heading) +
+                                (active_kd * filtered_d_cte);
+                    if (sr.found > 0) {
+                        last_valid_steer_top = steer_top;
+                    }
+
                     steer_cmd = steer_top;
                     if (horizon.is_sharp_corner) {
                         steer_cmd += (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
@@ -307,8 +373,8 @@ int main(void) {
                 if (s_rollout_ticks <= 5) {
                     steer_cmd = 0.0f;
                 }
-                if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
-                if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
+                if (steer_cmd > max_right_delta) steer_cmd = max_right_delta;
+                if (steer_cmd < max_left_delta)  steer_cmd = max_left_delta;
                 Steer(steer_cmd + g_params.steering_offset);
                 last_steer_cmd = steer_cmd;
 
@@ -334,7 +400,8 @@ int main(void) {
                         float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                                            ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                         if (steer_norm > 1.0f) steer_norm = 1.0f;
-                        float diff_drag = steer_norm * (target_speed - g_params.speed_inside_min);
+                        float straight_scale = (abs_steer < 22.0f) ? 0.35f : 1.0f;
+                        float diff_drag = straight_scale * steer_norm * (target_speed - g_params.speed_inside_min);
 
                         if (steer_cmd > 0.0f) {
                             target_left  = target_speed;
@@ -393,16 +460,34 @@ int main(void) {
 
                 /* 2. Steering Calculation */
                 if (sr.found == 0 && !s_intersection_ahead) {
-                    /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
-                    steer_cmd = last_steer_cmd;
-                    steer_top = last_steer_cmd;
+                    /* Corner apex dropout: preserve or increase turn angle if front camera sees tighter corner */
+                    float active_ff = s_corner_blend * (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
+                    float candidate_steer = last_valid_steer_top + active_ff;
+                    if (fabsf(candidate_steer) > fabsf(last_steer_cmd) &&
+                        (candidate_steer * last_steer_cmd >= 0.0f || fabsf(last_steer_cmd) < 5.0f)) {
+                        steer_cmd = candidate_steer;
+                    } else {
+                        steer_cmd = last_steer_cmd;
+                    }
+                    steer_top = last_valid_steer_top;
                 } else {
                     /* Continuous Gain Scheduling between straight and corner gains */
                     float active_k_cte     = g_params.k_cte + s_corner_blend * (g_params.k_cte_corner - g_params.k_cte);
                     float active_k_heading = g_params.k_heading + s_corner_blend * (g_params.k_heading_corner - g_params.k_heading);
+                    float active_kd        = g_params.kd_straight + s_corner_blend * (g_params.kd_corner - g_params.kd_straight);
 
-                    /* Top Camera Centering between closest lines */
-                    steer_top = (active_k_cte * filtered_cte) + (active_k_heading * filtered_heading);
+                    float eff_heading = filtered_heading;
+                    if (!horizon.is_sharp_corner && s_corner_blend < 0.20f && fabsf(eff_heading) < (float)HEADING_DEADBAND_DEG) {
+                        eff_heading = 0.0f;
+                    }
+
+                    /* Top Camera Centering + Derivative Damping */
+                    steer_top = (active_k_cte * filtered_cte) +
+                                (active_k_heading * eff_heading) +
+                                (active_kd * filtered_d_cte);
+                    if (sr.found > 0) {
+                        last_valid_steer_top = steer_top;
+                    }
 
                     steer_cmd = steer_top;
                     /* Front feedforward pre-steer scaled smoothly by corner blend */
@@ -432,8 +517,8 @@ int main(void) {
                 }
 
                 /* Servo Clamping & Actuation */
-                if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
-                if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
+                if (steer_cmd > max_right_delta) steer_cmd = max_right_delta;
+                if (steer_cmd < max_left_delta)  steer_cmd = max_left_delta;
                 Steer(steer_cmd + g_params.steering_offset);
                 last_steer_cmd = steer_cmd;
 
@@ -449,8 +534,9 @@ int main(void) {
                                        ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                     if (steer_norm > 1.0f) steer_norm = 1.0f;
 
-                    /* Differential drag: full pivot drag restored when corner blend is active */
-                    float diff_mult = steer_norm + s_corner_blend * (1.0f - steer_norm);
+                    /* Proportional differential drag scaled by corner blend (no premature lockup at small steer angles) */
+                    float corner_authority = 0.25f + 0.75f * s_corner_blend;
+                    float diff_mult = steer_norm * corner_authority;
                     float diff_drag = diff_mult * (target_speed - g_params.speed_inside_min);
 
                     if (steer_cmd > 0.0f) {

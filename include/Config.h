@@ -39,8 +39,8 @@
 #define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              45.0f     // Rapid pre-braking ramp (~2 ticks from 100% to 50%)
-#define ACCEL_RAMP_STEP              35.0f     // Crisp corner exit acceleration (~60ms to 100%)
+#define DECEL_RAMP_STEP              30.0f     // Rapid pre-braking & pivot lock ramp (~2 ticks from 100% to 40%)
+#define ACCEL_RAMP_STEP              6.0f      // Smooth traction-preserving corner exit acceleration (~160ms)
 
 // ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
 #define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
@@ -70,7 +70,7 @@
 #define DEFAULT_K_CTE                0.55f     // Calibrated CTE weight (smooth straight line centering)
 #define DEFAULT_K_HEADING            1.3f     // Direct base camera heading damping (calibrated to eliminate straightaway weave)
 #define DEFAULT_K_LOOKAHEAD          0.0f      // Lookahead steering injection disabled (eliminates premature turn-in)
-#define HEADING_DEADBAND_DEG         5.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
+#define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
 
 // ---- Control Loop ----
 #define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz

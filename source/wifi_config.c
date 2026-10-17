@@ -164,10 +164,16 @@ static void command_execute(char *cmd) {
     }
     else if ((!strcmp(keyword, "kp_straight") || !strcmp(keyword, "kp_s") ||
               !strcmp(keyword, "kp_corner")   || !strcmp(keyword, "kp_c") ||
-              !strcmp(keyword, "kd_straight") || !strcmp(keyword, "kd_s") ||
-              !strcmp(keyword, "kd_corner")   || !strcmp(keyword, "kd_c") ||
               !strcmp(keyword, "ki")) && has_val) {
-        send_ack("ERR inactive PID param; steering uses k_head and k_cte\r\n");
+        send_ack("ERR inactive PID param; steering uses k_head, k_cte, kd_s, kd_c\r\n");
+    }
+    else if ((!strcmp(keyword, "kd_straight") || !strcmp(keyword, "kd_s")) && has_val) {
+        g_params.kd_straight = val;
+        send_ack_dbl("kd_straight=", val);
+    }
+    else if ((!strcmp(keyword, "kd_corner") || !strcmp(keyword, "kd_c")) && has_val) {
+        g_params.kd_corner = val;
+        send_ack_dbl("kd_corner=", val);
     }
     else if ((!strcmp(keyword, "speed_straight") || !strcmp(keyword, "spd_s") || !strcmp(keyword, "speed_s")) && has_val) { g_params.speed_straight = val; send_ack_dbl("speed_straight=", val); }
     else if ((!strcmp(keyword, "speed_outside") || !strcmp(keyword, "speed_out") || !strcmp(keyword, "spd_out")) && has_val) { g_params.speed_outside_corner = val; send_ack_dbl("speed_outside=", val); }
@@ -336,7 +342,7 @@ static void command_execute(char *cmd) {
         send_ack(buf);
     }
     else if (!strcmp(keyword, "help")) {
-        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], blend [0/1], dump [0/1], scale, spd_s, spd_out, spd_in, k_head, k_cte, k_head_c, k_cte_c, h_lo, h_hi, rel, att, fa_th, offset, ramp_a, ramp_d\r\n");
+        send_ack("Commands: start, stop, motor_left, motor_right, version, status, steer, drive [0/1], blend [0/1], dump [0/1], scale, spd_s, spd_out, spd_in, k_head, k_cte, k_head_c, k_cte_c, kd_s, kd_c, alpha, h_lo, h_hi, rel, att, fa_th, offset, ramp_a, ramp_d\r\n");
     }
     else {
         send_ack("ERR unknown command\r\n");
@@ -362,7 +368,7 @@ void command_poll(void) {
 }
 
 void esp_printf(const char *fmt, ...) {
-    char buf[128];
+    char buf[384];
     va_list args;
     va_start(args, fmt);
     int len = vsnprintf(buf, sizeof(buf), fmt, args);

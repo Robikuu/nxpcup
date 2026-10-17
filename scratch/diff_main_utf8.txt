@@ -1,0 +1,304 @@
+diff --git a/source/main.c b/source/main.c
+index f904c44..deba317 100644
+--- a/source/main.c
++++ b/source/main.c
+@@ -94,6 +94,8 @@ int main(void) {
+     uint8_t  s_was_in_intersection_gap = 0; /* Flag set during intersection blind gap */
+     uint32_t s_reacquire_ticks         = 0; /* Slew-rate limiter ticks after blind gap */
+     uint8_t  s_telemetry_div          = 0; /* 12.5 Hz telemetry divider */
++    float    s_corner_blend           = 0.0f; /* 0.0 = straight, 1.0 = sharp corner */
++    float    s_blend_target           = 0.0f; /* Debug target holding blend */
+ 
+     PRINTF("Running. Waiting for Start.\r\n");
+ 
+@@ -133,6 +135,8 @@ int main(void) {
+                 s_intersection_gap_ticks  = 0;
+                 s_was_in_intersection_gap = 0;
+                 s_reacquire_ticks         = 0;
++                s_corner_blend            = 0.0f;
++                s_blend_target            = 0.0f;
+ 
+                 if (motor_test_is_active()) {
+                     motor_test_tick();
+@@ -260,87 +264,205 @@ int main(void) {
+                 }
+             }
+ 
+-            /* --- 3. Steering Calculation --- */
+-            float steer_top = 0.0f;
+-            if (sr.found == 0 && !s_intersection_ahead) {
+-                /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
+-                steer_cmd = last_steer_cmd;
+-                steer_top = last_steer_cmd;
+-            } else {
+-                /* Top Camera Centering between closest lines */
+-                steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * filtered_heading);
++            float front_t      = 0.0f;
++            float head_t       = 0.0f;
++            float steer_top    = 0.0f;
++            float target_speed = g_params.speed_straight;
++            float target_left  = target_speed;
++            float target_right = target_speed;
+ 
+-                steer_cmd = steer_top;
+-                if (horizon.is_sharp_corner) {
+-                    steer_cmd += (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
++            if (!g_params.blend_enable) {
++                /* =========================================================================
++                 * LEGACY DISCRETE MODE BYPASS (blend 0)
++                 * Exact baseline behavior for instant A/B validation without reflashing
++                 * ========================================================================= */
++                front_t        = horizon.is_sharp_corner ? 1.0f : 0.0f;
++                head_t         = 0.0f;
++                s_corner_blend = front_t;
++                s_blend_target = front_t;
++
++                /* Steering Calculation */
++                if (sr.found == 0 && !s_intersection_ahead) {
++                    steer_cmd = last_steer_cmd;
++                    steer_top = last_steer_cmd;
++                } else {
++                    steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * filtered_heading);
++                    steer_cmd = steer_top;
++                    if (horizon.is_sharp_corner) {
++                        steer_cmd += (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
++                    }
++
++                    if (s_intersection_ahead && sr.found == 0) {
++                        if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
++                        if (steer_cmd < -3.0f) steer_cmd = -3.0f;
++                    }
++
++                    if (s_reacquire_ticks > 0) {
++                        s_reacquire_ticks--;
++                        float delta = steer_cmd - last_steer_cmd;
++                        if (delta > 4.0f) {
++                            steer_cmd = last_steer_cmd + 4.0f;
++                        } else if (delta < -4.0f) {
++                            steer_cmd = last_steer_cmd - 4.0f;
++                        }
++                    }
+                 }
+ 
+-                if (s_intersection_ahead && sr.found == 0) {
+-                    /* Intersection blind gap: clamp held steering to +-3.0 deg immediately after PID calculation */
+-                    if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
+-                    if (steer_cmd < -3.0f) steer_cmd = -3.0f;
++                if (s_rollout_ticks <= 5) {
++                    steer_cmd = 0.0f;
+                 }
++                if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
++                if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
++                Steer(steer_cmd + g_params.steering_offset);
++                last_steer_cmd = steer_cmd;
+ 
+-                /* Re-Acquisition Slew-Rate Limiter: <= 4.0 deg/tick for 3 ticks */
+-                if (s_reacquire_ticks > 0) {
+-                    s_reacquire_ticks--;
+-                    float delta = steer_cmd - last_steer_cmd;
+-                    if (delta > 4.0f) {
+-                        steer_cmd = last_steer_cmd + 4.0f;
+-                    } else if (delta < -4.0f) {
+-                        steer_cmd = last_steer_cmd - 4.0f;
++                /* Speed & Differential Braking */
++                if (horizon.is_sharp_corner) {
++                    target_speed = g_params.speed_outside_corner;
++                    if (fabsf(steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
++                        if (steer_cmd > 0.0f) {
++                            target_left  = g_params.speed_outside_corner;
++                            target_right = g_params.speed_inside_min;
++                        } else {
++                            target_left  = g_params.speed_inside_min;
++                            target_right = g_params.speed_outside_corner;
++                        }
++                    } else {
++                        target_left  = target_speed;
++                        target_right = target_speed;
++                    }
++                } else {
++                    target_speed = g_params.speed_straight;
++                    float abs_steer = fabsf(steer_cmd);
++                    if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
++                        float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
++                                           ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
++                        if (steer_norm > 1.0f) steer_norm = 1.0f;
++                        float diff_drag = steer_norm * (target_speed - g_params.speed_inside_min);
++
++                        if (steer_cmd > 0.0f) {
++                            target_left  = target_speed;
++                            target_right = target_speed - diff_drag;
++                        } else {
++                            target_left  = target_speed - diff_drag;
++                            target_right = target_speed;
++                        }
++                    } else {
++                        target_left  = target_speed;
++                        target_right = target_speed;
+                     }
+                 }
+-            }
++            } else {
++                /* =========================================================================
++                 * CONTINUOUS ASYMMETRIC CORNER BLEND GOVERNOR (blend 1)
++                 * ========================================================================= */
++                /* 1. Calculate Target & Diode Hold */
++                float hold = 0.0f;
+ 
+-            /* Rollout protection for first 5 ticks */
+-            if (s_rollout_ticks <= 5) {
+-                steer_cmd = 0.0f;
+-            }
++                if (s_intersection_ahead) {
++                    /* Suppress corner blend during intersection transit with smooth release */
++                    s_corner_blend += g_params.blend_release * (0.0f - s_corner_blend);
++                    s_blend_target = 0.0f;
++                } else {
++                    /* Front Camera Preview Target: decoupled start and ceiling */
++                    if (horizon.found > 0) {
++                        float fa_span = (float)FRONT_CORNER_ANGLE_THRESH_DEG - g_params.front_angle_thresh;
++                        if (fa_span < 5.0f) fa_span = 5.0f;
++                        front_t = (fabsf(filtered_front_angle) - g_params.front_angle_thresh) / fa_span;
++                        if (front_t < 0.0f) front_t = 0.0f;
++                        if (front_t > 1.0f) front_t = 1.0f;
++                    }
++                    if (horizon.is_sharp_corner) {
++                        front_t = 1.0f; /* Lock to 1.0 on transverse wall or sharp corner flag */
++                    }
+ 
+-            /* Servo Clamping & Actuation */
+-            if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
+-            if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
+-            Steer(steer_cmd + g_params.steering_offset);
+-            last_steer_cmd = steer_cmd;
++                    /* Top Camera Heading Floor */
++                    float h_range = g_params.h_hi - g_params.h_lo;
++                    if (h_range > 0.1f) {
++                        head_t = (fabsf(filtered_heading) - g_params.h_lo) / h_range;
++                        if (head_t < 0.0f) head_t = 0.0f;
++                        if (head_t > 1.0f) head_t = 1.0f;
++                    }
+ 
+-            /* --- 4. Speed & Differential Braking --- */
+-            float target_speed = g_params.speed_straight;
+-            float target_left  = target_speed;
+-            float target_right = target_speed;
++                    /* Diode / Ratchet Asymmetric Leaky Integrator */
++                    hold = fmaxf(front_t, head_t);
++                    s_blend_target = hold;
+ 
+-            if (horizon.is_sharp_corner) {
+-                /* SHARP CORNER MODE: Drop speed to corner speed + active differential pivot ONLY if steering past deadzone */
+-                target_speed = g_params.speed_outside_corner;
+-                if (fabsf(steer_cmd) > (float)DIFFERENTIAL_DEADZONE_DEG) {
+-                    if (steer_cmd > 0.0f) {
+-                        /* Turning Right: Left is outside, Right is inside pivot */
+-                        target_left  = g_params.speed_outside_corner;
+-                        target_right = g_params.speed_inside_min;
+-                    } else {
+-                        /* Turning Left: Right is outside, Left is inside pivot */
+-                        target_left  = g_params.speed_inside_min;
+-                        target_right = g_params.speed_outside_corner;
++                    if (front_t > s_corner_blend) {
++                        s_corner_blend += g_params.blend_attack * (front_t - s_corner_blend);
++                    } else if (hold < s_corner_blend) {
++                        s_corner_blend += g_params.blend_release * (hold - s_corner_blend);
+                     }
++                }
++
++                /* 2. Steering Calculation */
++                if (sr.found == 0 && !s_intersection_ahead) {
++                    /* Corner apex dropout: HOLD LAST STEER! Do NOT decay or clamp to +-3 deg */
++                    steer_cmd = last_steer_cmd;
++                    steer_top = last_steer_cmd;
+                 } else {
+-                    /* Wheels are straight (|steer| <= 10 deg): equal duty, zero yaw torque induced! */
+-                    target_left  = target_speed;
+-                    target_right = target_speed;
++                    /* Continuous Gain Scheduling between straight and corner gains */
++                    float active_k_cte     = g_params.k_cte + s_corner_blend * (g_params.k_cte_corner - g_params.k_cte);
++                    float active_k_heading = g_params.k_heading + s_corner_blend * (g_params.k_heading_corner - g_params.k_heading);
++
++                    /* Top Camera Centering between closest lines */
++                    steer_top = (active_k_cte * filtered_cte) + (active_k_heading * filtered_heading);
++
++                    steer_cmd = steer_top;
++                    /* Front feedforward pre-steer scaled smoothly by corner blend */
++                    steer_cmd += s_corner_blend * (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
++
++                    if (s_intersection_ahead && sr.found == 0) {
++                        /* Intersection blind gap: clamp held steering to +-3.0 deg immediately after PID calculation */
++                        if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
++                        if (steer_cmd < -3.0f) steer_cmd = -3.0f;
++                    }
++
++                    /* Re-Acquisition Slew-Rate Limiter: <= 4.0 deg/tick for 3 ticks */
++                    if (s_reacquire_ticks > 0) {
++                        s_reacquire_ticks--;
++                        float delta = steer_cmd - last_steer_cmd;
++                        if (delta > 4.0f) {
++                            steer_cmd = last_steer_cmd + 4.0f;
++                        } else if (delta < -4.0f) {
++                            steer_cmd = last_steer_cmd - 4.0f;
++                        }
++                    }
+                 }
+-            } else {
+-                /* STRAIGHT / INTERSECTION / MILD CURVE MODE: 100% full throttle */
+-                target_speed = g_params.speed_straight;
++
++                /* Rollout protection for first 5 ticks */
++                if (s_rollout_ticks <= 5) {
++                    steer_cmd = 0.0f;
++                }
++
++                /* Servo Clamping & Actuation */
++                if (steer_cmd > (float)STEER_CMD_MAX_RIGHT) steer_cmd = (float)STEER_CMD_MAX_RIGHT;
++                if (steer_cmd < (float)STEER_CMD_MAX_LEFT)  steer_cmd = (float)STEER_CMD_MAX_LEFT;
++                Steer(steer_cmd + g_params.steering_offset);
++                last_steer_cmd = steer_cmd;
++
++                /* 3. Speed & Differential Braking */
++                /* Continuous blend smoothly lowers speed target from straight to outside corner */
++                target_speed = g_params.speed_straight - s_corner_blend * (g_params.speed_straight - g_params.speed_outside_corner);
++                target_left  = target_speed;
++                target_right = target_speed;
++
+                 float abs_steer = fabsf(steer_cmd);
+                 if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                     float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
+                                        ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
+                     if (steer_norm > 1.0f) steer_norm = 1.0f;
+-                    float diff_drag = steer_norm * (target_speed - g_params.speed_inside_min);
++
++                    /* Differential drag: full pivot drag restored when corner blend is active */
++                    float diff_mult = steer_norm + s_corner_blend * (1.0f - steer_norm);
++                    float diff_drag = diff_mult * (target_speed - g_params.speed_inside_min);
+ 
+                     if (steer_cmd > 0.0f) {
++                        /* Turning Right: Left is outside, Right is inside pivot */
+                         target_left  = target_speed;
+                         target_right = target_speed - diff_drag;
+                     } else {
++                        /* Turning Left: Right is outside, Left is inside pivot */
+                         target_left  = target_speed - diff_drag;
+                         target_right = target_speed;
+                     }
+@@ -381,7 +503,7 @@ int main(void) {
+             /* --- 7. Telemetry Output (12.5 Hz = Every 4th Tick) --- */
+             if (++s_telemetry_div >= 4) {
+                 s_telemetry_div = 0;
+-                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
++                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d BW:%d BL:%d FT:%d HT:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
+                            (unsigned)sr.found, (unsigned)horizon.found,
+                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
+                            (int)(filtered_heading * 10.0f),
+@@ -389,6 +511,9 @@ int main(void) {
+                            (int)(filtered_front_angle * 10.0f),
+                            (int)(steer_cmd * 10.0f),
+                            (int)(horizon.is_sharp_corner ? 0 : 100),
++                           (int)(s_corner_blend * 100.0f),
++                           (int)(front_t * 100.0f),
++                           (int)(head_t * 100.0f),
+                            horizon.is_sharp_corner ? 'F' : 'T',
+                            horizon.found > 0 ? 1U : 0U,
+                            (unsigned)s_intersection_ahead,

@@ -13,6 +13,7 @@
 //nume peripheral = LP_FLEXCOMM9_PERIPHERAL
 
 static int button_prev_state = 1;
+static int button_debounce_cnt = 0;
 
 void receive_message() {
     uint8_t character;
@@ -29,15 +30,25 @@ void receive_message() {
 
 void buttons_init(void)
 {
-    button_prev_state = 1; // idles HIGH due to pull-up
+    button_prev_state   = 1; // idles HIGH due to pull-up
+    button_debounce_cnt = 0;
 }
 
 int button_pressed_edge(void)
 {
-    int button_now = GPIO_PinRead(GPIO0, 23U);
-    int edge = (button_prev_state == 1 && button_now == 0);
-    button_prev_state = button_now;
-    return edge;
+    int button_raw = GPIO_PinRead(GPIO0, 23U);
+    if (button_raw != button_prev_state) {
+        button_debounce_cnt++;
+        if (button_debounce_cnt >= 3) {
+            int edge = (button_prev_state == 1 && button_raw == 0);
+            button_prev_state   = button_raw;
+            button_debounce_cnt = 0;
+            return edge;
+        }
+    } else {
+        button_debounce_cnt = 0;
+    }
+    return 0;
 }
 
 void print_double(const char *label, float val)

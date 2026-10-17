@@ -1,0 +1,4 @@
+import re
+
+with open(r"d:\nxpcup\scratch\raw_runs.txt", "w", encoding="utf-8") as f:
+    pass # we will put the text there or parse directly
