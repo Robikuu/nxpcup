@@ -1,8 +1,8 @@
 D:\nxpcup\drivers/fsl_gpio.h:428:24:GPIO_PinRead	16	static
 D:\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
-../source/utils.c:17:6:receive_message	16	static
-../source/utils.c:30:6:buttons_init	4	static
-../source/utils.c:35:5:button_pressed_edge	16	static
-../source/utils.c:43:6:print_double	32	static
-../source/utils.c:52:6:TestHbridge	48	static
-../source/utils.c:112:6:TestPidSteer	72	static
+../source/utils.c:18:6:receive_message	16	static
+../source/utils.c:31:6:buttons_init	4	static
+../source/utils.c:37:5:button_pressed_edge	16	static
+../source/utils.c:54:6:print_double	32	static
+../source/utils.c:63:6:TestHbridge	48	static
+../source/utils.c:123:6:TestPidSteer	72	static

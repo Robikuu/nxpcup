@@ -1,3 +1,3 @@
-../source/vectors.c:16:6:reset_steering_tracking	4	static
-../source/vectors.c:25:6:compute_top_camera_lane	104	static
-../source/vectors.c:162:6:compute_front_camera_horizon	1392	static
+../source/vectors.c:26:6:reset_steering_tracking	4	static
+../source/vectors.c:39:6:compute_top_camera_lane	192	static
+../source/vectors.c:270:6:compute_front_camera_horizon	1400	static

@@ -9,31 +9,30 @@
 #define PIXY_TRACK_HALF_WIDTH        25.0f
 
 // ---- Top Camera Chassis Exclusion Zone (Ignores Front Bumper, Wheels, Servo & Tie-Rods) ----
-// Covers entire front axle, wheels at full steering deflection, servo horn, and chassis plate.
-#define TOP_CAM_EXCLUDE_Y_MIN        38U       // Pixy2 frame Y >= 38 (~290-400 in PixyMon, covers axle & wheels)
-#define TOP_CAM_EXCLUDE_X_MIN        18U       // Pixy2 frame X >= 18 (~145 in PixyMon, covers left wheel lock)
-#define TOP_CAM_EXCLUDE_X_MAX        62U       // Pixy2 frame X <= 62 (~505 in PixyMon, covers right wheel lock)
+#define TOP_CAM_EXCLUDE_Y_MIN        38U       // Pixy2 frame Y >= 38
+#define TOP_CAM_EXCLUDE_X_MIN        18U       // Pixy2 frame X >= 18
+#define TOP_CAM_EXCLUDE_X_MAX        62U       // Pixy2 frame X <= 62
 
 // ---- Physical Steering Limits & Trim Offset ----
 #define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit
 #define STEERING_LIMIT_LEFT         -65.0f     // Physical servo left mechanical limit
-#define STEERING_OFFSET              0.00f    // Straight-line trim offset (trimmed to eliminate rightward lane drift)
+#define STEERING_OFFSET              0.00f     // Straight-line trim offset
 
 // Relative command limits (steer_cmd relative to center trim)
-#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)  // +52.5f
-#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)   // -77.5f
+#define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)
+#define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)
 
-// ---- Wheel Speeds & Asymmetric Differential Drag (Fast Race Profile) ----
+// ---- Wheel Speeds & Asymmetric Differential Drag ----
 #define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         50.0f     // Calibrated apex outside wheel drive (%)
+#define SPEED_OUTSIDE_CORNER         55.0f     // Calibrated apex outside wheel drive (%)
 #define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
-#define DIFFERENTIAL_DEADZONE_DEG   8.0f     // Steer angle deadzone below which zero differential drag applies (prevents straightaway torque-steer weave)
+#define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
 #define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
 
-// ---- Clean Dual-Camera Horizon & Lane Constants ----
+// ---- Dual-Camera Horizon & Lane Constants ----
 #define FRONT_CORNER_ANGLE_THRESH_DEG 30.0f    // Horizon road angle threshold for sharp corner detection
 #define TRACK_HALF_WIDTH_PX          25.0f     // Nominal lane half-width (pixels) in top camera view
 #define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
@@ -42,93 +41,38 @@
 #define DECEL_RAMP_STEP              30.0f     // Rapid pre-braking & pivot lock ramp (~2 ticks from 100% to 40%)
 #define ACCEL_RAMP_STEP              6.0f      // Smooth traction-preserving corner exit acceleration (~160ms)
 
-// ---- Direction-Reversal Transition Ramp (S-curves / chicanes) ----
-#define REVERSAL_RELEASE_STEP        20.0f     // Unloads previous dragging inside wheel without breaking rear traction
-#define REVERSAL_DECEL_STEP          18.0f     // Rapidly locks new inside wheel into pivot drag
-#define YAW_CONFLICT_DEADBAND        3.0f      // Steer angle deadband to trigger yaw conflict logic
+// ---- Error Weights & Heading Deadband ----
+#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight (smooth straight line centering)
+#define DEFAULT_K_HEADING            1.10f     // Direct base camera heading damping
+#define HEADING_DEADBAND_DEG         2.0f      // Heading deadband on straights to prevent pixel jitter
 
-// ---- Forward Camera Lookahead Horizon & Root Anchor Geometry ----
-#define FORWARD_CAM_HORIZON_Y_MIN    13U       // Discards upper 25% of forward camera view (walls/lights)
-#define FORWARD_CAM_ROOT_ANCHOR_Y_MIN 30U      // Vector base must anchor in foreground bumper zone (Y >= 30)
-#define FORWARD_CAM_SAMPLE_HORIZON_Y 20.0f     // Far preview horizon (~1.5m ahead) for speed governor pre-braking
-#define FORWARD_CAM_SAMPLE_NEAR_Y    38.0f     // Near steering horizon (~0.45m ahead) for fallback steering & feedforward
-#define FORWARD_CAM_LEFT_MAX_X       34.0f     // Left root vector base must lie in X <= 34.0
-#define FORWARD_CAM_RIGHT_MIN_X      45.0f     // Right root vector base must lie in X >= 45.0
-#define LOOKAHEAD_DEADBAND_PX        5.0f      // Neutral straightaway curvature margin (+/- 3.5px)
-#define LOOKAHEAD_FULL_URGENCY_PX    13.0f     // Lateral offset/curvature for 100% lookahead urgency
-
-// ---- Dynamic PID Gain Scheduling (Rationalized Decoupled Architecture) ----
-#define KP_STRAIGHT                  0.50f     // Damped straight-line centering (no twitch)
-#define KP_CORNER                    3.8f     // Crisp cornering authority (decisive bite into 90 deg turns)
-#define KD_STRAIGHT                  0.120f    // Lateral velocity damping (calibrated to damp straightaway weave)
-#define KD_CORNER                    0.180f    // Lateral velocity damping
-#define DEFAULT_KI                   0.0f
-#define DEFAULT_ALPHA                0.25f     // Low-pass filter coefficient on derivative term
-#define MAX_STEER_RATE_PER_SEC       650.0f    // Max steering slew rate (deg/s) -> 13.0 deg/tick
-
-// ---- Error Weights & Decoupled Feedforward ----
-#define DEFAULT_K_CTE                0.55f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.3f     // Direct base camera heading damping (calibrated to eliminate straightaway weave)
-#define DEFAULT_K_LOOKAHEAD          0.0f      // Lookahead steering injection disabled (eliminates premature turn-in)
-#define HEADING_DEADBAND_DEG         2.0f      // Heading deadband below which base feedforward is 0.0 (prevents straight jitter)
-
-// ---- Control Loop ----
-#define DEFAULT_DT                   0.02f     // 20ms tick = 50Hz
-#define DEFAULT_SHADOW_MODE          1U        // 1 = shadow mode (top steers, front logs for calibration)
+// ---- Control Loop & Failsafe ----
 #define DEFAULT_MOTOR_ENABLE         1U        // 1 = drive motors active, 0 = drive motors disabled for push calibration
-
-// ---- Dual-Camera Steering Blend & Fallback ----
-#define FRONT_KP                     0.70f     // Calibrated front camera proportional steering gain (1:1 parity with top)
-#define FRONT_K_OFFSET               0.25f     // Calibrated front camera horizon lateral offset gain
-#define BLEND_FALL_SLEW_MAX          0.50f     // 2 ticks (40ms) fast transfer to front camera on top dropout
-#define BLEND_RISE_SLEW_MAX          0.08f     // ~12 ticks (240ms) smooth return to top camera on reacquisition
-#define BLEND_FALLBACK_SPEED_CAP     65.0f     // Max speed when front camera dominates (alpha < 0.30)
-
-// ---- State Machine & Macro States ----
-#define MACRO_STATE_NORMAL           0
-#define MACRO_STATE_INTERSECTION     1
-#define MACRO_STATE_LINE_LOST        2
-
-// ---- Continuous Curvature Governor (Noise Deadbands & Saturation) ----
-#define GOVERNOR_HEADING_DEADBAND_DEG 5.0f     // Noise floor below which base heading curvature is 0.0 (stops phantom braking)
-#define GOVERNOR_HEADING_MAX_DEG      25.0f    // Heading angle corresponding to 100% corner intensity
-#define INTERSECTION_TIMEOUT_TICKS    18U      // 18 ticks (360ms) fixed crossing timeout
-#define LINE_LOST_DEBOUNCE_TICKS      3U       // 3 ticks (60ms) optical dropout debounce before entering LINE_LOST
-#define LINE_LOST_BRAKE_TICKS         18U      // 18 ticks (360ms) coast window before active braking
-#define LINE_LOST_STOP_TICKS          50U      // 50 ticks (1000ms) before full emergency stop
 #define OFF_TRACK_FAILSAFE_TICKS     125U      // 125 ticks (2.5 seconds @ 50Hz) off-track emergency stop
-#define LINE_REACQUIRE_TICKS          3U       // 3 consecutive valid frames required to return to NORMAL
 
 // ---- Geometric Boundary Validation ----
-#define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width (rejects center-dash at 25px, preserves tight curves at 34px)
+#define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width to reject duplicate split line segments
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
-#define CONNECT_DIST_PX              15.0f     // Endpoint distance threshold to reject split curve fragments
 
 // ---- Continuous Asymmetric Corner Blend Governor ----
-#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0 (prevents straight drag)
-#define DEFAULT_H_HI                 25.0f     // Heading saturation ceiling (deg): above this, hold = 1.0 (full corner hold)
+#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0
+#define DEFAULT_H_HI                 25.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   15.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   20.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
-#define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE      // Start equal to straight gains (0.55f)
-#define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING  // Start equal to straight gains (1.30f)
+#define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
+#define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
 
 // ---- Robot States ----
 #define STATE_IDLE                   0
 #define STATE_RUNNING                1
 
-// ---- Runtime-Tunable Parameter Struct ----
+// ---- Runtime-Tunable Parameter Struct (18 Active Fields) ----
 typedef struct {
-    float kp_straight;
-    float kp_corner;
-    float ki;
-    float kd_straight;
-    float kd_corner;
     float speed_straight;
     float speed_outside_corner;
     float speed_inside_min;
-    float alpha;
     float steering_offset;
     float k_cte;
     float k_heading;
@@ -139,13 +83,10 @@ typedef struct {
     float blend_attack;
     float blend_release;
     float front_angle_thresh;
-    float k_lookahead;
-    float dt;
     float accel_ramp;
     float decel_ramp;
-    float drive_scale;           // Output plant gain scale
+    float drive_scale;           // Output plant gain scale (0.10 to 1.00)
     uint8_t blend_enable;        // 1 = continuous blend active, 0 = legacy discrete mode
-    uint8_t shadow_mode_enable; // 1 = shadow mode (steer on top, log front), 0 = active blend
     uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
     uint8_t state;
 } robot_params_t;

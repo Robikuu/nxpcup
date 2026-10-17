@@ -1,7 +1,10 @@
+D:\nxpcup\drivers/fsl_lpi2c.h:558:20:LPI2C_MasterEnable	16	static
+D:\nxpcup\drivers/fsl_lpi2c.h:605:20:LPI2C_MasterClearStatusFlags	16	static
 ../source/pixy.c:8:13:pixy_edma_cb	32	static
-../source/pixy.c:22:6:pixy_init	32	static
-../source/pixy.c:41:17:pixy_send	56	static
-../source/pixy.c:66:17:pixy_recv	56	static
-../source/pixy.c:91:10:pixy_set_led	40	static
-../source/pixy.c:100:10:pixy_set_lamp	40	static
-../source/pixy.c:109:10:pixy_get_vectors	168	static
+../source/pixy.c:22:13:pixy_recover_bus	16	static
+../source/pixy.c:29:6:pixy_init	40	static
+../source/pixy.c:57:17:pixy_send	56	static
+../source/pixy.c:88:17:pixy_recv	56	static
+../source/pixy.c:119:10:pixy_set_led	40	static
+../source/pixy.c:128:10:pixy_set_lamp	40	static
+../source/pixy.c:137:10:pixy_get_vectors	168	static

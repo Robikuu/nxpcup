@@ -9,9 +9,10 @@
     #define M_PI 3.14159265358979323846f
 #endif
 
-#define TOP_CAM_LOOKAHEAD_Y_REF      35.0f
+#define TOP_CAM_LOOKAHEAD_Y_REF      44.0f
 #define TOP_CAM_TRACK_GATE_PX        22.0f
 #define TOP_CAM_MAX_BLIND_TRACK_TICKS 8U
+#define TOP_SINGLE_LINE_PERSP_DEG    14.0f
 #define FRONT_SINGLE_LINE_PERSP_DEG  18.0f
 
 /* Stateful temporal memory for lane continuity and left/right boundary tracking */
@@ -54,10 +55,12 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
     bool  left_found       = false;
     bool  right_found      = false;
     float best_left_x      = -1000.0f;
+    float best_left_x_far  = 0.0f;
     float best_left_angle  = 0.0f;
     float best_left_dy     = 0.0f;
     float best_left_dist   = 1000.0f;
     float best_right_x     = 1000.0f;
+    float best_right_x_far = 0.0f;
     float best_right_angle = 0.0f;
     float best_right_dy    = 0.0f;
     float best_right_dist  = 1000.0f;
@@ -148,6 +151,7 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
             float ref_dist = use_tracking ? fabsf(x_proj - s_last_left_x) : fabsf((float)PIXY_CENTER_X - x_proj);
             if (!left_found || ref_dist < best_left_dist) {
                 best_left_x     = x_proj;
+                best_left_x_far = x_far;
                 best_left_angle = angle;
                 best_left_dy    = dy;
                 best_left_dist  = ref_dist;
@@ -157,6 +161,7 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
             float ref_dist = use_tracking ? fabsf(x_proj - s_last_right_x) : fabsf(x_proj - (float)PIXY_CENTER_X);
             if (!right_found || ref_dist < best_right_dist) {
                 best_right_x     = x_proj;
+                best_right_x_far = x_far;
                 best_right_angle = angle;
                 best_right_dy    = dy;
                 best_right_dist  = ref_dist;
@@ -193,6 +198,13 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         s_blind_frames = 0U;
     } else if (left_found) {
         heading = best_left_angle;
+        if (best_left_x_far < (float)PIXY_CENTER_X && heading > 0.0f) {
+            float persp_scale = (30.0f - fabsf(heading)) / (30.0f - 20.0f);
+            if (persp_scale < 0.0f) persp_scale = 0.0f;
+            if (persp_scale > 1.0f) persp_scale = 1.0f;
+            float comp = TOP_SINGLE_LINE_PERSP_DEG * persp_scale;
+            heading = (heading > comp) ? (heading - comp) : 0.0f;
+        }
         float cos_h = cosf(heading * (M_PI / 180.0f));
         if (cos_h < 0.55f) cos_h = 0.55f;
         float perp_offset = (float)TRACK_HALF_WIDTH_PX / cos_h;
@@ -204,6 +216,13 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         s_blind_frames = 0U;
     } else if (right_found) {
         heading = best_right_angle;
+        if (best_right_x_far >= (float)PIXY_CENTER_X && heading < 0.0f) {
+            float persp_scale = (30.0f - fabsf(heading)) / (30.0f - 20.0f);
+            if (persp_scale < 0.0f) persp_scale = 0.0f;
+            if (persp_scale > 1.0f) persp_scale = 1.0f;
+            float comp = TOP_SINGLE_LINE_PERSP_DEG * persp_scale;
+            heading = (heading < -comp) ? (heading + comp) : 0.0f;
+        }
         float cos_h = cosf(heading * (M_PI / 180.0f));
         if (cos_h < 0.55f) cos_h = 0.55f;
         float perp_offset = (float)TRACK_HALF_WIDTH_PX / cos_h;
@@ -301,6 +320,10 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
 
         /* Transverse tape aspect ratio test: dy <= 0.27 * |dx| && |dx| >= 16.0 */
         if (dy <= 0.27f * abs_dx && abs_dx >= 16.0f) {
+            if (y_near < 14.0f) {
+                parsed[i].is_transverse = false;
+                continue; /* Ignore far-away transverse walls in top 27% of horizon frame */
+            }
             parsed[i].is_transverse = true;
             out->has_transverse_tape = 1U;
 
@@ -457,18 +480,13 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         if (out->transverse_crosses_center == 0U && has_exit_line) {
             out->is_intersection_ahead = 1U;
             out->is_sharp_corner       = 0U; /* Open intersection -> do not brake or trigger pivot drag */
-            out->horizon_angle_deg     = 0.0f;
         } else {
             out->is_intersection_ahead = 0U;
             out->is_sharp_corner       = 1U; /* Fail-safe default to corner, pre-brake! */
-            /* Preserve longitudinal turn direction for feedforward pre-steer on 90-deg corners */
-            if (sum_length > 0.1f && valid_count > 0) {
-                out->horizon_angle_deg = sum_weighted_angle / sum_length;
-            } else {
-                out->horizon_angle_deg = 0.0f;
-            }
         }
-        out->found = (uint8_t)count;
+        /* Transverse tape detected: pre-brake on corner wall, do not pull front wheels early */
+        out->horizon_angle_deg = 0.0f;
+        out->found             = (uint8_t)count;
     } else {
         out->is_intersection_ahead = 0U;
         if (sum_length > 0.1f && valid_count > 0) {

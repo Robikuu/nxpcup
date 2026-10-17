@@ -19,6 +19,13 @@ static void pixy_edma_cb(LPI2C_Type *base,
     }
 }
 
+static void pixy_recover_bus(pixy_t *cam)
+{
+    LPI2C_MasterTransferAbortEDMA(cam->instance, &cam->edmaHandle);
+    cam->instance->MCR |= (LPI2C_MCR_RRF_MASK | LPI2C_MCR_RTF_MASK);
+    LPI2C_MasterClearStatusFlags(cam->instance, (uint32_t)kLPI2C_MasterClearFlags);
+}
+
 void pixy_init(pixy_t *cam,
                LPI2C_Type *inst,
                uint8_t addr,
@@ -29,6 +36,15 @@ void pixy_init(pixy_t *cam,
     cam->address        = addr;
     cam->transferDone   = false;
     cam->transferStatus = kStatus_Success;
+
+    /* Enable 50us hardware bus-idle timeout and 1-cycle SDA/SCL glitch filter so BBF never locks up */
+    LPI2C_MasterEnable(cam->instance, false);
+    uint32_t cfgr2 = cam->instance->MCFGR2;
+    cfgr2 &= ~(LPI2C_MCFGR2_BUSIDLE_MASK | LPI2C_MCFGR2_FILTSDA_MASK | LPI2C_MCFGR2_FILTSCL_MASK);
+    cfgr2 |= LPI2C_MCFGR2_BUSIDLE(600U) | LPI2C_MCFGR2_FILTSDA(1U) | LPI2C_MCFGR2_FILTSCL(1U);
+    cam->instance->MCFGR2 = cfgr2;
+    LPI2C_MasterEnable(cam->instance, true);
+
     LPI2C_MasterCreateEDMAHandle(
         cam->instance,
         &cam->edmaHandle,
@@ -51,14 +67,20 @@ static status_t pixy_send(pixy_t *cam, const uint8_t *cmd, size_t len)
         .flags          = kLPI2C_TransferDefaultFlag,
     };
     status_t s = LPI2C_MasterTransferEDMA(cam->instance, &cam->edmaHandle, &xfer);
-    if (s != kStatus_Success) return s;
+    if (s != kStatus_Success) {
+        pixy_recover_bus(cam);
+        return s;
+    }
 
     uint32_t timeout = PIXY_TIMEOUT_CYCLES;
     while (!cam->transferDone && --timeout > 0) {}
 
     if (timeout == 0) {
-        LPI2C_MasterTransferAbortEDMA(cam->instance, &cam->edmaHandle);
+        pixy_recover_bus(cam);
         return kStatus_Timeout;
+    }
+    if (cam->transferStatus != kStatus_Success) {
+        pixy_recover_bus(cam);
     }
     return cam->transferStatus;
 }
@@ -76,14 +98,20 @@ static status_t pixy_recv(pixy_t *cam, uint8_t *buf, size_t len)
         .flags          = kLPI2C_TransferDefaultFlag,
     };
     status_t s = LPI2C_MasterTransferEDMA(cam->instance, &cam->edmaHandle, &xfer);
-    if (s != kStatus_Success) return s;
+    if (s != kStatus_Success) {
+        pixy_recover_bus(cam);
+        return s;
+    }
 
     uint32_t timeout = PIXY_TIMEOUT_CYCLES;
     while (!cam->transferDone && --timeout > 0) {}
 
     if (timeout == 0) {
-        LPI2C_MasterTransferAbortEDMA(cam->instance, &cam->edmaHandle);
+        pixy_recover_bus(cam);
         return kStatus_Timeout;
+    }
+    if (cam->transferStatus != kStatus_Success) {
+        pixy_recover_bus(cam);
     }
     return cam->transferStatus;
 }
@@ -122,13 +150,13 @@ status_t pixy_get_vectors(pixy_t *cam,
     status_t s = pixy_send(cam, cmd, sizeof(cmd));
     if (s != kStatus_Success) return s;
 
-    uint8_t buf[68];
+    uint8_t buf[100];
     s = pixy_recv(cam, buf, sizeof(buf));
     if (s != kStatus_Success) return s;
 
     /* Locate Pixy2 response sync (0xAF, 0xC1) and type 49 (CCC/Line main features response) */
     uint16_t hdr_off = 0xFFFFU;
-    for (uint16_t h = 0; h <= 2U; h++) {
+    for (uint16_t h = 0; h <= 60U; h++) {
         if (buf[h] == 0xAFU && buf[h + 1U] == 0xC1U && buf[h + 2U] == 49U) {
             hdr_off = h;
             break;
