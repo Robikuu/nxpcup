@@ -1,2 +1,7 @@
+../source/control_theory.h:67:20:corner_severity_reset	16	static
 ../source/control_theory.c:4:6:pid_init	32	static
 ../source/control_theory.c:17:7:pid_update	48	static
+../source/control_theory.c:52:14:clamp01	16	static
+../source/control_theory.c:60:14:ramp01	32	static
+../source/control_theory.c:67:7:corner_severity_update	56	static
+../source/control_theory.c:105:7:corner_severity_speed	24	static

@@ -37,6 +37,10 @@
 #define TRACK_HALF_WIDTH_PX          25.0f     // Nominal lane half-width (pixels) in top camera view
 #define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
 
+// ---- Severity-Scaled Corner Speed (speed = spd_s - severity * (spd_s - spd_out)) ----
+#define FRONT_SEVERITY_FULL_DEG      50.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)
+#define CORNER_SEVERITY_HOLD_TICKS   3U        // Ticks the severity peak is held after it drops (corner wall flicker guard)
+
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              30.0f     // Rapid pre-braking & pivot lock ramp (~2 ticks from 100% to 40%)
 #define ACCEL_RAMP_STEP              6.0f      // Smooth traction-preserving corner exit acceleration (~160ms)
@@ -55,11 +59,11 @@
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
 
 // ---- Continuous Asymmetric Corner Blend Governor ----
-#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0
-#define DEFAULT_H_HI                 25.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
+#define DEFAULT_H_LO                 18.0f     // Heading deadband floor (deg): below this, hold = 0.0
+#define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   20.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   25.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
 #define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
 #define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING

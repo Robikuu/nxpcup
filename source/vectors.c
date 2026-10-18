@@ -320,9 +320,9 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
 
         /* Transverse tape aspect ratio test: dy <= 0.27 * |dx| && |dx| >= 16.0 */
         if (dy <= 0.27f * abs_dx && abs_dx >= 16.0f) {
-            if (y_near < 14.0f) {
+            if (y_near < 22.0f) {
                 parsed[i].is_transverse = false;
-                continue; /* Ignore far-away transverse walls in top 27% of horizon frame */
+                continue; /* Ignore distant transverse walls in top 43% of horizon frame */
             }
             parsed[i].is_transverse = true;
             out->has_transverse_tape = 1U;
@@ -475,37 +475,44 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         }
     }
 
+    /* Compute weighted foreground/longitudinal road angle from non-transverse vectors */
+    float avg_angle = 0.0f;
+    if (sum_length > 0.1f && valid_count > 0) {
+        avg_angle = sum_weighted_angle / sum_length;
+
+        /* Single-line perspective convergence compensation:
+         * Only subtract the natural ~18 deg straight-line convergence when a single vector
+         * stays on its own side of PIXY_CENTER_X (not curving across the track center).
+         */
+        if (valid_count == 1) {
+            float sx_near = parsed[last_valid_idx].x_near;
+            float sx_far  = parsed[last_valid_idx].x_far;
+            if (sx_near < (float)PIXY_CENTER_X && sx_far < (float)PIXY_CENTER_X && avg_angle > 0.0f) {
+                avg_angle = (avg_angle > FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle - FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+            } else if (sx_near >= (float)PIXY_CENTER_X && sx_far >= (float)PIXY_CENTER_X && avg_angle < 0.0f) {
+                avg_angle = (avg_angle < -FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle + FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+            }
+        }
+    }
+
     /* Strategic Decision */
     if (out->has_transverse_tape) {
         if (out->transverse_crosses_center == 0U && has_exit_line) {
             out->is_intersection_ahead = 1U;
             out->is_sharp_corner       = 0U; /* Open intersection -> do not brake or trigger pivot drag */
+            out->horizon_angle_deg     = 0.0f;
         } else {
             out->is_intersection_ahead = 0U;
             out->is_sharp_corner       = 1U; /* Fail-safe default to corner, pre-brake! */
+            /* Preserve foreground curving lane angle when available so inner-loop corners
+             * keep front-camera steering feedforward (top_turn_gate in main.c blocks early
+             * turn-in on straights). */
+            out->horizon_angle_deg     = (valid_count > 0) ? avg_angle : 0.0f;
         }
-        /* Transverse tape detected: pre-brake on corner wall, do not pull front wheels early */
-        out->horizon_angle_deg = 0.0f;
-        out->found             = (uint8_t)count;
+        out->found = (uint8_t)count;
     } else {
         out->is_intersection_ahead = 0U;
         if (sum_length > 0.1f && valid_count > 0) {
-            float avg_angle = sum_weighted_angle / sum_length;
-
-            /* Single-line perspective convergence compensation:
-             * Only subtract the natural ~18 deg straight-line convergence when a single vector
-             * stays on its own side of PIXY_CENTER_X (not curving across the track center).
-             */
-            if (valid_count == 1) {
-                float sx_near = parsed[last_valid_idx].x_near;
-                float sx_far  = parsed[last_valid_idx].x_far;
-                if (sx_near < (float)PIXY_CENTER_X && sx_far < (float)PIXY_CENTER_X && avg_angle > 0.0f) {
-                    avg_angle = (avg_angle > FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle - FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
-                } else if (sx_near >= (float)PIXY_CENTER_X && sx_far >= (float)PIXY_CENTER_X && avg_angle < 0.0f) {
-                    avg_angle = (avg_angle < -FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle + FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
-                }
-            }
-
             out->is_sharp_corner   = (fabsf(avg_angle) > (float)FRONT_CORNER_ANGLE_THRESH_DEG) ? 1U : 0U;
             out->horizon_angle_deg = avg_angle;
             out->found             = valid_count;

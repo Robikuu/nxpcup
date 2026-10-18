@@ -82,15 +82,15 @@ int main(void)
         CHECK(sr.cte > 6.0f, "Single angled left line uses perpendicular offset 25/cos(theta) (cte=%.2f)", sr.cte);
     }
 
-    printf("\n=== Test 6: Front camera transverse corner wall triggers pre-brake without early steering pull ===\n");
+    printf("\n=== Test 6: Front camera transverse corner wall triggers pre-brake AND preserves foreground curve angle ===\n");
     {
         uint16_t vecs[] = {
-            15, 27, 65, 25,   /* Transverse corner wall */
+            15, 27, 65, 25,   /* Transverse corner wall in braking zone (y_near=27 >= 22) */
             20, 48, 55, 26    /* Right-curving longitudinal boundary */
         };
         compute_front_camera_horizon(vecs, 2, &hr);
-        CHECK(hr.is_sharp_corner == 1 && hr.horizon_angle_deg == 0.0f,
-              "90-deg corner wall triggers is_sharp_corner=1 with horizon_angle_deg=0.0 (is_sharp=%u, angle=%.2f)",
+        CHECK(hr.is_sharp_corner == 1 && hr.has_transverse_tape == 1 && hr.horizon_angle_deg > 30.0f,
+              "90-deg corner wall triggers is_sharp_corner=1 while preserving foreground curve angle (is_sharp=%u, angle=%.2f)",
               hr.is_sharp_corner, hr.horizon_angle_deg);
     }
 
@@ -113,23 +113,23 @@ int main(void)
     {
         /* A. On straightaway (filtered_heading = 3.0 deg) while front camera sees corner (FS = +40 deg) -> gate = 0.0 */
         float h_straight = 3.0f, fs = 40.0f;
-        float gate_s = (h_straight * fs > 0.0f) ? ((fabsf(h_straight) - 5.0f) / 13.0f) : 0.0f;
+        float gate_s = (h_straight * fs > 0.0f) ? ((fabsf(h_straight) - 3.0f) / 12.0f) : 0.0f;
         if (gate_s < 0.0f) gate_s = 0.0f;
         CHECK(gate_s == 0.0f, "Straightaway (heading=3 deg) blocks early front-camera steering (gate=%.2f)", gate_s);
 
         /* B. S-curve conflict (filtered_heading = -14.2 deg left, FS = +25.8 deg right) -> gate = 0.0 */
         float h_scurve = -14.2f, fs_scurve = 25.8f;
-        float gate_sc = (h_scurve * fs_scurve > 0.0f) ? ((fabsf(h_scurve) - 5.0f) / 13.0f) : 0.0f;
+        float gate_sc = (h_scurve * fs_scurve > 0.0f) ? ((fabsf(h_scurve) - 3.0f) / 12.0f) : 0.0f;
         if (gate_sc < 0.0f) gate_sc = 0.0f;
         CHECK(gate_sc == 0.0f, "S-curve opposing signs (H=-14.2, FS=+25.8) blocks fighting feedforward (gate=%.2f)", gate_sc);
 
-        /* C. Entering corner (filtered_heading = +11.5 deg, FS = +40 deg) -> smooth 0.50 ramp */
-        float h_turn = 11.5f;
-        float gate_t = (h_turn * fs > 0.0f) ? ((fabsf(h_turn) - 5.0f) / 13.0f) : 0.0f;
-        CHECK(fabsf(gate_t - 0.50f) < 0.01f, "Mid-entry (heading=11.5 deg) smoothly ramps gate to 0.50 (gate=%.2f)", gate_t);
+        /* C. Entering corner (filtered_heading = +9.0 deg, FS = +40 deg) -> smooth 0.50 ramp */
+        float h_turn = 9.0f;
+        float gate_t = (h_turn * fs > 0.0f) ? ((fabsf(h_turn) - 3.0f) / 12.0f) : 0.0f;
+        CHECK(fabsf(gate_t - 0.50f) < 0.01f, "Mid-entry (heading=9.0 deg) smoothly ramps gate to 0.50 (gate=%.2f)", gate_t);
     }
 
-    printf("\n=== Test 9: blend=1 proportional differential braking & ramp constants ===\n");
+    printf("\n=== Test 9: blend=1 proportional differential braking & ramp/speed-hold constants ===\n");
     {
         float abs_steer = 10.0f;
         float s_corner_blend = 1.0f;
@@ -141,9 +141,11 @@ int main(void)
         float inside_wheel = target_speed - diff_mult * (target_speed - (float)SPEED_INSIDE_MIN);
         CHECK(inside_wheel > 52.0f,
               "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 32%%)", inside_wheel);
-        CHECK(DECEL_RAMP_STEP == 30.0f && ACCEL_RAMP_STEP == 6.0f && SPEED_OUTSIDE_CORNER == 55.0f,
-              "Config defaults: DECEL=%.1f, ACCEL=%.1f, SPD_OUT=%.1f",
-              (float)DECEL_RAMP_STEP, (float)ACCEL_RAMP_STEP, (float)SPEED_OUTSIDE_CORNER);
+        CHECK(DECEL_RAMP_STEP == 30.0f && ACCEL_RAMP_STEP == 6.0f && SPEED_OUTSIDE_CORNER == 55.0f &&
+              DEFAULT_H_LO == 18.0f && DEFAULT_H_HI == 35.0f && DEFAULT_FRONT_ANGLE_THRESH == 25.0f,
+              "Config defaults: DECEL=%.1f, ACCEL=%.1f, SPD_OUT=%.1f, H_LO=%.1f, H_HI=%.1f, FA_TH=%.1f",
+              (float)DECEL_RAMP_STEP, (float)ACCEL_RAMP_STEP, (float)SPEED_OUTSIDE_CORNER,
+              (float)DEFAULT_H_LO, (float)DEFAULT_H_HI, (float)DEFAULT_FRONT_ANGLE_THRESH);
     }
 
     printf("\n=== Test 10: Top camera single-line perspective compensation (fade 20..30 deg) ===\n");
@@ -165,15 +167,15 @@ int main(void)
               sr.heading_deg);
     }
 
-    printf("\n=== Test 11: Front camera ignores far-away transverse walls (y_near < 14.0f) in Pass 1 ===\n");
+    printf("\n=== Test 11: Front camera ignores distant transverse walls (y_near < 22.0f) on inner-loop chutes ===\n");
     {
         uint16_t far_wall_and_curve[] = {
-            15, 11, 65, 10,   /* Far-away transverse wall at top of frame (y_near=11 < 14) */
+            15, 19, 65, 18,   /* Distant transverse wall on inner-loop chute (y_near=19 < 22) */
             15, 48, 52, 18    /* Foreground right-curving lane line */
         };
         compute_front_camera_horizon(far_wall_and_curve, 2, &hr);
         CHECK(hr.has_transverse_tape == 0 && hr.horizon_angle_deg > 30.0f,
-              "Far transverse wall (y_near=11 < 14) ignored without zeroing foreground angle (has_trans=%u, angle=%.2f)",
+              "Distant transverse wall (y_near=19 < 22) ignored on inner-loop chute (has_trans=%u, angle=%.2f)",
               hr.has_transverse_tape, hr.horizon_angle_deg);
     }
 

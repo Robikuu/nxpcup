@@ -106,6 +106,8 @@ int main(void) {
     uint8_t  s_corner_hold_ticks       = 0; /* 3-tick release hold for blend 0 corner latch */
     float    s_corner_blend            = 0.0f; /* 0.0 = straight, 1.0 = sharp corner */
     float    s_blend_target            = 0.0f; /* Debug target holding blend */
+    corner_severity_t s_corner_sev;            /* Severity-scaled corner speed state (peak hold) */
+    corner_severity_reset(&s_corner_sev);
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -148,6 +150,7 @@ int main(void) {
                 s_reacquire_ticks         = 0;
                 s_sharp_cancel_count      = 0;
                 s_corner_hold_ticks       = 0;
+                corner_severity_reset(&s_corner_sev);
                 s_corner_blend            = 0.0f;
                 s_blend_target            = 0.0f;
 
@@ -165,7 +168,8 @@ int main(void) {
             memset(&horizon, 0, sizeof(horizon));
             if (s_front == kStatus_Success && num_vectors_front > 0) {
                 compute_front_camera_horizon(vectors_front, num_vectors_front, &horizon);
-                if (horizon.found > 0) {
+                if (horizon.found > 0 &&
+                    (!horizon.has_transverse_tape || fabsf(horizon.horizon_angle_deg) > 0.1f || horizon.is_intersection_ahead)) {
                     filtered_front_angle = 0.40f * horizon.horizon_angle_deg + 0.60f * filtered_front_angle;
                 } else {
                     filtered_front_angle *= 0.85f;
@@ -307,14 +311,14 @@ int main(void) {
             float max_left_delta  = (float)STEERING_LIMIT_LEFT  - g_params.steering_offset;
 
             /* Smooth, sign-aware corner-entry gate for front-camera steering feedforward:
-             * 0.0 on straights (|heading| <= 5 deg) or when S-curve signs oppose,
-             * ramping smoothly to 1.0 at |heading| >= 18 deg (or 1.0 during blind apex dropout).
+             * 0.0 on straights (|heading| <= 3 deg) or when S-curve signs oppose,
+             * ramping smoothly to 1.0 at |heading| >= 15 deg (or 1.0 during blind apex dropout).
              */
             float top_turn_gate = 0.0f;
             if (sr.found == 0) {
                 top_turn_gate = 1.0f;
             } else if (filtered_heading * filtered_front_angle > 0.0f) {
-                top_turn_gate = (fabsf(filtered_heading) - 5.0f) / (18.0f - 5.0f);
+                top_turn_gate = (fabsf(filtered_heading) - 3.0f) / (15.0f - 3.0f);
                 if (top_turn_gate < 0.0f) top_turn_gate = 0.0f;
                 if (top_turn_gate > 1.0f) top_turn_gate = 1.0f;
 
@@ -327,14 +331,30 @@ int main(void) {
                 }
             }
 
+            /* Severity-scaled corner speed (both modes): max(front lookahead, top apex), 3-tick peak hold,
+             * zero while an intersection is latched. A front-camera corner wall is transverse tape that
+             * was NOT classified as an intersection on this frame. */
+            uint8_t front_corner_wall = (horizon.has_transverse_tape && !horizon.is_intersection_ahead) ? 1U : 0U;
+            float corner_severity = corner_severity_update(&s_corner_sev,
+                                                           filtered_front_angle, filtered_heading,
+                                                           front_corner_wall,
+                                                           sr.transverse_crosses_center ? 1U : 0U,
+                                                           s_intersection_ahead ? 1U : 0U,
+                                                           g_params.front_angle_thresh,
+                                                           g_params.h_lo, g_params.h_hi);
+            float severity_speed = corner_severity_speed(corner_severity,
+                                                         g_params.speed_straight,
+                                                         g_params.speed_outside_corner);
+
             if (!g_params.blend_enable) {
                 /* =========================================================================
                  * LEGACY DISCRETE MODE BYPASS (blend 0)
+                 * is_corner controls feedforward + differential mode only; speed comes from severity.
                  * ========================================================================= */
                 bool raw_corner = (!s_intersection_ahead) &&
                                   (horizon.is_sharp_corner ||
                                    sr.transverse_crosses_center ||
-                                   fabsf(filtered_heading) >= 20.0f);
+                                   fabsf(filtered_heading) >= 24.0f);
                 if (s_intersection_ahead) {
                     s_corner_hold_ticks = 0U;
                 } else if (raw_corner) {
@@ -344,7 +364,7 @@ int main(void) {
                 }
                 bool is_corner = (s_corner_hold_ticks > 0U);
                 s_corner_blend = is_corner ? 1.0f : 0.0f;
-                s_blend_target = s_corner_blend;
+                s_blend_target = corner_severity; /* BT: in telemetry = speed severity (0..100) */
 
                 /* Steering Calculation */
                 if (sr.found == 0 && !s_intersection_ahead) {
@@ -397,9 +417,9 @@ int main(void) {
                 last_steer_cmd = steer_cmd;
 
                 /* Speed & Differential Braking (proportional in both corner and straight modes) */
+                target_speed = severity_speed;
                 float abs_steer = fabsf(steer_cmd);
                 if (is_corner) {
-                    target_speed = g_params.speed_outside_corner;
                     if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
                         float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                                            ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
@@ -418,7 +438,6 @@ int main(void) {
                         target_right = target_speed;
                     }
                 } else {
-                    target_speed = g_params.speed_straight;
                     if (abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
                         float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                                            ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
@@ -441,36 +460,13 @@ int main(void) {
                 /* =========================================================================
                  * CONTINUOUS ASYMMETRIC CORNER BLEND GOVERNOR (blend 1)
                  * ========================================================================= */
-                /* 1. Calculate Target & Diode Hold */
-                float front_t = 0.0f;
-                float head_t  = 0.0f;
-                float hold    = 0.0f;
-
+                /* 1. Calculate Target & Diode Hold from unified corner_severity */
                 if (s_intersection_ahead) {
                     /* Suppress corner blend during intersection transit with smooth release */
                     s_corner_blend += g_params.blend_release * (0.0f - s_corner_blend);
                     s_blend_target = 0.0f;
                 } else {
-                    /* Front Camera Preview Target */
-                    if (horizon.found > 0) {
-                        front_t = (fabsf(filtered_front_angle) - g_params.front_angle_thresh) / g_params.front_angle_thresh;
-                        if (front_t < 0.0f) front_t = 0.0f;
-                        if (front_t > 1.0f) front_t = 1.0f;
-                    }
-                    if (horizon.is_sharp_corner || sr.transverse_crosses_center) {
-                        front_t = 1.0f; /* Lock to 1.0 on transverse wall or sharp corner flag */
-                    }
-
-                    /* Top Camera Heading Floor */
-                    float h_range = g_params.h_hi - g_params.h_lo;
-                    if (h_range > 0.1f) {
-                        head_t = (fabsf(filtered_heading) - g_params.h_lo) / h_range;
-                        if (head_t < 0.0f) head_t = 0.0f;
-                        if (head_t > 1.0f) head_t = 1.0f;
-                    }
-
-                    /* Diode / Ratchet Asymmetric Leaky Integrator */
-                    hold = fmaxf(front_t, head_t);
+                    float hold = corner_severity;
                     s_blend_target = hold;
 
                     if (hold > s_corner_blend) {
