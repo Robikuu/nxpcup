@@ -112,8 +112,13 @@ static void send_ack_dbl(const char *prefix, float val) {
     int  whole  = (int)val;
     float frac = val - (float)whole;
     if (frac < 0) frac = -frac;
-    int  f100   = (int)(frac * 100.0f);
-    snprintf(buf, sizeof(buf), "OK %s%d.%02d\r\n", prefix, whole, f100);
+    int  f100   = (int)(frac * 100.0f + 0.5f);
+    if (f100 >= 100) {
+        f100 -= 100;
+        whole += (val < 0.0f) ? -1 : 1;
+    }
+    const char *sign = (val < 0.0f && whole == 0 && f100 > 0) ? "-" : "";
+    snprintf(buf, sizeof(buf), "OK %s%s%d.%02d\r\n", prefix, sign, whole, f100);
     send_ack(buf);
 }
 
@@ -121,8 +126,13 @@ static int append_flt(char *buf, int off, size_t cap, const char *label, float v
     int whole = (int)val;
     float frac = val - (float)whole;
     if (frac < 0) frac = -frac;
-    int f100 = (int)(frac * 100.0f);
-    return off + snprintf(buf + off, cap - (size_t)off, "%s%d.%02d\r\n", label, whole, f100);
+    int f100 = (int)(frac * 100.0f + 0.5f);
+    if (f100 >= 100) {
+        f100 -= 100;
+        whole += (val < 0.0f) ? -1 : 1;
+    }
+    const char *sign = (val < 0.0f && whole == 0 && f100 > 0) ? "-" : "";
+    return off + snprintf(buf + off, cap - (size_t)off, "%s%s%d.%02d\r\n", label, sign, whole, f100);
 }
 
 static void command_execute(char *cmd) {
@@ -147,7 +157,7 @@ static void command_execute(char *cmd) {
         g_params.state = STATE_RUNNING;
         send_ack("OK state=RUNNING\r\n");
     }
-    else if (!strcmp(keyword, "stop") || !strcmp(keyword, "brake")) {
+    else if (!strncmp(cmd, "stop", 4) || !strncmp(keyword, "stop", 4) || !strcmp(keyword, "brake")) {
         motor_test_stop();
         g_params.state = STATE_IDLE;
         HbridgeBrake(&g_hbridge);

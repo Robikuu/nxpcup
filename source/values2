@@ -1,0 +1,23 @@
+---- Sent utf8 encoded message: "status;\r" ----
+spd_s=100.00
+spd_out=80.00
+spd_in=35.00
+offset=0.00
+k_cte=0.50
+k_head=1.25
+k_cte_c=0.50
+k_head_c=1.25
+h_lo=18.00
+h_hi=35.00
+h_hi=35.00
+h_hi=35.00
+rel=0.06
+att=0.35
+fa_th=25.00
+ramp_a=6.50
+ramp_d=30.00
+scale=1.00
+blend=0
+drive=1
+dump=0
+state=IDLE

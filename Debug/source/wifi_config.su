@@ -6,8 +6,8 @@ D:\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
 ../source/wifi_config.c:64:6:motor_test_tick	8	static
 ../source/wifi_config.c:75:12:parse_float	40	static
 ../source/wifi_config.c:106:13:send_ack	16	static
-../source/wifi_config.c:110:13:send_ack_dbl	88	static
-../source/wifi_config.c:120:12:append_flt	56	static
-../source/wifi_config.c:128:13:command_execute	600	static
-../source/wifi_config.c:333:6:command_poll	16	static
-../source/wifi_config.c:351:6:esp_printf	408	static
+../source/wifi_config.c:110:13:send_ack_dbl	96	static
+../source/wifi_config.c:125:12:append_flt	64	static
+../source/wifi_config.c:138:13:command_execute	600	static
+../source/wifi_config.c:343:6:command_poll	16	static
+../source/wifi_config.c:361:6:esp_printf	408	static

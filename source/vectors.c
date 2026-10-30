@@ -387,7 +387,6 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
 
             /* Exit line must extend beyond transverse tape into distance */
             if (parsed[j].y_far >= trans_y_far_min) continue;
-            if (parsed[j].y_near > (trans_y_near_max + 5.0f)) continue;
 
             float mid_j = (parsed[j].x_near + parsed[j].x_far) * 0.5f;
 
@@ -396,7 +395,6 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
                 if (fabsf(parsed[k].angle) > 45.0f) continue;
 
                 if (parsed[k].y_far >= trans_y_far_min) continue;
-                if (parsed[k].y_near > (trans_y_near_max + 5.0f)) continue;
 
                 float mid_k = (parsed[k].x_near + parsed[k].x_far) * 0.5f;
 
@@ -464,7 +462,6 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
                 if (parsed[j].is_transverse || parsed[j].dy < 4.0f) continue;
                 if (fabsf(parsed[j].angle) > 22.0f) continue;
                 if (parsed[j].y_far >= trans_y_far_min) continue;
-                if (parsed[j].y_near > (trans_y_near_max + 5.0f)) continue;
 
                 float mid_x = (parsed[j].x_near + parsed[j].x_far) * 0.5f;
                 if (mid_x >= 20.0f && mid_x <= 58.0f) {
@@ -494,6 +491,8 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
             }
         }
     }
+
+    out->valid_longitudinal_count = valid_count;
 
     /* Strategic Decision */
     if (out->has_transverse_tape) {

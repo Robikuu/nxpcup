@@ -22,6 +22,7 @@ typedef struct {
     float   horizon_angle_deg;          /* Length-weighted average forward road angle (-90 to +90 deg) */
     uint8_t is_sharp_corner;            /* 1 if |horizon_angle_deg| > 30.0f or corner fail-safe */
     uint8_t found;                      /* Number of valid horizon vectors detected */
+    uint8_t valid_longitudinal_count;   /* Number of non-transverse longitudinal lane vectors */
     uint8_t is_intersection_ahead;      /* 1 if confirmed intersection ahead (gap + exit pair) */
     uint8_t has_transverse_tape;        /* 1 if transverse tape detected */
     uint8_t transverse_crosses_center;  /* 1 if transverse tape spans center corridor */

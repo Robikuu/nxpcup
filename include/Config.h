@@ -14,9 +14,9 @@
 #define TOP_CAM_EXCLUDE_X_MAX        62U       // Pixy2 frame X <= 62
 
 // ---- Physical Steering Limits & Trim Offset ----
-#define STEERING_LIMIT_RIGHT         65.0f     // Physical servo right mechanical limit
-#define STEERING_LIMIT_LEFT         -65.0f     // Physical servo left mechanical limit
-#define STEERING_OFFSET              0.00f     // Straight-line trim offset
+#define STEERING_LIMIT_RIGHT         77.0f     // Physical servo right mechanical limit
+#define STEERING_LIMIT_LEFT         -67.0f     // Physical servo left mechanical limit
+#define STEERING_OFFSET              10.00f     // Straight-line trim offset
 
 // Relative command limits (steer_cmd relative to center trim)
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)
@@ -25,8 +25,8 @@
 // ---- Wheel Speeds & Asymmetric Differential Drag ----
 #define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
 #define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         55.0f     // Calibrated apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_OUTSIDE_CORNER         65.0f     // Calibrated apex outside wheel drive (%)
+#define SPEED_INSIDE_MIN             28.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
 #define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
@@ -38,16 +38,16 @@
 #define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
 
 // ---- Severity-Scaled Corner Speed (speed = spd_s - severity * (spd_s - spd_out)) ----
-#define FRONT_SEVERITY_FULL_DEG      50.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)
-#define CORNER_SEVERITY_HOLD_TICKS   3U        // Ticks the severity peak is held after it drops (corner wall flicker guard)
+#define FRONT_SEVERITY_FULL_DEG      40.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)
+#define CORNER_SEVERITY_HOLD_TICKS   6U        // Ticks the severity peak is held after it drops (120ms bridge + flicker guard)
 
 // ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
 #define DECEL_RAMP_STEP              30.0f     // Rapid pre-braking & pivot lock ramp (~2 ticks from 100% to 40%)
-#define ACCEL_RAMP_STEP              6.0f      // Smooth traction-preserving corner exit acceleration (~160ms)
+#define ACCEL_RAMP_STEP              6.5f      // Smooth traction-preserving corner exit acceleration (~160ms)
 
 // ---- Error Weights & Heading Deadband ----
-#define DEFAULT_K_CTE                0.50f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.10f     // Direct base camera heading damping
+#define DEFAULT_K_CTE                0.45f     // Calibrated CTE weight (smooth straight line centering)
+#define DEFAULT_K_HEADING            1.15f     // Direct base camera heading damping
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband on straights to prevent pixel jitter
 
 // ---- Control Loop & Failsafe ----
@@ -59,11 +59,11 @@
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
 
 // ---- Continuous Asymmetric Corner Blend Governor ----
-#define DEFAULT_H_LO                 18.0f     // Heading deadband floor (deg): below this, hold = 0.0
+#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0
 #define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   25.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   22.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
 #define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
 #define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
