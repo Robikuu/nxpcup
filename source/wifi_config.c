@@ -139,6 +139,14 @@ static void command_execute(char *cmd) {
     char keyword[32];
     float val = 0.0f;
     int has_val = 0;
+
+    while (*cmd != '\0' && ((unsigned char)*cmd <= ' ' || (unsigned char)*cmd >= 127U)) {
+        cmd++;
+    }
+    if (*cmd == '\0') {
+        return;
+    }
+
     char *space = strchr(cmd, ' ');
 
     if (space) {
@@ -146,10 +154,17 @@ static void command_execute(char *cmd) {
         if (klen >= sizeof(keyword)) klen = sizeof(keyword) - 1;
         memcpy(keyword, cmd, klen);
         keyword[klen] = '\0';
-        if (parse_float(space + 1, &val)) has_val = 1;
+        while (*space == ' ') space++;
+        if (parse_float(space, &val)) has_val = 1;
     } else {
         strncpy(keyword, cmd, sizeof(keyword) - 1);
         keyword[sizeof(keyword) - 1] = '\0';
+    }
+
+    for (size_t i = 0; keyword[i] != '\0'; i++) {
+        if (keyword[i] >= 'A' && keyword[i] <= 'Z') {
+            keyword[i] = (char)(keyword[i] - 'A' + 'a');
+        }
     }
 
     if (!strcmp(keyword, "start")) {
@@ -161,6 +176,7 @@ static void command_execute(char *cmd) {
         motor_test_stop();
         g_params.state = STATE_IDLE;
         HbridgeBrake(&g_hbridge);
+        Steer(g_params.steering_offset);
         send_ack("OK state=IDLE\r\n");
     }
     else if ((!strcmp(keyword, "speed_straight") || !strcmp(keyword, "spd_s") || !strcmp(keyword, "speed_s")) && has_val) {
@@ -341,6 +357,12 @@ static void command_execute(char *cmd) {
 }
 
 void command_poll(void) {
+    uint32_t err_flags = LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) &
+                         (uint32_t)(kLPUART_RxOverrunFlag | kLPUART_NoiseErrorFlag |
+                                    kLPUART_FramingErrorFlag | kLPUART_ParityErrorFlag);
+    if (err_flags != 0U) {
+        LPUART_ClearStatusFlags(LP_FLEXCOMM9_PERIPHERAL, err_flags);
+    }
     while (LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) & kLPUART_RxDataRegFullFlag) {
         uint8_t c = LPUART_ReadByte(LP_FLEXCOMM9_PERIPHERAL);
         if (c == ';') {
@@ -349,11 +371,21 @@ void command_poll(void) {
                 command_execute(s_cmd_buf);
                 s_cmd_idx = 0;
             }
-        } else if (c != '\n' && c != '\r') {
+        } else if (c == '\n' || c == '\r') {
+            if (s_cmd_idx == 0) {
+                continue;
+            }
+        } else if (c >= 32U && c < 127U) {
             if (s_cmd_idx < CMD_BUF_SIZE - 1) {
                 s_cmd_buf[s_cmd_idx] = (char)c;
                 s_cmd_idx++;
             }
+        }
+        err_flags = LPUART_GetStatusFlags(LP_FLEXCOMM9_PERIPHERAL) &
+                    (uint32_t)(kLPUART_RxOverrunFlag | kLPUART_NoiseErrorFlag |
+                               kLPUART_FramingErrorFlag | kLPUART_ParityErrorFlag);
+        if (err_flags != 0U) {
+            LPUART_ClearStatusFlags(LP_FLEXCOMM9_PERIPHERAL, err_flags);
         }
     }
 }

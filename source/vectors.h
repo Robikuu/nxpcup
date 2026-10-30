@@ -15,6 +15,7 @@ typedef struct {
     uint8_t has_transverse_tape;        /* 1 if transverse tape detected */
     uint8_t transverse_crosses_center;  /* 1 if transverse tape spans center corridor [32, 46] */
     uint8_t is_intersection_ahead;      /* Reserved / detection flag */
+    float   lane_width_px;              /* Projected right-left boundary width (px); 0 unless found == 2 */
 } steering_result_t;
 
 /* Front Camera Result: Lookahead horizon road angle */

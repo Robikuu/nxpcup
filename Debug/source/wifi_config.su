@@ -9,5 +9,5 @@ D:\nxpcup\drivers/fsl_lpuart.h:869:23:LPUART_ReadByte	32	static
 ../source/wifi_config.c:110:13:send_ack_dbl	96	static
 ../source/wifi_config.c:125:12:append_flt	64	static
 ../source/wifi_config.c:138:13:command_execute	600	static
-../source/wifi_config.c:343:6:command_poll	16	static
-../source/wifi_config.c:361:6:esp_printf	408	static
+../source/wifi_config.c:359:6:command_poll	16	static
+../source/wifi_config.c:393:6:esp_printf	408	static

@@ -110,51 +110,50 @@ int main(void)
               hr.is_sharp_corner, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 8: Smooth sign-aware top_turn_gate with 0.45f pre-steer floor and 1..10 deg ramp ===\n");
+    printf("\n=== Test 8: Delayed top_turn_gate (0 below |H|<12 deg, 12..28 deg ramp, 0.35 2-line cap) prevents early cornering ===\n");
     {
-        float fa_th = DEFAULT_FRONT_ANGLE_THRESH; /* 22.0f */
-
-        /* A. On straightaway approaching corner (H = 0.0 deg, FS = -51.5 deg) -> 0.45f floor crosses 8-deg deadzone */
-        float h_straight = 0.0f, fs = -51.5f;
-        float gate_s = 0.0f;
-        if (fabsf(fs) > fa_th && (h_straight * fs >= 0.0f || fabsf(h_straight) < 3.0f)) {
-            gate_s = 0.45f;
-        }
-        if (h_straight * fs > 0.0f && fabsf(h_straight) > 1.0f) {
-            float h_norm = (fabsf(h_straight) - 1.0f) / (10.0f - 1.0f);
+        /* Helper matching source/main.c top_turn_gate calculation */
+        /* A. Straight approach (Run 1 L14-15 / Run 6 L14: L:2, H = -5.8 deg, FS = -28.3 deg) -> gate = 0.0 (no early turn-in!) */
+        uint8_t found_a = 2, trans_a = 0;
+        float h_a = -5.8f, fs_a = -28.3f;
+        float gate_a = 0.0f;
+        if (found_a == 0 || trans_a != 0U) {
+            gate_a = 1.0f;
+        } else if (h_a * fs_a > 0.0f && fabsf(h_a) >= 12.0f) {
+            float h_norm = (fabsf(h_a) - 12.0f) / (28.0f - 12.0f);
             if (h_norm > 1.0f) h_norm = 1.0f;
-            float ramp = (gate_s > 0.0f) ? (0.45f + 0.55f * h_norm) : h_norm;
-            if (ramp > gate_s) gate_s = ramp;
+            gate_a = h_norm;
+            if (found_a == 2 && gate_a > 0.35f) gate_a = 0.35f;
         }
-        float pre_steer = gate_s * (float)FRONT_FEEDFORWARD_GAIN * fs;
-        CHECK(fabsf(gate_s - 0.45f) < 0.01f && fabsf(pre_steer) > (float)DIFFERENTIAL_DEADZONE_DEG,
-              "Straight approach (H=0, FS=-51.5) pre-steers at gate=%.2f (%.2f deg crosses 8 deg deadzone)",
-              gate_s, pre_steer);
+        CHECK(gate_a == 0.0f,
+              "Run 6 L14 approach (L:2, H=-5.8, FS=-28.3) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
+              gate_a);
 
         /* B. S-curve conflict (filtered_heading = -14.2 deg left, FS = +25.8 deg right) -> gate = 0.0 */
         float h_scurve = -14.2f, fs_scurve = 25.8f;
         float gate_sc = 0.0f;
-        if (fabsf(fs_scurve) > fa_th && (h_scurve * fs_scurve >= 0.0f || fabsf(h_scurve) < 3.0f)) {
-            gate_sc = 0.45f;
-        }
-        if (h_scurve * fs_scurve > 0.0f && fabsf(h_scurve) > 1.0f) {
-            float h_norm = (fabsf(h_scurve) - 1.0f) / (10.0f - 1.0f);
-            if (h_norm > 1.0f) h_norm = 1.0f;
-            float ramp = (gate_sc > 0.0f) ? (0.45f + 0.55f * h_norm) : h_norm;
-            if (ramp > gate_sc) gate_sc = ramp;
+        if (h_scurve * fs_scurve > 0.0f && fabsf(h_scurve) >= 12.0f) {
+            gate_sc = (fabsf(h_scurve) - 12.0f) / (28.0f - 12.0f);
         }
         CHECK(gate_sc == 0.0f, "S-curve opposing signs (H=-14.2, FS=+25.8) blocks fighting feedforward (gate=%.2f)", gate_sc);
 
-        /* C. Entering corner (filtered_heading = -5.5 deg, FS = -51.5 deg) -> smooth 0.725 ramp (midpoint of 1..10 deg) */
-        float h_turn = -5.5f;
-        float gate_t = 0.45f;
-        if (h_turn * fs > 0.0f && fabsf(h_turn) > 1.0f) {
-            float h_norm = (fabsf(h_turn) - 1.0f) / (10.0f - 1.0f);
-            if (h_norm > 1.0f) h_norm = 1.0f;
-            float ramp = (gate_t > 0.0f) ? (0.45f + 0.55f * h_norm) : h_norm;
-            if (ramp > gate_t) gate_t = ramp;
-        }
-        CHECK(fabsf(gate_t - 0.725f) < 0.01f, "Mid-entry (heading=-5.5 deg) smoothly ramps gate to 0.725 (gate=%.3f)", gate_t);
+        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.35f while both lines visible */
+        uint8_t found_c = 2;
+        float h_c = -27.8f, fs_c = -64.1f;
+        float gate_c = (fabsf(h_c) - 12.0f) / (28.0f - 12.0f);
+        if (gate_c > 1.0f) gate_c = 1.0f;
+        if (found_c == 2 && gate_c > 0.35f) gate_c = 0.35f;
+        float steer_c = (DEFAULT_K_CTE * (-1.1f)) + (DEFAULT_K_HEADING * h_c) + gate_c * (float)FRONT_FEEDFORWARD_GAIN * fs_c;
+        CHECK(fabsf(gate_c - 0.35f) < 0.01f && steer_c > -40.0f && steer_c < -30.0f,
+              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.35, steer=%.1f deg (not -54.5 deg)", steer_c);
+
+        /* D. True single-line apex (Run 5 L16 / Run 6 L18: L:1, H=-40.8 deg, FS=-66.8 deg) -> full gate=1.0 */
+        uint8_t found_d = 1;
+        float h_d = -40.8f, fs_d = -66.8f;
+        float gate_d = (fabsf(h_d) - 12.0f) / (28.0f - 12.0f);
+        if (gate_d > 1.0f) gate_d = 1.0f;
+        if (found_d == 2 && gate_d > 0.35f) gate_d = 0.35f;
+        CHECK(fabsf(gate_d - 1.0f) < 0.01f, "Single-line apex (L:1, H=-40.8) reaches full gate=%.2f", gate_d);
     }
 
     printf("\n=== Test 9: blend=1 proportional differential braking & updated Config.h boot defaults ===\n");
@@ -168,17 +167,16 @@ int main(void)
         float diff_mult = steer_norm * corner_authority;
         float inside_wheel = target_speed - diff_mult * (target_speed - (float)SPEED_INSIDE_MIN);
         CHECK(inside_wheel > 60.0f,
-              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 28%%)", inside_wheel);
-        CHECK(SPEED_STRAIGHT == 100.0f && SPEED_OUTSIDE_CORNER == 65.0f && SPEED_INSIDE_MIN == 28.0f &&
-              DEFAULT_K_CTE == 0.45f && DEFAULT_K_HEADING == 1.15f &&
+              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 34%%)", inside_wheel);
+        CHECK(SPEED_STRAIGHT == 95.0f && SPEED_OUTSIDE_CORNER == 65.0f && SPEED_INSIDE_MIN == 34.0f &&
+              DEFAULT_K_CTE == 0.55f && DEFAULT_K_HEADING == 0.90f &&
               DEFAULT_H_LO == 12.0f && DEFAULT_H_HI == 35.0f &&
-              DEFAULT_FRONT_ANGLE_THRESH == 22.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
+              DEFAULT_FRONT_ANGLE_THRESH == 28.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
               CORNER_SEVERITY_HOLD_TICKS == 6U && DECEL_RAMP_STEP == 30.0f &&
               ACCEL_RAMP_STEP == 6.5f && DEFAULT_BLEND_ENABLE == 0U,
-              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, H_LO=%.0f, H_HI=%.0f, FA_TH=%.0f, FULL=%.0f, HOLD=%u",
+              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, K_CTE=%.2f, K_HEAD=%.2f, FA_TH=%.0f",
               (float)SPEED_STRAIGHT, (float)SPEED_OUTSIDE_CORNER, (float)SPEED_INSIDE_MIN,
-              (float)DEFAULT_H_LO, (float)DEFAULT_H_HI, (float)DEFAULT_FRONT_ANGLE_THRESH,
-              (float)FRONT_SEVERITY_FULL_DEG, (unsigned)CORNER_SEVERITY_HOLD_TICKS);
+              (float)DEFAULT_K_CTE, (float)DEFAULT_K_HEADING, (float)DEFAULT_FRONT_ANGLE_THRESH);
     }
 
     printf("\n=== Test 10: Top camera single-line perspective compensation (fade 20..30 deg) ===\n");
@@ -212,43 +210,37 @@ int main(void)
               hr.has_transverse_tape, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 12: inside_scale preserves feedforward in real corners (L51) & suppresses mild non-corner drift ===\n");
+    printf("\n=== Test 12: inside_scale suppresses inside-of-turn dive (Run 6 L24-25) & preserves centered/outside turn-in ===\n");
     {
-        float fa_th = DEFAULT_FRONT_ANGLE_THRESH; /* 22.0f */
-
-        /* A. Real corner entry on inside of turn (L51: F = +16.6 px, H = -9.0 deg, FS = -44.1 deg -> |FS - H| = 35.1 deg)
-         * Must NOT be zeroed out by inside_scale! */
-        float f_l51 = 16.6f, h_l51 = -9.0f, fs_l51 = -44.1f;
-        float curve_rel_l51 = fs_l51 - h_l51;
-        float h_norm_l51 = (fabsf(h_l51) - 1.0f) / (10.0f - 1.0f);
-        if (h_norm_l51 > 1.0f) h_norm_l51 = 1.0f;
-        float gate_l51 = 0.45f + 0.55f * h_norm_l51;
-        bool real_corner_l51 = (fabsf(fs_l51) >= fa_th && fabsf(curve_rel_l51) >= 15.0f) || (fabsf(h_l51) >= 18.0f);
-        if ((f_l51 * fs_l51 < 0.0f) && !real_corner_l51) {
-            float inside_scale = (10.0f - fabsf(f_l51)) / (10.0f - 4.0f);
+        /* A. Car already far on INSIDE of left turn (Run 6 L25: F = +26.6 px, H = -26.4 deg, FS = -37.1 deg)
+         * Must zero out front feedforward so the car doesn't dive across the inside curb! */
+        float f_in = 26.6f, h_in = -26.4f, fs_in = -37.1f;
+        float gate_in = (fabsf(h_in) - 12.0f) / (28.0f - 12.0f);
+        if (gate_in > 1.0f) gate_in = 1.0f;
+        if (f_in * fs_in < 0.0f) {
+            float inside_scale = (12.0f - fabsf(f_in)) / (12.0f - 3.0f);
             if (inside_scale < 0.0f) inside_scale = 0.0f;
             if (inside_scale > 1.0f) inside_scale = 1.0f;
-            gate_l51 *= inside_scale;
+            gate_in *= inside_scale;
         }
-        float steer_l51 = (DEFAULT_K_CTE * f_l51) + (DEFAULT_K_HEADING * h_l51) + gate_l51 * (float)FRONT_FEEDFORWARD_GAIN * fs_l51;
-        CHECK(gate_l51 > 0.90f && steer_l51 < -20.0f,
-              "Real corner entry on inside (L51: F=+16.6, H=-9.0, FS=-44.1) preserves gate=%.2f, steer=%.1f deg",
-              gate_l51, steer_l51);
+        float steer_in = (DEFAULT_K_CTE * f_in) + (DEFAULT_K_HEADING * h_in) + gate_in * (float)FRONT_FEEDFORWARD_GAIN * fs_in;
+        CHECK(gate_in == 0.0f && steer_in > -12.0f,
+              "Inside-of-turn approach (Run 6 L25: F=+26.6, H=-26.4, FS=-37.1) suppresses FF (gate=%.2f, steer=%.1f deg)",
+              gate_in, steer_in);
 
-        /* B. Mild non-corner inside drift (F = -12.0 px, H = +8.0 deg, FS = +19.0 deg -> |FS - H| = 11.0 < 15.0, |FS| < 22) */
-        float f_mild = -12.0f, h_mild = 8.0f, fs_mild = 19.0f;
-        float curve_rel_mild = fs_mild - h_mild;
-        float gate_mild = (fabsf(h_mild) - 1.0f) / (10.0f - 1.0f);
-        bool real_corner_mild = (fabsf(fs_mild) >= fa_th && fabsf(curve_rel_mild) >= 15.0f) || (fabsf(h_mild) >= 18.0f);
-        if ((f_mild * fs_mild < 0.0f) && !real_corner_mild) {
-            float inside_scale = (10.0f - fabsf(f_mild)) / (10.0f - 4.0f);
+        /* B. Centered / outside corner entry (F = -2.0 px, H = -28.0 deg, FS = -50.0 deg, L:1) -> full gate=1.0 */
+        float f_out = -2.0f, h_out = -28.0f, fs_out = -50.0f;
+        float gate_out = (fabsf(h_out) - 12.0f) / (28.0f - 12.0f);
+        if (gate_out > 1.0f) gate_out = 1.0f;
+        if (f_out * fs_out < 0.0f) {
+            float inside_scale = (12.0f - fabsf(f_out)) / (12.0f - 3.0f);
             if (inside_scale < 0.0f) inside_scale = 0.0f;
             if (inside_scale > 1.0f) inside_scale = 1.0f;
-            gate_mild *= inside_scale;
+            gate_out *= inside_scale;
         }
-        CHECK(gate_mild == 0.0f,
-              "Non-corner inside drift (F=-12.0, H=+8.0, FS=+19.0) suppresses pre-steer (gate=%.2f)",
-              gate_mild);
+        CHECK(fabsf(gate_out - 1.0f) < 0.01f,
+              "Centered/outside corner entry (F=-2.0, H=-28.0, FS=-50.0) preserves full gate=%.2f",
+              gate_out);
     }
 
     printf("\n=== Test 13: Continuous foreground-to-background lane lines across intersection crossbar avoid 55%% speed lock ===\n");

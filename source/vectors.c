@@ -14,6 +14,9 @@
 #define TOP_CAM_MAX_BLIND_TRACK_TICKS 8U
 #define TOP_SINGLE_LINE_PERSP_DEG    14.0f
 #define FRONT_SINGLE_LINE_PERSP_DEG  18.0f
+#define TOP_CAM_CONNECT_PX           4.0f   /* Max gap (px) for chained-fragment detection */
+#define TOP_CAM_SCORE_DY_W           0.35f  /* Candidate score bonus per px of vertical span */
+#define TOP_CAM_SCORE_LEN_W          0.15f  /* Candidate score bonus per px of length */
 
 /* Stateful temporal memory for lane continuity and left/right boundary tracking */
 static float   s_last_center_x = (float)PIXY_CENTER_X;
@@ -58,12 +61,12 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
     float best_left_x_far  = 0.0f;
     float best_left_angle  = 0.0f;
     float best_left_dy     = 0.0f;
-    float best_left_dist   = 1000.0f;
+    float best_left_score  = 1000.0f;
     float best_right_x     = 1000.0f;
     float best_right_x_far = 0.0f;
     float best_right_angle = 0.0f;
     float best_right_dy    = 0.0f;
-    float best_right_dist  = 1000.0f;
+    float best_right_score = 1000.0f;
 
     bool use_tracking = (s_has_tracking != 0U) && (s_blind_frames < TOP_CAM_MAX_BLIND_TRACK_TICKS);
 
@@ -86,15 +89,20 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         float dy = y_near - y_far;
         float dx = x_far - x_near;
         float abs_dx = fabsf(dx);
+        float len = sqrtf(dx * dx + dy * dy);
 
         /* Chassis / Wheel / Tie-Rod Exclusion Zone at bottom of top camera frame:
          * Rejects short/medium reflections starting in the lower exclusion box unless the vector
          * is a genuine long lane boundary extending into the upper half of the view.
+         * Border-exit bypass: a long boundary whose far end leaves through the left/right frame border
+         * (x_far <= 3 or >= 75, dy >= 12) is a real lane line crossing the FOV edge when the car is
+         * off-center, not chassis noise, so the y_far >= 28 rule is waived for it.
          */
+        bool border_exit = (x_far <= 3.0f || x_far >= 75.0f) && (dy >= 12.0f);
         if (y_near >= (float)TOP_CAM_EXCLUDE_Y_MIN &&
             x_near >= (float)TOP_CAM_EXCLUDE_X_MIN &&
             x_near <= (float)TOP_CAM_EXCLUDE_X_MAX &&
-            (y_far >= 28.0f || dy < 16.0f)) {
+            ((y_far >= 28.0f && !border_exit) || dy < 16.0f)) {
             continue;
         }
 
@@ -108,6 +116,29 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
             }
             continue; /* Discard from left/right boundary selection */
         }
+
+        /* Connected-fragment filter: Pixy splits one curved boundary into chained segments that share
+         * a vertex. A shorter segment whose NEAR endpoint sits on the FAR endpoint of a longer longitudinal
+         * segment is only the continuation of that boundary; its extrapolated slope is unrelated to the lane
+         * and can pair with the real line as a false second boundary. Keep the longer foreground part. */
+        bool is_continuation = false;
+        for (size_t k = 0; k < num_vectors; k++) {
+            if (k == i) continue;
+            float kx0 = (float)vectors[4 * k + 0], ky0 = (float)vectors[4 * k + 1];
+            float kx1 = (float)vectors[4 * k + 2], ky1 = (float)vectors[4 * k + 3];
+            float kxf = (ky0 >= ky1) ? kx1 : kx0;
+            float kyf = (ky0 >= ky1) ? ky1 : ky0;
+            float kdx = kx1 - kx0, kdy = ky1 - ky0;
+            if (fabsf(kdy) <= 0.27f * fabsf(kdx)) continue; /* Ignore transverse crossbars as parents */
+            float klen = sqrtf(kdx * kdx + kdy * kdy);
+            if (klen > len &&
+                fabsf(kxf - x_near) <= TOP_CAM_CONNECT_PX &&
+                fabsf(kyf - y_near) <= TOP_CAM_CONNECT_PX) {
+                is_continuation = true;
+                break;
+            }
+        }
+        if (is_continuation) continue;
 
         /* Must extend into lower visible field near car */
         if (y_near < 16.0f) continue;
@@ -136,7 +167,13 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         if (use_tracking) {
             float d_left  = fabsf(x_proj - s_last_left_x);
             float d_right = fabsf(x_proj - s_last_right_x);
-            if (d_left <= d_right && d_left <= TOP_CAM_TRACK_GATE_PX) {
+            if (fabsf(angle) < 20.0f && x_proj < 28.0f && x_near < 30.0f) {
+                /* Near-straight boundary well inside left FOV cannot be right boundary */
+                is_left_candidate = true;
+            } else if (fabsf(angle) < 20.0f && x_proj > 51.0f && x_near > 49.0f) {
+                /* Near-straight boundary well inside right FOV cannot be left boundary */
+                is_left_candidate = false;
+            } else if (d_left <= d_right && d_left <= TOP_CAM_TRACK_GATE_PX) {
                 is_left_candidate = true;
             } else if (d_right < d_left && d_right <= TOP_CAM_TRACK_GATE_PX) {
                 is_left_candidate = false;
@@ -147,24 +184,30 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
             is_left_candidate = (x_proj < (float)PIXY_CENTER_X);
         }
 
+        /* Candidate score (lower wins): proximity to expected boundary, minus a bonus for vertical span
+         * and length so a 50 px foreground boundary beats a 10 px edge fragment that merely projects
+         * closer to the last known boundary position. */
+        float span_bonus = TOP_CAM_SCORE_DY_W * dy + TOP_CAM_SCORE_LEN_W * len;
         if (is_left_candidate) {
             float ref_dist = use_tracking ? fabsf(x_proj - s_last_left_x) : fabsf((float)PIXY_CENTER_X - x_proj);
-            if (!left_found || ref_dist < best_left_dist) {
+            float score    = ref_dist - span_bonus;
+            if (!left_found || score < best_left_score) {
                 best_left_x     = x_proj;
                 best_left_x_far = x_far;
                 best_left_angle = angle;
                 best_left_dy    = dy;
-                best_left_dist  = ref_dist;
+                best_left_score = score;
                 left_found      = true;
             }
         } else {
             float ref_dist = use_tracking ? fabsf(x_proj - s_last_right_x) : fabsf(x_proj - (float)PIXY_CENTER_X);
-            if (!right_found || ref_dist < best_right_dist) {
+            float score    = ref_dist - span_bonus;
+            if (!right_found || score < best_right_score) {
                 best_right_x     = x_proj;
                 best_right_x_far = x_far;
                 best_right_angle = angle;
                 best_right_dy    = dy;
-                best_right_dist  = ref_dist;
+                best_right_score = score;
                 right_found      = true;
             }
         }
@@ -173,7 +216,7 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
     /* Minimum Lane Width Validation: reject duplicate split segments of the same line */
     if (left_found && right_found && (best_right_x - best_left_x) < (float)MIN_LANE_WIDTH_PX) {
         if (use_tracking) {
-            if (best_left_dist <= best_right_dist) {
+            if (best_left_score <= best_right_score) {
                 right_found = false;
             } else {
                 left_found = false;
@@ -192,6 +235,7 @@ void compute_top_camera_lane(const uint16_t *vectors, size_t num_vectors, steeri
         center_x       = (best_left_x + best_right_x) * 0.5f;
         heading        = (best_left_angle + best_right_angle) * 0.5f;
         out->found     = 2;
+        out->lane_width_px = best_right_x - best_left_x;
         s_last_left_x  = best_left_x;
         s_last_right_x = best_right_x;
         s_has_tracking = 1U;

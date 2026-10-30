@@ -24,9 +24,9 @@
 
 // ---- Wheel Speeds & Asymmetric Differential Drag ----
 #define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
-#define SPEED_STRAIGHT               100.0f    // Straight line sprint speed (%)
+#define SPEED_STRAIGHT               100.0f     // Straight line sprint speed (%)
 #define SPEED_OUTSIDE_CORNER         65.0f     // Calibrated apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             28.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_INSIDE_MIN             34.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
 #define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
@@ -46,8 +46,8 @@
 #define ACCEL_RAMP_STEP              6.5f      // Smooth traction-preserving corner exit acceleration (~160ms)
 
 // ---- Error Weights & Heading Deadband ----
-#define DEFAULT_K_CTE                0.45f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.15f     // Direct base camera heading damping
+#define DEFAULT_K_CTE                0.55f     // Calibrated CTE weight (smooth straight line centering)
+#define DEFAULT_K_HEADING            0.90f     // Direct base camera heading damping
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband on straights to prevent pixel jitter
 
 // ---- Control Loop & Failsafe ----
@@ -63,10 +63,25 @@
 #define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   22.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   28.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
 #define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
 #define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
+
+// ---- Corner-Exit / Off-Center Recovery (all tick counts are 50 Hz loop ticks; 4 ticks = 1 telemetry line) ----
+#define STEER_SYMMETRIC_CLAMP        1U        // 1 = clamp steer_cmd to +/-min(right,left) throw around trim so CW == CCW authority
+#define FRONT_STALE_DECAY_NET        0.65f     // Net per-tick filtered_front_angle factor when top cam is straight+centered and front cam sees nothing (0.65^4=0.18/line)
+#define STALE_FRONT_MAX_HEADING_DEG  15.0f     // Top-camera |heading| below which front-angle fast decay / corner release is allowed
+#define STALE_FRONT_MAX_CTE_PX       12.0f     // Top-camera |cte| below which front-angle fast decay is allowed
+#define CORNER_RELEASE_STRAIGHT_TICKS 6U       // Consecutive straight 2-line ticks (120 ms) before stale corner state is cleared
+#define CORNER_RELEASE_LANE_MIN_PX   35.0f     // Valid lane width window for corner release
+#define CORNER_RELEASE_LANE_MAX_PX   68.0f
+#define OFFCENTER_HOLD_CTE_PX        10.0f     // L:0 recovery hold + bypass of +/-3 deg intersection steer clamp above this |cte|
+#define OFFCENTER_HOLD_MAX_TICKS     24U       // 24 ticks = 480 ms of gentle decay during blind gap
+#define OFFCENTER_HOLD_CTE_DECAY     0.975f    // per tick (0.975^4 = 0.90 per telemetry line)
+#define OFFCENTER_HOLD_HEAD_DECAY    0.96f     // per tick (0.96^4  = 0.85 per telemetry line)
+#define IX_BLOCK_CTE_PX              14.0f     // Do not latch an intersection when |filtered_cte| exceeds this ...
+#define IX_BLOCK_HEADING_DEG         20.0f     // ... or |filtered_heading| exceeds this (boundary crossed diagonally)
 
 // ---- Robot States ----
 #define STATE_IDLE                   0
