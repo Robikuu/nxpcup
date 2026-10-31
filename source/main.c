@@ -225,8 +225,10 @@ int main(void) {
                 s_fv0_ticks = 0U;
             }
 
-            /* Lightly filtered front angle for feedforward: EMA(alpha=0.6) (Item 2) */
-            if (horizon.found > 0) {
+            /* Lightly filtered front angle for feedforward: EMA(alpha=0.6) (Item 2)
+             * Guarded against transverse wall with 0.0f angle so it decays gently instead of collapsing */
+            if (horizon.found > 0 &&
+                (!horizon.has_transverse_tape || fabsf(horizon.horizon_angle_deg) > 0.1f || horizon.is_intersection_ahead)) {
                 s_fs_ff = 0.60f * horizon.horizon_angle_deg + 0.40f * s_fs_ff;
             } else {
                 s_fs_ff *= 0.85f;
@@ -501,11 +503,13 @@ int main(void) {
                 cv_ff = s_fs_ff - s_h_ff;
             }
 
-            /* Bug 2(a) Fix: cv_ff must only be active in the direction of fs_ff:
-             * if cv_ff * fs_ff <= 0.0f or |cv_ff| > |fs_ff| (meaning FS is closer to 0 deg than H is,
-             * i.e., the road ahead is straightening out relative to the car), clamp cv_ff = 0.0f */
-            if ((cv_ff * s_fs_ff <= 0.0f) || (fabsf(cv_ff) > fabsf(s_fs_ff))) {
+            /* Bug 2 Fix: When cv_ff and s_fs_ff have same sign, clamp cv_ff = s_fs_ff if |cv_ff| > |fs_ff|
+             * (do not add extra yaw when H and FS have opposite signs, but keep full FS!).
+             * Only zero cv_ff when cv_ff and s_fs_ff have opposing signs (straightening out). */
+            if (cv_ff * s_fs_ff <= 0.0f) {
                 cv_ff = 0.0f;
+            } else if (fabsf(cv_ff) > fabsf(s_fs_ff)) {
+                cv_ff = s_fs_ff;
             }
 
             /* Bug 2(b) Fix: When the car is off-center (|filtered_cte| > 8.0f) and filtered_cte * cv_ff < 0.0f
@@ -637,7 +641,9 @@ int main(void) {
                     if (!is_corner && fabsf(eff_heading) < (float)HEADING_DEADBAND_DEG) {
                         eff_heading = 0.0f;
                     }
-                    steer_top = (g_params.k_cte * filtered_cte) + (g_params.k_heading * eff_heading);
+                    float active_k_cte = is_corner ? g_params.k_cte_corner : g_params.k_cte;
+                    float active_k_head = is_corner ? g_params.k_heading_corner : g_params.k_heading;
+                    steer_top = (active_k_cte * filtered_cte) + (active_k_head * eff_heading);
                     if (sr.found > 0) {
                         last_valid_steer_top = steer_top;
                     }

@@ -170,14 +170,27 @@ int main(void)
         float s_cmd = prev_s + delta_s;
         CHECK(fabsf(s_cmd - 9.0f) < 0.01f, "Slew rate limits +22.0 step to +9.0 deg in 1 tick (s=%.2f)", s_cmd);
 
-        /* E. Bug 2(a) Fix: Lines 80-82 mid-corner exit straightening (H=-50.6, FS=-8.2 -> cv_ff=+42.4)
-         * cv_ff * fs_ff <= 0.0f or |cv_ff| > |fs_ff| clamps cv_ff = 0.0f, preventing wrong-way counter-steer */
+        /* E. Bug 2 Fix: Lines 80-82 mid-corner exit straightening (H=-50.6, FS=-8.2 -> cv_ff=+42.4)
+         * cv_ff * fs_ff <= 0.0f clamps cv_ff = 0.0f, preventing wrong-way counter-steer */
         float fs_e = -8.2f, h_e = -50.6f;
         float cv_e = fs_e - h_e; /* +42.4 */
-        if ((cv_e * fs_e <= 0.0f) || (fabsf(cv_e) > fabsf(fs_e))) {
+        if (cv_e * fs_e <= 0.0f) {
             cv_e = 0.0f;
+        } else if (fabsf(cv_e) > fabsf(fs_e)) {
+            cv_e = fs_e;
         }
         CHECK(cv_e == 0.0f, "Mid-corner exit straightening (H=-50.6, FS=-8.2) clamped cv_ff to 0.0 (cv_ff=%.1f)", cv_e);
+
+        /* E2. Bug 2 Fix: Approaching right turn with nose slightly left (FS=+30.0, H=-1.0 -> cv_ff=+31.0)
+         * cv_ff * fs_ff > 0.0f and |cv_ff| > |fs_ff| clamps cv_ff = fs_ff (+30.0f), keeping full front lookahead */
+        float fs_e2 = 30.0f, h_e2 = -1.0f;
+        float cv_e2 = fs_e2 - h_e2; /* +31.0 */
+        if (cv_e2 * fs_e2 <= 0.0f) {
+            cv_e2 = 0.0f;
+        } else if (fabsf(cv_e2) > fabsf(fs_e2)) {
+            cv_e2 = fs_e2;
+        }
+        CHECK(cv_e2 == 30.0f, "Opposite nose heading (FS=+30.0, H=-1.0) preserves full FS=+30.0 instead of zeroing (cv_ff=%.1f)", cv_e2);
 
         /* F. Bug 2(b) Fix: Lines 166-172 off-center recovery (F=+30.7, H=+0.5, FS=-12.0)
          * (|F| > 8.0 && F * cv_ff < 0.0 && |H| < 15.0) suppresses w=0.0 and blocks false corner entry */
@@ -742,6 +755,58 @@ int main(void)
             CHECK(spd == 70.0f, "fv0_ticks=4 clamps %s to blind_spd=%.1f (no 100%% pump)",
                   is_c ? "ST:C" : "ST:S", spd);
         }
+    }
+
+    printf("\n=== Test 25: Front Single-Line Fade, Transverse s_fs_ff Guard & blend=0 k_cte_c ===\n");
+    {
+        /* A. Front camera single-line fade (22..34 deg) */
+        float comp18 = 18.0f;
+        /* At 15 deg (straight convergence) -> 100% comp */
+        float a15 = 15.0f;
+        float s15 = (34.0f - a15) / (34.0f - 22.0f);
+        if (s15 > 1.0f) s15 = 1.0f;
+        float res15 = (a15 > (comp18 * s15)) ? (a15 - comp18 * s15) : 0.0f;
+        CHECK(res15 == 0.0f, "15 deg single line gets full 18 deg comp -> 0.0 (res=%.1f)", res15);
+
+        /* At 28 deg (halfway) -> 50% comp (9 deg) */
+        float a28 = 28.0f;
+        float s28 = (34.0f - a28) / (34.0f - 22.0f);
+        float res28 = a28 - comp18 * s28;
+        CHECK(fabsf(s28 - 0.50f) < 0.01f && fabsf(res28 - 19.0f) < 0.01f,
+              "28 deg single line gets 50%% comp -> 19.0 deg (res=%.1f)", res28);
+
+        /* At 50 deg (sharp corner) -> 0% comp */
+        float a50 = 50.0f;
+        float s50 = (34.0f - a50) / (34.0f - 22.0f);
+        if (s50 < 0.0f) s50 = 0.0f;
+        float res50 = a50 - comp18 * s50;
+        CHECK(res50 == 50.0f && s50 == 0.0f, "50 deg single corner line gets 0%% comp -> 50.0 deg (res=%.1f)", res50);
+
+        /* B. s_fs_ff transverse wall guard: when wall has 0.0f angle, decays by 0.85 instead of *0.40 */
+        float s_fs_ff = 40.0f;
+        horizon_result_t hz_wall;
+        memset(&hz_wall, 0, sizeof(hz_wall));
+        hz_wall.found = 1;
+        hz_wall.has_transverse_tape = 1;
+        hz_wall.horizon_angle_deg = 0.0f;
+        hz_wall.is_intersection_ahead = 0;
+
+        if (hz_wall.found > 0 &&
+            (!hz_wall.has_transverse_tape || fabsf(hz_wall.horizon_angle_deg) > 0.1f || hz_wall.is_intersection_ahead)) {
+            s_fs_ff = 0.60f * hz_wall.horizon_angle_deg + 0.40f * s_fs_ff;
+        } else {
+            s_fs_ff *= 0.85f;
+        }
+        CHECK(fabsf(s_fs_ff - 34.0f) < 0.01f, "Transverse wall (angle=0.0) decays s_fs_ff by 0.85 (%.1f, not 16.0)", s_fs_ff);
+
+        /* C. blend=0 active_k_cte in corner (ST:C) uses k_cte_corner (0.65) */
+        float f_cte = 20.0f;
+        float steer_straight = (DEFAULT_K_CTE * f_cte);
+        float steer_corner   = (DEFAULT_K_CTE_CORNER * f_cte);
+        CHECK(DEFAULT_K_CTE == 0.45f && DEFAULT_K_CTE_CORNER == 0.65f, "Gains configured correctly: k_cte=%.2f, k_cte_c=%.2f",
+              DEFAULT_K_CTE, DEFAULT_K_CTE_CORNER);
+        CHECK(fabsf(steer_corner - 13.0f) < 0.01f && fabsf(steer_straight - 9.0f) < 0.01f,
+              "ST:C provides full 0.65 centering (steer=%.1f vs straight=%.1f)", steer_corner, steer_straight);
     }
 
     printf("\nSummarize: %d failures\n", g_failures);

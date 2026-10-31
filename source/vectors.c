@@ -522,16 +522,21 @@ void compute_front_camera_horizon(const uint16_t *vectors, size_t num_vectors, h
         avg_angle = sum_weighted_angle / sum_length;
 
         /* Single-line perspective convergence compensation:
-         * Only subtract the natural ~18 deg straight-line convergence when a single vector
-         * stays on its own side of PIXY_CENTER_X (not curving across the track center).
+         * Fade the single-line perspective subtraction linearly from 100% at |avg_angle| <= 22.0f
+         * to 0% at |avg_angle| >= 34.0f when a single vector stays on its own side of PIXY_CENTER_X.
          */
         if (valid_count == 1) {
             float sx_near = parsed[last_valid_idx].x_near;
             float sx_far  = parsed[last_valid_idx].x_far;
+            float persp_scale = (34.0f - fabsf(avg_angle)) / (34.0f - 22.0f);
+            if (persp_scale < 0.0f) persp_scale = 0.0f;
+            if (persp_scale > 1.0f) persp_scale = 1.0f;
+            float comp = FRONT_SINGLE_LINE_PERSP_DEG * persp_scale;
+
             if (sx_near < (float)PIXY_CENTER_X && sx_far < (float)PIXY_CENTER_X && avg_angle > 0.0f) {
-                avg_angle = (avg_angle > FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle - FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+                avg_angle = (avg_angle > comp) ? (avg_angle - comp) : 0.0f;
             } else if (sx_near >= (float)PIXY_CENTER_X && sx_far >= (float)PIXY_CENTER_X && avg_angle < 0.0f) {
-                avg_angle = (avg_angle < -FRONT_SINGLE_LINE_PERSP_DEG) ? (avg_angle + FRONT_SINGLE_LINE_PERSP_DEG) : 0.0f;
+                avg_angle = (avg_angle < -comp) ? (avg_angle + comp) : 0.0f;
             }
         }
     }
