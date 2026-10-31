@@ -122,6 +122,7 @@ int main(void) {
 
             /* Hardware push button toggle */
             if (button_pressed_edge()) {
+                SDK_DelayAtLeastUs(3000000, SystemCoreClock);
                 motor_test_stop();
                 if (g_params.state == STATE_IDLE) {
                     g_params.state = STATE_RUNNING;
@@ -282,21 +283,34 @@ int main(void) {
             }
             uint8_t front_corner_wall = (s_front_wall_ticks >= 2U) ? 1U : 0U;
 
-            /* True road curvature guard against straightaway chassis yaw:
-             * When off-center on a straightaway without a corner wall and front camera simply reflects
-             * chassis yaw (H * FS > 0, |H| < 24 deg, and |FS - H| < fa_th), use (FS - H) as the effective front angle. */
-            bool straight_yaw_artifact = (fabsf(filtered_cte) > 4.0f) &&
-                                         (fabsf(filtered_heading) < 24.0f) &&
-                                         (!front_corner_wall) &&
-                                         (!sr.transverse_crosses_center) &&
-                                         (filtered_heading * filtered_front_angle > 0.0f) &&
-                                         (fabsf(front_curve_rel) < g_params.front_angle_thresh);
-            float eff_front_angle = straight_yaw_artifact ? front_curve_rel : filtered_front_angle;
+            /* Crooked-chassis straight track detection:
+             * When the front camera sees lane lines ahead (horizon.found > 0) without a corner wall,
+             * and relative curvature |FS - H| < 15.0f, the track ahead is straight. The chassis is merely
+             * angled diagonally relative to the straight corridor (e.g. Line 74 and Line 97). */
+            bool crooked_straight_track = (horizon.found > 0) &&
+                                          (!front_corner_wall) &&
+                                          (!sr.transverse_crosses_center) &&
+                                          (fabsf(front_curve_rel) < 15.0f);
+
+            float eff_front_angle = filtered_front_angle;
+            if (crooked_straight_track) {
+                eff_front_angle = 0.0f;
+            } else if (horizon.found > 0 && (filtered_front_angle * filtered_heading > 0.0f)) {
+                if (fabsf(filtered_front_angle) <= fabsf(filtered_heading)) {
+                    eff_front_angle = 0.0f;
+                } else {
+                    float net_front = filtered_front_angle - 0.65f * filtered_heading;
+                    if (net_front * filtered_front_angle < 0.0f) {
+                        net_front = 0.0f;
+                    }
+                    eff_front_angle = net_front;
+                }
+            }
 
             bool effective_sharp_corner = (front_corner_wall != 0U) ||
-                                          (!straight_corridor_crossbar &&
+                                          (!straight_corridor_crossbar && !crooked_straight_track &&
                                            (fabsf(eff_front_angle) >= g_params.front_angle_thresh ||
-                                            (horizon.is_sharp_corner && !horizon.has_transverse_tape && !straight_yaw_artifact)));
+                                            (horizon.is_sharp_corner && !horizon.has_transverse_tape)));
 
             if (sr.transverse_crosses_center) {
                 /* Top camera confirms wall across center right in front of car -> immediate corner preempt */
@@ -422,44 +436,56 @@ int main(void) {
             }
 #endif
 
-            /* Delayed, sign-aware corner-entry gate for front-camera steering feedforward:
-             * - 0.0 while the top camera still sees a straight/approach lane (|heading| < 12 deg, no top wall),
-             *   so the car brakes early via corner_severity without turning in before reaching the curve.
-             * - Ramps smoothly from 0.0 to 1.0 across |heading| = 12.0 deg..28.0 deg in the turn direction.
-             * - Capped at 0.35f while both lane boundaries are visible in the top camera (sr.found == 2),
-             *   because steer_top already tracks 2-line CTE + heading; full 1.0f at single-line/blind apex.
-             * - Scaled down by inside_scale whenever the car is already on the inside of the turn
-             *   (filtered_cte * eff_front_angle < 0) so feedforward never pulls across the inside curb.
+            /* Responsive, sign-aware corner-entry gate for front-camera steering feedforward:
+             * - Activates when heading reaches 2.0 deg (ramping 2.0..12.0 deg) or when a true front corner is detected
+             *   (|FS - H| >= front_angle_thresh) with an immediate 0.30f floor for instant proactive turn-in.
+             * - Capped at 0.75f while both lane boundaries are visible in the top camera without a corner wall
+             *   (sr.found == 2 && !front_corner_wall); opens to full 1.0f at single-line apex or wall detection.
+             * - Scaled down smoothly by inside_scale (floor 0.40f over 4.0..16.0 px) when on the inside of the turn
+             *   (filtered_cte * eff_front_angle < 0) to avoid curb clipping while keeping entry responsiveness.
+             * - When crooked_straight_track is true, |filtered_heading| >= 20.0f is forbidden from triggering
+             *   top_in_corner or corner braking.
              */
+            bool heading_turn_confirmed = (filtered_heading * eff_front_angle > 0.0f) ||
+                                          (!crooked_straight_track && fabsf(filtered_heading) >= 20.0f);
             bool top_in_corner = (sr.found == 0) ||
                                  (sr.transverse_crosses_center != 0U) ||
-                                 (fabsf(filtered_heading) >= 12.0f &&
-                                  (filtered_heading * eff_front_angle > 0.0f || fabsf(filtered_heading) >= 24.0f));
+                                 (!crooked_straight_track && fabsf(eff_front_angle) >= g_params.front_angle_thresh) ||
+                                 (fabsf(filtered_heading) >= 2.0f && heading_turn_confirmed);
             float top_turn_gate = 0.0f;
             if (sr.found == 0 || sr.transverse_crosses_center != 0U) {
                 top_turn_gate = 1.0f;
             } else if ((fabsf(eff_front_angle) >= g_params.front_angle_thresh || front_corner_wall != 0U) &&
-                       (filtered_heading * eff_front_angle > 0.0f) &&
-                       (fabsf(filtered_heading) >= 12.0f)) {
-                float h_norm = (fabsf(filtered_heading) - 12.0f) / (28.0f - 12.0f);
-                if (h_norm > 1.0f) h_norm = 1.0f;
-                top_turn_gate = h_norm;
-                if (sr.found == 2 && top_turn_gate > 0.35f) {
-                    top_turn_gate = 0.35f;
+                       (filtered_heading * eff_front_angle > 0.0f || fabsf(filtered_heading) < 3.0f)) {
+                if (fabsf(front_curve_rel) >= g_params.front_angle_thresh) {
+                    top_turn_gate = 0.30f; /* Immediate confirmed corner entry floor */
+                }
+                if (fabsf(filtered_heading) >= 2.0f) {
+                    float h_norm = (fabsf(filtered_heading) - 2.0f) / (12.0f - 2.0f);
+                    if (h_norm > 1.0f) h_norm = 1.0f;
+                    if (h_norm > top_turn_gate) top_turn_gate = h_norm;
+                }
+                if (sr.found == 2 && !front_corner_wall && top_turn_gate > 0.75f) {
+                    top_turn_gate = 0.75f;
                 }
             }
 
             if ((sr.found > 0) && (filtered_cte * eff_front_angle < 0.0f) && !sr.transverse_crosses_center) {
-                float inside_scale = (12.0f - fabsf(filtered_cte)) / (12.0f - 3.0f);
-                if (inside_scale < 0.0f) inside_scale = 0.0f;
-                if (inside_scale > 1.0f) inside_scale = 1.0f;
+                float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(filtered_cte)) / (16.0f - 4.0f));
+                if (inside_scale < 0.40f) inside_scale = 0.40f;
+                if (inside_scale > 1.0f)  inside_scale = 1.0f;
                 top_turn_gate *= inside_scale;
             }
 
             /* Severity-scaled corner speed (both modes): max(front lookahead, top apex), 6-tick peak hold,
-             * zero while an intersection is latched. */
+             * zero while an intersection is latched or when crooked on a straight track. */
+            float sev_front_angle = crooked_straight_track ? 0.0f : eff_front_angle;
+            float sev_heading     = crooked_straight_track ? 0.0f : filtered_heading;
+            if (crooked_straight_track) {
+                corner_severity_reset(&s_corner_sev);
+            }
             float corner_severity = corner_severity_update(&s_corner_sev,
-                                                           eff_front_angle, filtered_heading,
+                                                           sev_front_angle, sev_heading,
                                                            front_corner_wall,
                                                            sr.transverse_crosses_center ? 1U : 0U,
                                                            s_intersection_ahead ? 1U : 0U,
@@ -477,11 +503,12 @@ int main(void) {
                  * actually reaches the curve entrance in the top camera.
                  * ========================================================================= */
                 bool raw_corner = (!s_intersection_ahead) &&
+                                  !crooked_straight_track &&
                                   top_in_corner &&
                                   (effective_sharp_corner ||
                                    sr.transverse_crosses_center ||
                                    fabsf(filtered_heading) >= 24.0f);
-                if (s_intersection_ahead) {
+                if (s_intersection_ahead || crooked_straight_track) {
                     s_corner_hold_ticks = 0U;
                 } else if (raw_corner) {
                     s_corner_hold_ticks = 3U; /* 3-tick release hold prevents 1-tick ST:C <-> ST:S chattering */
@@ -590,7 +617,7 @@ int main(void) {
                  * CONTINUOUS ASYMMETRIC CORNER BLEND GOVERNOR (blend 1)
                  * ========================================================================= */
                 /* 1. Calculate Target & Diode Hold from unified corner_severity */
-                if (s_intersection_ahead) {
+                if (s_intersection_ahead || crooked_straight_track) {
                     /* Suppress corner blend during intersection transit with smooth release */
                     s_corner_blend += g_params.blend_release * (0.0f - s_corner_blend);
                     s_blend_target = 0.0f;

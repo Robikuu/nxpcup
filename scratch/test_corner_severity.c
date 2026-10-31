@@ -181,9 +181,21 @@ int main(void)
             if (st < min_bridge_sev) min_bridge_sev = st;
         }
         float spd_bridge = corner_severity_speed(min_bridge_sev, SPEED_STRAIGHT, SPEED_OUTSIDE_CORNER);
-        CHECK(min_bridge_sev == 1.0f && fabsf(spd_bridge - 65.0f) < 0.01f,
+        CHECK(min_bridge_sev == 1.0f && fabsf(spd_bridge - SPEED_OUTSIDE_CORNER) < 0.01f,
               "6-tick hold bridges front->top handoff at sev=%.2f, speed=%.1f%% (no mid-entry re-accel)",
               min_bridge_sev, spd_bridge);
+    }
+
+    printf("\n=== 15. Crooked chassis on straight track (Line 74/97) suppresses corner severity & braking ===\n");
+    corner_severity_reset(&cs);
+    {
+        /* Car is crooked on straight track: front cam rel curvature < 15.0 deg -> crooked_straight_track = true
+         * Sev angles are zeroed and hold reset, so severity stays 0.0 and speed stays 100% */
+        float sev_74 = corner_severity_update(&cs, 0.0f, 0.0f, 0, 0, 0,
+                                              DEFAULT_FRONT_ANGLE_THRESH, DEFAULT_H_LO, DEFAULT_H_HI);
+        float spd_74 = corner_severity_speed(sev_74, SPEED_STRAIGHT, SPEED_OUTSIDE_CORNER);
+        CHECK(sev_74 == 0.0f && spd_74 == SPEED_STRAIGHT,
+              "Crooked straight track produces sev=%.2f, speed=%.1f%% (no false braking)", sev_74, spd_74);
     }
 
     printf("\nSummarize: %d failures\n", g_failures);

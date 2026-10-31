@@ -110,73 +110,97 @@ int main(void)
               hr.is_sharp_corner, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 8: Delayed top_turn_gate (0 below |H|<12 deg, 12..28 deg ramp, 0.35 2-line cap) prevents early cornering ===\n");
+    printf("\n=== Test 8: Proactive corner entry top_turn_gate (ramp 2..12 deg, 0.30 floor on confirmed corner, 0.75 2-line cap) ===\n");
     {
-        /* Helper matching source/main.c top_turn_gate calculation */
-        /* A. Straight approach (Run 1 L14-15 / Run 6 L14: L:2, H = -5.8 deg, FS = -28.3 deg) -> gate = 0.0 (no early turn-in!) */
+        /* A. Straightaway approach without corner ahead (H = -1.2 deg, FS = -4.0 deg) -> gate = 0.0 */
         uint8_t found_a = 2, trans_a = 0;
-        float h_a = -5.8f, fs_a = -28.3f;
+        float h_a = -1.2f, fs_a = -4.0f;
+        float rel_a = fs_a - h_a;
         float gate_a = 0.0f;
         if (found_a == 0 || trans_a != 0U) {
             gate_a = 1.0f;
-        } else if (h_a * fs_a > 0.0f && fabsf(h_a) >= 12.0f) {
-            float h_norm = (fabsf(h_a) - 12.0f) / (28.0f - 12.0f);
-            if (h_norm > 1.0f) h_norm = 1.0f;
-            gate_a = h_norm;
-            if (found_a == 2 && gate_a > 0.35f) gate_a = 0.35f;
+        } else if ((fabsf(fs_a) >= DEFAULT_FRONT_ANGLE_THRESH) &&
+                   (h_a * fs_a > 0.0f || fabsf(h_a) < 3.0f)) {
+            if (fabsf(rel_a) >= DEFAULT_FRONT_ANGLE_THRESH) {
+                gate_a = 0.30f;
+            }
+            if (fabsf(h_a) >= 2.0f) {
+                float h_norm = (fabsf(h_a) - 2.0f) / (12.0f - 2.0f);
+                if (h_norm > 1.0f) h_norm = 1.0f;
+                if (h_norm > gate_a) gate_a = h_norm;
+            }
+            if (found_a == 2 && gate_a > 0.75f) gate_a = 0.75f;
         }
         CHECK(gate_a == 0.0f,
-              "Run 6 L14 approach (L:2, H=-5.8, FS=-28.3) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
+              "Straightaway approach (H=-1.2, FS=-4.0) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
               gate_a);
 
         /* B. S-curve conflict (filtered_heading = -14.2 deg left, FS = +25.8 deg right) -> gate = 0.0 */
         float h_scurve = -14.2f, fs_scurve = 25.8f;
         float gate_sc = 0.0f;
-        if (h_scurve * fs_scurve > 0.0f && fabsf(h_scurve) >= 12.0f) {
-            gate_sc = (fabsf(h_scurve) - 12.0f) / (28.0f - 12.0f);
+        if ((h_scurve * fs_scurve > 0.0f || fabsf(h_scurve) < 3.0f) && fabsf(h_scurve) >= 2.0f) {
+            gate_sc = (fabsf(h_scurve) - 2.0f) / (12.0f - 2.0f);
         }
         CHECK(gate_sc == 0.0f, "S-curve opposing signs (H=-14.2, FS=+25.8) blocks fighting feedforward (gate=%.2f)", gate_sc);
 
-        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.35f while both lines visible */
+        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.75f while both lines visible */
         uint8_t found_c = 2;
         float h_c = -27.8f, fs_c = -64.1f;
-        float gate_c = (fabsf(h_c) - 12.0f) / (28.0f - 12.0f);
+        float gate_c = (fabsf(h_c) - 2.0f) / (12.0f - 2.0f);
         if (gate_c > 1.0f) gate_c = 1.0f;
-        if (found_c == 2 && gate_c > 0.35f) gate_c = 0.35f;
+        if (found_c == 2 && gate_c > 0.75f) gate_c = 0.75f;
         float steer_c = (DEFAULT_K_CTE * (-1.1f)) + (DEFAULT_K_HEADING * h_c) + gate_c * (float)FRONT_FEEDFORWARD_GAIN * fs_c;
-        CHECK(fabsf(gate_c - 0.35f) < 0.01f && steer_c > -40.0f && steer_c < -30.0f,
-              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.35, steer=%.1f deg (not -54.5 deg)", steer_c);
+        CHECK(fabsf(gate_c - 0.75f) < 0.01f && steer_c < -40.0f,
+              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.75, steer=%.1f deg", steer_c);
 
         /* D. True single-line apex (Run 5 L16 / Run 6 L18: L:1, H=-40.8 deg, FS=-66.8 deg) -> full gate=1.0 */
         uint8_t found_d = 1;
         float h_d = -40.8f, fs_d = -66.8f;
-        float gate_d = (fabsf(h_d) - 12.0f) / (28.0f - 12.0f);
+        float gate_d = (fabsf(h_d) - 2.0f) / (12.0f - 2.0f);
         if (gate_d > 1.0f) gate_d = 1.0f;
-        if (found_d == 2 && gate_d > 0.35f) gate_d = 0.35f;
+        if (found_d == 2 && gate_d > 0.75f) gate_d = 0.75f;
         CHECK(fabsf(gate_d - 1.0f) < 0.01f, "Single-line apex (L:1, H=-40.8) reaches full gate=%.2f", gate_d);
+
+        /* E. Immediate 0.30f floor on confirmed corner ahead (|FS - H| >= 18 deg) e.g. Line 22 */
+        float h_e = 1.6f, fs_e = 33.8f;
+        float rel_e = fs_e - h_e;
+        float gate_e = 0.0f;
+        if ((fabsf(fs_e) >= DEFAULT_FRONT_ANGLE_THRESH) &&
+            (h_e * fs_e > 0.0f || fabsf(h_e) < 3.0f)) {
+            if (fabsf(rel_e) >= DEFAULT_FRONT_ANGLE_THRESH) {
+                gate_e = 0.30f;
+            }
+            if (fabsf(h_e) >= 2.0f) {
+                float h_norm = (fabsf(h_e) - 2.0f) / (12.0f - 2.0f);
+                if (h_norm > 1.0f) h_norm = 1.0f;
+                if (h_norm > gate_e) gate_e = h_norm;
+            }
+        }
+        CHECK(fabsf(gate_e - 0.30f) < 0.01f, "Line 22 confirmed corner (H=1.6, FS=33.8) engages 0.30 floor (gate=%.2f)", gate_e);
     }
 
     printf("\n=== Test 9: blend=1 proportional differential braking & updated Config.h boot defaults ===\n");
     {
         float abs_steer = 10.0f;
         float s_corner_blend = 1.0f;
-        float target_speed = SPEED_OUTSIDE_CORNER; /* 65% */
+        float target_speed = SPEED_OUTSIDE_CORNER;
         float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                            ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
         float corner_authority = 0.25f + 0.75f * s_corner_blend;
         float diff_mult = steer_norm * corner_authority;
         float inside_wheel = target_speed - diff_mult * (target_speed - (float)SPEED_INSIDE_MIN);
-        CHECK(inside_wheel > 60.0f,
-              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 34%%)", inside_wheel);
-        CHECK(SPEED_STRAIGHT == 95.0f && SPEED_OUTSIDE_CORNER == 65.0f && SPEED_INSIDE_MIN == 34.0f &&
-              DEFAULT_K_CTE == 0.55f && DEFAULT_K_HEADING == 0.90f &&
+        CHECK(inside_wheel > 55.0f,
+              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 28%%)", inside_wheel);
+        CHECK(SPEED_STRAIGHT == 100.0f && SPEED_OUTSIDE_CORNER == 62.0f && SPEED_INSIDE_MIN == 28.0f &&
+              STEER_FULL_BRAKE_DEG == 32.0f && FRONT_FEEDFORWARD_GAIN == 0.50f &&
+              DEFAULT_K_CTE == 0.65f && DEFAULT_K_HEADING == 1.00f &&
               DEFAULT_H_LO == 12.0f && DEFAULT_H_HI == 35.0f &&
-              DEFAULT_FRONT_ANGLE_THRESH == 28.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
+              DEFAULT_FRONT_ANGLE_THRESH == 18.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
               CORNER_SEVERITY_HOLD_TICKS == 6U && DECEL_RAMP_STEP == 30.0f &&
               ACCEL_RAMP_STEP == 6.5f && DEFAULT_BLEND_ENABLE == 0U,
-              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, K_CTE=%.2f, K_HEAD=%.2f, FA_TH=%.0f",
+              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, STEER_BRAKE=%.0f, FA_TH=%.0f",
               (float)SPEED_STRAIGHT, (float)SPEED_OUTSIDE_CORNER, (float)SPEED_INSIDE_MIN,
-              (float)DEFAULT_K_CTE, (float)DEFAULT_K_HEADING, (float)DEFAULT_FRONT_ANGLE_THRESH);
+              (float)STEER_FULL_BRAKE_DEG, (float)DEFAULT_FRONT_ANGLE_THRESH);
     }
 
     printf("\n=== Test 10: Top camera single-line perspective compensation (fade 20..30 deg) ===\n");
@@ -210,32 +234,32 @@ int main(void)
               hr.has_transverse_tape, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 12: inside_scale suppresses inside-of-turn dive (Run 6 L24-25) & preserves centered/outside turn-in ===\n");
+    printf("\n=== Test 12: inside_scale softens to 0.40f floor over 4..16 px & preserves centered/outside turn-in ===\n");
     {
         /* A. Car already far on INSIDE of left turn (Run 6 L25: F = +26.6 px, H = -26.4 deg, FS = -37.1 deg)
-         * Must zero out front feedforward so the car doesn't dive across the inside curb! */
+         * Softens front feedforward to 0.40f floor so car doesn't dive across curb but still gets turn-in authority */
         float f_in = 26.6f, h_in = -26.4f, fs_in = -37.1f;
-        float gate_in = (fabsf(h_in) - 12.0f) / (28.0f - 12.0f);
+        float gate_in = (fabsf(h_in) - 2.0f) / (12.0f - 2.0f);
         if (gate_in > 1.0f) gate_in = 1.0f;
         if (f_in * fs_in < 0.0f) {
-            float inside_scale = (12.0f - fabsf(f_in)) / (12.0f - 3.0f);
-            if (inside_scale < 0.0f) inside_scale = 0.0f;
-            if (inside_scale > 1.0f) inside_scale = 1.0f;
+            float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(f_in)) / (16.0f - 4.0f));
+            if (inside_scale < 0.40f) inside_scale = 0.40f;
+            if (inside_scale > 1.0f)  inside_scale = 1.0f;
             gate_in *= inside_scale;
         }
         float steer_in = (DEFAULT_K_CTE * f_in) + (DEFAULT_K_HEADING * h_in) + gate_in * (float)FRONT_FEEDFORWARD_GAIN * fs_in;
-        CHECK(gate_in == 0.0f && steer_in > -12.0f,
-              "Inside-of-turn approach (Run 6 L25: F=+26.6, H=-26.4, FS=-37.1) suppresses FF (gate=%.2f, steer=%.1f deg)",
+        CHECK(fabsf(gate_in - 0.40f) < 0.01f && steer_in < -12.0f,
+              "Inside-of-turn approach (Run 6 L25: F=+26.6, H=-26.4, FS=-37.1) keeps 0.40 floor FF (gate=%.2f, steer=%.1f deg)",
               gate_in, steer_in);
 
         /* B. Centered / outside corner entry (F = -2.0 px, H = -28.0 deg, FS = -50.0 deg, L:1) -> full gate=1.0 */
         float f_out = -2.0f, h_out = -28.0f, fs_out = -50.0f;
-        float gate_out = (fabsf(h_out) - 12.0f) / (28.0f - 12.0f);
+        float gate_out = (fabsf(h_out) - 2.0f) / (12.0f - 2.0f);
         if (gate_out > 1.0f) gate_out = 1.0f;
         if (f_out * fs_out < 0.0f) {
-            float inside_scale = (12.0f - fabsf(f_out)) / (12.0f - 3.0f);
-            if (inside_scale < 0.0f) inside_scale = 0.0f;
-            if (inside_scale > 1.0f) inside_scale = 1.0f;
+            float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(f_out)) / (16.0f - 4.0f));
+            if (inside_scale < 0.40f) inside_scale = 0.40f;
+            if (inside_scale > 1.0f)  inside_scale = 1.0f;
             gate_out *= inside_scale;
         }
         CHECK(fabsf(gate_out - 1.0f) < 0.01f,
@@ -451,6 +475,119 @@ int main(void)
             snprintf(buf, sizeof(buf), "%s%d.%02d", sign, whole, f100);
             CHECK(strcmp(buf, expect[i]) == 0, "%.3ff rounds/formats to \"%s\" (expect \"%s\")", val, buf, expect[i]);
         }
+    }
+
+    printf("\n=== Test 19: Regression test for Line 74 (H=-29.1, FS=-30.4) and Line 97 (H=-42.6, FS=-29.6) ===\n");
+    {
+        /* Case 1: Line 74: H=-29.1 deg, FS=-30.4 deg on straight track
+         * Relative curvature |FS - H| = 1.3 deg < 15.0 deg -> crooked_straight_track = true
+         * eff_front_angle must be 0.0f, top_in_corner must be false, is_corner must be false (ST:S),
+         * and extra left feedforward added to steer_cmd must be 0.0f. */
+        float h_74 = -29.1f, fs_74 = -30.4f;
+        uint8_t horizon_found_74 = 1, front_wall_74 = 0, trans_center_74 = 0, found_74 = 2;
+        float rel_74 = fs_74 - h_74;
+
+        bool crooked_74 = (horizon_found_74 > 0) && (!front_wall_74) && (!trans_center_74) && (fabsf(rel_74) < 15.0f);
+        float eff_front_74 = fs_74;
+        if (crooked_74) {
+            eff_front_74 = 0.0f;
+        } else if (horizon_found_74 > 0 && (fs_74 * h_74 > 0.0f)) {
+            if (fabsf(fs_74) <= fabsf(h_74)) {
+                eff_front_74 = 0.0f;
+            } else {
+                float net_front = fs_74 - 0.65f * h_74;
+                if (net_front * fs_74 < 0.0f) net_front = 0.0f;
+                eff_front_74 = net_front;
+            }
+        }
+
+        bool heading_turn_conf_74 = (h_74 * eff_front_74 > 0.0f) || (!crooked_74 && fabsf(h_74) >= 20.0f);
+        bool top_in_corner_74 = (found_74 == 0) || (trans_center_74 != 0U) ||
+                                (!crooked_74 && fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH) ||
+                                (fabsf(h_74) >= 4.0f && heading_turn_conf_74);
+        bool raw_corner_74 = !crooked_74 && top_in_corner_74 && (fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h_74) >= 24.0f);
+        bool is_corner_74 = raw_corner_74;
+
+        float gate_74 = 0.0f;
+        if (fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH && (h_74 * eff_front_74 > 0.0f || fabsf(h_74) < 3.0f)) {
+            if (fabsf(h_74) >= 4.0f) {
+                gate_74 = (fabsf(h_74) - 4.0f) / (16.0f - 4.0f);
+                if (gate_74 > 1.0f) gate_74 = 1.0f;
+            }
+        }
+        float extra_ff_74 = is_corner_74 ? (gate_74 * FRONT_FEEDFORWARD_GAIN * eff_front_74) : 0.0f;
+
+        CHECK(crooked_74 == true && eff_front_74 == 0.0f,
+              "Line 74 (H=-29.1, FS=-30.4): crooked_straight_track=true, eff_front_angle=%.2f", eff_front_74);
+        CHECK(top_in_corner_74 == false && is_corner_74 == false,
+              "Line 74: top_in_corner=false, is_corner=false -> ST:S verified");
+        CHECK(extra_ff_74 == 0.0f,
+              "Line 74: extra left feedforward is exactly 0.0f (no fighting pull)");
+
+        /* Case 2: Line 97: H=-42.6 deg, FS=-29.6 deg on straight track
+         * Relative curvature |FS - H| = 13.0 deg < 15.0 deg AND |FS| <= |H| (road ahead is straighter)
+         * eff_front_angle must be 0.0f, top_in_corner must be false, is_corner must be false (ST:S),
+         * and extra left feedforward added to steer_cmd must be 0.0f. */
+        float h_97 = -42.6f, fs_97 = -29.6f;
+        uint8_t horizon_found_97 = 1, front_wall_97 = 0, trans_center_97 = 0, found_97 = 2;
+        float rel_97 = fs_97 - h_97;
+
+        bool crooked_97 = (horizon_found_97 > 0) && (!front_wall_97) && (!trans_center_97) && (fabsf(rel_97) < 15.0f);
+        float eff_front_97 = fs_97;
+        if (crooked_97) {
+            eff_front_97 = 0.0f;
+        } else if (horizon_found_97 > 0 && (fs_97 * h_97 > 0.0f)) {
+            if (fabsf(fs_97) <= fabsf(h_97)) {
+                eff_front_97 = 0.0f;
+            } else {
+                float net_front = fs_97 - 0.65f * h_97;
+                if (net_front * fs_97 < 0.0f) net_front = 0.0f;
+                eff_front_97 = net_front;
+            }
+        }
+
+        bool heading_turn_conf_97 = (h_97 * eff_front_97 > 0.0f) || (!crooked_97 && fabsf(h_97) >= 20.0f);
+        bool top_in_corner_97 = (found_97 == 0) || (trans_center_97 != 0U) ||
+                                (!crooked_97 && fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH) ||
+                                (fabsf(h_97) >= 4.0f && heading_turn_conf_97);
+        bool raw_corner_97 = !crooked_97 && top_in_corner_97 && (fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h_97) >= 24.0f);
+        bool is_corner_97 = raw_corner_97;
+
+        float gate_97 = 0.0f;
+        if (fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH && (h_97 * eff_front_97 > 0.0f || fabsf(h_97) < 3.0f)) {
+            if (fabsf(h_97) >= 4.0f) {
+                gate_97 = (fabsf(h_97) - 4.0f) / (16.0f - 4.0f);
+                if (gate_97 > 1.0f) gate_97 = 1.0f;
+            }
+        }
+        float extra_ff_97 = is_corner_97 ? (gate_97 * FRONT_FEEDFORWARD_GAIN * eff_front_97) : 0.0f;
+
+        CHECK(crooked_97 == true && eff_front_97 == 0.0f,
+              "Line 97 (H=-42.6, FS=-29.6): crooked_straight_track=true, eff_front_angle=%.2f", eff_front_97);
+        CHECK(top_in_corner_97 == false && is_corner_97 == false,
+              "Line 97: top_in_corner=false, is_corner=false -> ST:S verified");
+        CHECK(extra_ff_97 == 0.0f,
+              "Line 97: extra left feedforward is exactly 0.0f (no fighting pull)");
+
+        /* Case 3: Confirmed real corner approach (H=5.0 deg, FS=35.0 deg, rel=30.0 deg >= 15.0 deg)
+         * Must NOT be treated as crooked straight track. Net front curvature computed and preserved. */
+        float h_real = 5.0f, fs_real = 35.0f;
+        float rel_real = fs_real - h_real;
+        bool crooked_real = (1 > 0) && (!0) && (!0) && (fabsf(rel_real) < 15.0f);
+        float eff_front_real = fs_real;
+        if (crooked_real) {
+            eff_front_real = 0.0f;
+        } else if (fs_real * h_real > 0.0f) {
+            if (fabsf(fs_real) <= fabsf(h_real)) {
+                eff_front_real = 0.0f;
+            } else {
+                float net_front = fs_real - 0.65f * h_real;
+                if (net_front * fs_real < 0.0f) net_front = 0.0f;
+                eff_front_real = net_front;
+            }
+        }
+        CHECK(crooked_real == false && fabsf(eff_front_real - (35.0f - 0.65f * 5.0f)) < 0.01f,
+              "Real corner (H=5, FS=35): net_front=%.2f deg preserved", eff_front_real);
     }
 
     printf("\nSummarize: %d failures\n", g_failures);

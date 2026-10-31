@@ -25,17 +25,17 @@
 // ---- Wheel Speeds & Asymmetric Differential Drag ----
 #define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
 #define SPEED_STRAIGHT               100.0f     // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         65.0f     // Calibrated apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             34.0f     // Inside wheel pivot anchor duty (%)
+#define SPEED_OUTSIDE_CORNER         62.0f     // Calibrated apex outside wheel drive (%)
+#define SPEED_INSIDE_MIN             32.0f     // Inside wheel pivot anchor duty (%)
 
 // ---- Differential Drag Scaling ----
 #define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
-#define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
+#define STEER_FULL_BRAKE_DEG         26.0f     // Steer angle (deg) for 100% pivot drag ramp
 
 // ---- Dual-Camera Horizon & Lane Constants ----
 #define FRONT_CORNER_ANGLE_THRESH_DEG 30.0f    // Horizon road angle threshold for sharp corner detection
 #define TRACK_HALF_WIDTH_PX          25.0f     // Nominal lane half-width (pixels) in top camera view
-#define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
+#define FRONT_FEEDFORWARD_GAIN       0.60f     // Pre-steer feedforward gain when corner detected
 
 // ---- Severity-Scaled Corner Speed (speed = spd_s - severity * (spd_s - spd_out)) ----
 #define FRONT_SEVERITY_FULL_DEG      40.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)
@@ -63,7 +63,7 @@
 #define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   28.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   23.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
 #define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
 #define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
