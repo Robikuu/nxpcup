@@ -90,12 +90,12 @@
 
 // ---- Differential Drag Scaling ----
 #define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
-#define STEER_FULL_BRAKE_DEG         40.0f     // Steer angle (deg) for 100% pivot drag ramp
+#define STEER_FULL_BRAKE_DEG         32.0f     // Steer angle (deg) for 100% pivot drag ramp
 
 // ---- Dual-Camera Horizon & Lane Constants ----
 #define FRONT_CORNER_ANGLE_THRESH_DEG 30.0f    // Horizon road angle threshold for sharp corner detection
 #define TRACK_HALF_WIDTH_PX          25.0f     // Nominal lane half-width (pixels) in top camera view
-#define FRONT_FEEDFORWARD_GAIN       0.45f     // Pre-steer feedforward gain when corner detected
+#define FRONT_FEEDFORWARD_GAIN       0.50f     // Pre-steer feedforward gain when corner detected
 
 // ---- Severity-Scaled Corner Speed (speed = spd_s - severity * (spd_s - spd_out)) ----
 #define FRONT_SEVERITY_FULL_DEG      40.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)

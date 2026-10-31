@@ -110,73 +110,97 @@ int main(void)
               hr.is_sharp_corner, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 8: Delayed top_turn_gate (0 below |H|<12 deg, 12..28 deg ramp, 0.35 2-line cap) prevents early cornering ===\n");
+    printf("\n=== Test 8: Proactive corner entry top_turn_gate (ramp 2..12 deg, 0.30 floor on confirmed corner, 0.75 2-line cap) ===\n");
     {
-        /* Helper matching source/main.c top_turn_gate calculation */
-        /* A. Straight approach (Run 1 L14-15 / Run 6 L14: L:2, H = -5.8 deg, FS = -28.3 deg) -> gate = 0.0 (no early turn-in!) */
+        /* A. Straightaway approach without corner ahead (H = -1.2 deg, FS = -4.0 deg) -> gate = 0.0 */
         uint8_t found_a = 2, trans_a = 0;
-        float h_a = -5.8f, fs_a = -28.3f;
+        float h_a = -1.2f, fs_a = -4.0f;
+        float rel_a = fs_a - h_a;
         float gate_a = 0.0f;
         if (found_a == 0 || trans_a != 0U) {
             gate_a = 1.0f;
-        } else if (h_a * fs_a > 0.0f && fabsf(h_a) >= 12.0f) {
-            float h_norm = (fabsf(h_a) - 12.0f) / (28.0f - 12.0f);
-            if (h_norm > 1.0f) h_norm = 1.0f;
-            gate_a = h_norm;
-            if (found_a == 2 && gate_a > 0.35f) gate_a = 0.35f;
+        } else if ((fabsf(fs_a) >= DEFAULT_FRONT_ANGLE_THRESH) &&
+                   (h_a * fs_a > 0.0f || fabsf(h_a) < 3.0f)) {
+            if (fabsf(rel_a) >= DEFAULT_FRONT_ANGLE_THRESH) {
+                gate_a = 0.30f;
+            }
+            if (fabsf(h_a) >= 2.0f) {
+                float h_norm = (fabsf(h_a) - 2.0f) / (12.0f - 2.0f);
+                if (h_norm > 1.0f) h_norm = 1.0f;
+                if (h_norm > gate_a) gate_a = h_norm;
+            }
+            if (found_a == 2 && gate_a > 0.75f) gate_a = 0.75f;
         }
         CHECK(gate_a == 0.0f,
-              "Run 6 L14 approach (L:2, H=-5.8, FS=-28.3) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
+              "Straightaway approach (H=-1.2, FS=-4.0) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
               gate_a);
 
         /* B. S-curve conflict (filtered_heading = -14.2 deg left, FS = +25.8 deg right) -> gate = 0.0 */
         float h_scurve = -14.2f, fs_scurve = 25.8f;
         float gate_sc = 0.0f;
-        if (h_scurve * fs_scurve > 0.0f && fabsf(h_scurve) >= 12.0f) {
-            gate_sc = (fabsf(h_scurve) - 12.0f) / (28.0f - 12.0f);
+        if ((h_scurve * fs_scurve > 0.0f || fabsf(h_scurve) < 3.0f) && fabsf(h_scurve) >= 2.0f) {
+            gate_sc = (fabsf(h_scurve) - 2.0f) / (12.0f - 2.0f);
         }
         CHECK(gate_sc == 0.0f, "S-curve opposing signs (H=-14.2, FS=+25.8) blocks fighting feedforward (gate=%.2f)", gate_sc);
 
-        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.35f while both lines visible */
+        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.75f while both lines visible */
         uint8_t found_c = 2;
         float h_c = -27.8f, fs_c = -64.1f;
-        float gate_c = (fabsf(h_c) - 12.0f) / (28.0f - 12.0f);
+        float gate_c = (fabsf(h_c) - 2.0f) / (12.0f - 2.0f);
         if (gate_c > 1.0f) gate_c = 1.0f;
-        if (found_c == 2 && gate_c > 0.35f) gate_c = 0.35f;
+        if (found_c == 2 && gate_c > 0.75f) gate_c = 0.75f;
         float steer_c = (DEFAULT_K_CTE * (-1.1f)) + (DEFAULT_K_HEADING * h_c) + gate_c * (float)FRONT_FEEDFORWARD_GAIN * fs_c;
-        CHECK(fabsf(gate_c - 0.35f) < 0.01f && steer_c > -40.0f && steer_c < -30.0f,
-              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.35, steer=%.1f deg (not -54.5 deg)", steer_c);
+        CHECK(fabsf(gate_c - 0.75f) < 0.01f && steer_c < -40.0f,
+              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.75, steer=%.1f deg", steer_c);
 
         /* D. True single-line apex (Run 5 L16 / Run 6 L18: L:1, H=-40.8 deg, FS=-66.8 deg) -> full gate=1.0 */
         uint8_t found_d = 1;
         float h_d = -40.8f, fs_d = -66.8f;
-        float gate_d = (fabsf(h_d) - 12.0f) / (28.0f - 12.0f);
+        float gate_d = (fabsf(h_d) - 2.0f) / (12.0f - 2.0f);
         if (gate_d > 1.0f) gate_d = 1.0f;
-        if (found_d == 2 && gate_d > 0.35f) gate_d = 0.35f;
+        if (found_d == 2 && gate_d > 0.75f) gate_d = 0.75f;
         CHECK(fabsf(gate_d - 1.0f) < 0.01f, "Single-line apex (L:1, H=-40.8) reaches full gate=%.2f", gate_d);
+
+        /* E. Immediate 0.30f floor on confirmed corner ahead (|FS - H| >= 18 deg) e.g. Line 22 */
+        float h_e = 1.6f, fs_e = 33.8f;
+        float rel_e = fs_e - h_e;
+        float gate_e = 0.0f;
+        if ((fabsf(fs_e) >= DEFAULT_FRONT_ANGLE_THRESH) &&
+            (h_e * fs_e > 0.0f || fabsf(h_e) < 3.0f)) {
+            if (fabsf(rel_e) >= DEFAULT_FRONT_ANGLE_THRESH) {
+                gate_e = 0.30f;
+            }
+            if (fabsf(h_e) >= 2.0f) {
+                float h_norm = (fabsf(h_e) - 2.0f) / (12.0f - 2.0f);
+                if (h_norm > 1.0f) h_norm = 1.0f;
+                if (h_norm > gate_e) gate_e = h_norm;
+            }
+        }
+        CHECK(fabsf(gate_e - 0.30f) < 0.01f, "Line 22 confirmed corner (H=1.6, FS=33.8) engages 0.30 floor (gate=%.2f)", gate_e);
     }
 
     printf("\n=== Test 9: blend=1 proportional differential braking & updated Config.h boot defaults ===\n");
     {
         float abs_steer = 10.0f;
         float s_corner_blend = 1.0f;
-        float target_speed = SPEED_OUTSIDE_CORNER; /* 65% */
+        float target_speed = SPEED_OUTSIDE_CORNER;
         float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                            ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
         float corner_authority = 0.25f + 0.75f * s_corner_blend;
         float diff_mult = steer_norm * corner_authority;
         float inside_wheel = target_speed - diff_mult * (target_speed - (float)SPEED_INSIDE_MIN);
-        CHECK(inside_wheel > 60.0f,
-              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 34%%)", inside_wheel);
-        CHECK(SPEED_STRAIGHT == 95.0f && SPEED_OUTSIDE_CORNER == 65.0f && SPEED_INSIDE_MIN == 34.0f &&
-              DEFAULT_K_CTE == 0.55f && DEFAULT_K_HEADING == 0.90f &&
+        CHECK(inside_wheel > 55.0f,
+              "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 28%%)", inside_wheel);
+        CHECK(SPEED_STRAIGHT == 100.0f && SPEED_OUTSIDE_CORNER == 62.0f && SPEED_INSIDE_MIN == 28.0f &&
+              STEER_FULL_BRAKE_DEG == 32.0f && FRONT_FEEDFORWARD_GAIN == 0.50f &&
+              DEFAULT_K_CTE == 0.65f && DEFAULT_K_HEADING == 1.00f &&
               DEFAULT_H_LO == 12.0f && DEFAULT_H_HI == 35.0f &&
-              DEFAULT_FRONT_ANGLE_THRESH == 28.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
+              DEFAULT_FRONT_ANGLE_THRESH == 18.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
               CORNER_SEVERITY_HOLD_TICKS == 6U && DECEL_RAMP_STEP == 30.0f &&
               ACCEL_RAMP_STEP == 6.5f && DEFAULT_BLEND_ENABLE == 0U,
-              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, K_CTE=%.2f, K_HEAD=%.2f, FA_TH=%.0f",
+              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, STEER_BRAKE=%.0f, FA_TH=%.0f",
               (float)SPEED_STRAIGHT, (float)SPEED_OUTSIDE_CORNER, (float)SPEED_INSIDE_MIN,
-              (float)DEFAULT_K_CTE, (float)DEFAULT_K_HEADING, (float)DEFAULT_FRONT_ANGLE_THRESH);
+              (float)STEER_FULL_BRAKE_DEG, (float)DEFAULT_FRONT_ANGLE_THRESH);
     }
 
     printf("\n=== Test 10: Top camera single-line perspective compensation (fade 20..30 deg) ===\n");
@@ -210,32 +234,32 @@ int main(void)
               hr.has_transverse_tape, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 12: inside_scale suppresses inside-of-turn dive (Run 6 L24-25) & preserves centered/outside turn-in ===\n");
+    printf("\n=== Test 12: inside_scale softens to 0.40f floor over 4..16 px & preserves centered/outside turn-in ===\n");
     {
         /* A. Car already far on INSIDE of left turn (Run 6 L25: F = +26.6 px, H = -26.4 deg, FS = -37.1 deg)
-         * Must zero out front feedforward so the car doesn't dive across the inside curb! */
+         * Softens front feedforward to 0.40f floor so car doesn't dive across curb but still gets turn-in authority */
         float f_in = 26.6f, h_in = -26.4f, fs_in = -37.1f;
-        float gate_in = (fabsf(h_in) - 12.0f) / (28.0f - 12.0f);
+        float gate_in = (fabsf(h_in) - 2.0f) / (12.0f - 2.0f);
         if (gate_in > 1.0f) gate_in = 1.0f;
         if (f_in * fs_in < 0.0f) {
-            float inside_scale = (12.0f - fabsf(f_in)) / (12.0f - 3.0f);
-            if (inside_scale < 0.0f) inside_scale = 0.0f;
-            if (inside_scale > 1.0f) inside_scale = 1.0f;
+            float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(f_in)) / (16.0f - 4.0f));
+            if (inside_scale < 0.40f) inside_scale = 0.40f;
+            if (inside_scale > 1.0f)  inside_scale = 1.0f;
             gate_in *= inside_scale;
         }
         float steer_in = (DEFAULT_K_CTE * f_in) + (DEFAULT_K_HEADING * h_in) + gate_in * (float)FRONT_FEEDFORWARD_GAIN * fs_in;
-        CHECK(gate_in == 0.0f && steer_in > -12.0f,
-              "Inside-of-turn approach (Run 6 L25: F=+26.6, H=-26.4, FS=-37.1) suppresses FF (gate=%.2f, steer=%.1f deg)",
+        CHECK(fabsf(gate_in - 0.40f) < 0.01f && steer_in < -12.0f,
+              "Inside-of-turn approach (Run 6 L25: F=+26.6, H=-26.4, FS=-37.1) keeps 0.40 floor FF (gate=%.2f, steer=%.1f deg)",
               gate_in, steer_in);
 
         /* B. Centered / outside corner entry (F = -2.0 px, H = -28.0 deg, FS = -50.0 deg, L:1) -> full gate=1.0 */
         float f_out = -2.0f, h_out = -28.0f, fs_out = -50.0f;
-        float gate_out = (fabsf(h_out) - 12.0f) / (28.0f - 12.0f);
+        float gate_out = (fabsf(h_out) - 2.0f) / (12.0f - 2.0f);
         if (gate_out > 1.0f) gate_out = 1.0f;
         if (f_out * fs_out < 0.0f) {
-            float inside_scale = (12.0f - fabsf(f_out)) / (12.0f - 3.0f);
-            if (inside_scale < 0.0f) inside_scale = 0.0f;
-            if (inside_scale > 1.0f) inside_scale = 1.0f;
+            float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(f_out)) / (16.0f - 4.0f));
+            if (inside_scale < 0.40f) inside_scale = 0.40f;
+            if (inside_scale > 1.0f)  inside_scale = 1.0f;
             gate_out *= inside_scale;
         }
         CHECK(fabsf(gate_out - 1.0f) < 0.01f,
@@ -451,6 +475,55 @@ int main(void)
             snprintf(buf, sizeof(buf), "%s%d.%02d", sign, whole, f100);
             CHECK(strcmp(buf, expect[i]) == 0, "%.3ff rounds/formats to \"%s\" (expect \"%s\")", val, buf, expect[i]);
         }
+    }
+
+    printf("\n=== Test 19: Corner state latch (no mid-corner C->S flip, min 10 ticks, exit on |H|<8 & |curv|<8) ===\n");
+    {
+        /* Case 1: Corner entry on Line 21 (H=30.1, FS=52.6, curv=22.5 >= 18) triggers raw_corner -> latches */
+        uint8_t hold_ticks = 0;
+        float h = 30.1f, fs = 52.6f;
+        float curv = fs - h;
+        bool top_in_corner = (fabsf(curv) >= DEFAULT_FRONT_ANGLE_THRESH);
+        bool raw_corner = top_in_corner && (fabsf(curv) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h) >= 24.0f);
+        uint8_t ix = 0;
+
+        /* Tick 1: Enter latch */
+        if (ix) hold_ticks = 0;
+        else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+        else if (raw_corner) hold_ticks = 1;
+
+        CHECK(hold_ticks == 1, "Tick 1: raw_corner triggers latch (hold_ticks=%u)", hold_ticks);
+
+        /* Case 2: Mid-corner apex Line 22 (H=45.9, FS=57.1, curv=11.2) - previously flipped C->S due to crooked_straight_track.
+         * Now must STAY latched (no mid-corner flip)! */
+        h = 45.9f; fs = 57.1f; curv = fs - h;
+        raw_corner = (fabsf(h) >= 24.0f);
+        for (int t = 2; t <= 5; t++) {
+            if (ix) hold_ticks = 0;
+            else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+            else if (raw_corner) hold_ticks = 1;
+        }
+        CHECK(hold_ticks == 5, "Tick 2..5 (H=45.9, FS=57.1): stays solidly latched (hold_ticks=%u, no C->S flip)", hold_ticks);
+
+        /* Case 3: Heading drops below 8 at tick 7, but hold_ticks < 10 -> MUST NOT EXIT YET */
+        h = 6.0f; fs = 6.0f; curv = 0.0f; raw_corner = false;
+        for (int t = 6; t <= 9; t++) {
+            if (ix) hold_ticks = 0;
+            else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+            else if (raw_corner) hold_ticks = 1;
+        }
+        CHECK(hold_ticks == 9, "Tick 9: hold_ticks < 10 enforces min 200ms hold (hold_ticks=%u)", hold_ticks);
+
+        /* Case 4: Tick 10 with |H| < 8 and |curv| < 8 -> cleanly exits latch */
+        if (ix) hold_ticks = 0;
+        else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+        else if (raw_corner) hold_ticks = 1;
+        CHECK(hold_ticks == 0, "Tick 10: reaches 10 ticks with |H|<8 & |curv|<8 -> cleanly exits (hold_ticks=%u)", hold_ticks);
+
+        /* Case 5: Intersection immediately cancels corner latch */
+        hold_ticks = 5; ix = 1;
+        if (ix) hold_ticks = 0;
+        CHECK(hold_ticks == 0, "Intersection immediately clears corner latch (hold_ticks=%u)", hold_ticks);
     }
 
     printf("\nSummarize: %d failures\n", g_failures);
