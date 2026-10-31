@@ -53,6 +53,8 @@ int main(void) {
 
     params_init();
     buttons_init();
+    /* Initialize on-board Red LED as preset indicator (active-low, start OFF = Preset 1) */
+    LED_RED_INIT(LOGIC_LED_OFF);
 
     /* 2. Actuators safe state */
     HbridgeInit(&g_hbridge, CTIMER0_PERIPHERAL, CTIMER0_PWM_PERIOD_CH,
@@ -120,17 +122,26 @@ int main(void) {
         if (g_tickFlag) {
             g_tickFlag = false;
 
-            /* Hardware push button toggle */
-            if (button_pressed_edge()) {
-                SDK_DelayAtLeastUs(3000000, SystemCoreClock);
-                motor_test_stop();
-                if (g_params.state == STATE_IDLE) {
-                    g_params.state = STATE_RUNNING;
-                    PRINTF("Button: STARTED\r\n");
-                } else {
+            /* Hardware push button handling:
+             * - In RUNNING: Any press immediately halts the vehicle (fail-safe emergency stop).
+             * - In IDLE: Short tap & release starts the vehicle;
+             *            Holding for >= BUTTON_HOLD_TICKS (1.0s) switches between Preset 1 & Preset 2.
+             */
+            button_event_t btn_evt = button_update();
+
+            if (g_params.state == STATE_RUNNING) {
+                if (btn_evt == BUTTON_EVT_PRESS) {
+                    motor_test_stop();
                     g_params.state = STATE_IDLE;
                     HbridgeBrake(&g_hbridge);
-                    PRINTF("Button: STOPPED\r\n");
+                    button_consume_press();
+                }
+            } else {
+                if (btn_evt == BUTTON_EVT_SHORT_CLICK) {
+                    motor_test_stop();
+                    g_params.state = STATE_RUNNING;
+                } else if (btn_evt == BUTTON_EVT_HOLD) {
+                    params_switch_preset();
                 }
             }
 

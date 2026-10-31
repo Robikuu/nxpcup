@@ -22,11 +22,71 @@
 #define STEER_CMD_MAX_RIGHT          (STEERING_LIMIT_RIGHT - STEERING_OFFSET)
 #define STEER_CMD_MAX_LEFT           (STEERING_LIMIT_LEFT - STEERING_OFFSET)
 
-// ---- Wheel Speeds & Asymmetric Differential Drag ----
-#define DEFAULT_DRIVE_SCALE          1.00f     // 100% full output power
-#define SPEED_STRAIGHT               100.0f     // Straight line sprint speed (%)
-#define SPEED_OUTSIDE_CORNER         62.0f     // Calibrated apex outside wheel drive (%)
-#define SPEED_INSIDE_MIN             28.0f     // Inside wheel pivot anchor duty (%)
+// ---- Button Hold Timing ----
+#define BUTTON_HOLD_TICKS            50U       // 50 ticks @ 50 Hz = 1000 ms (1.0 second hold threshold)
+
+// ============================================================================
+// CAR PARAMETER PRESETS
+// ============================================================================
+
+// ---- Preset 1 (Calibrated High-Speed / Race Profile) ----
+#define PRESET1_SPEED_STRAIGHT         100.0f    // Straight line sprint speed (%)
+#define PRESET1_SPEED_OUTSIDE_CORNER   65.0f     // Calibrated apex outside wheel drive (%)
+#define PRESET1_SPEED_INSIDE_MIN       34.0f     // Inside wheel pivot anchor duty (%)
+#define PRESET1_DRIVE_SCALE            1.00f     // 100% full output power
+#define PRESET1_ACCEL_RAMP             6.5f      // Corner exit acceleration step (% / tick)
+#define PRESET1_DECEL_RAMP             30.0f     // Rapid pre-braking ramp (% / tick)
+#define PRESET1_STEERING_OFFSET        STEERING_OFFSET // Straight-line trim offset (deg)
+#define PRESET1_K_CTE                  0.55f     // Calibrated CTE weight (smooth straight line centering)
+#define PRESET1_K_HEADING              0.90f     // Direct base camera heading damping
+#define PRESET1_K_CTE_CORNER           0.55f
+#define PRESET1_K_HEADING_CORNER       0.90f
+#define PRESET1_H_LO                   12.0f     // Heading deadband floor (deg)
+#define PRESET1_H_HI                   35.0f     // Heading saturation ceiling (deg)
+#define PRESET1_BLEND_ATTACK           0.35f     // Corner blend attack rate
+#define PRESET1_BLEND_RELEASE          0.06f     // Corner blend release rate
+#define PRESET1_FRONT_ANGLE_THRESH     28.0f     // Front camera angle threshold (deg)
+#define PRESET1_BLEND_ENABLE           0U        // 0 = legacy discrete mode, 1 = continuous blend
+#define PRESET1_MOTOR_ENABLE           1U        // 1 = motors enabled, 0 = disabled
+
+// ---- Preset 2 (Conservative / Technical Track Setup) ----
+#define PRESET2_SPEED_STRAIGHT         85.0f     // Moderate straight line speed (%)
+#define PRESET2_SPEED_OUTSIDE_CORNER   55.0f     // Conservative apex outside wheel drive (%)
+#define PRESET2_SPEED_INSIDE_MIN       30.0f     // Gentle inside wheel pivot anchor duty (%)
+#define PRESET2_DRIVE_SCALE            1.00f     // Output plant gain scale (0.10 to 1.00)
+#define PRESET2_ACCEL_RAMP             5.0f      // Smoother corner exit acceleration (% / tick)
+#define PRESET2_DECEL_RAMP             30.0f     // Pre-braking ramp (% / tick)
+#define PRESET2_STEERING_OFFSET        STEERING_OFFSET // Straight-line trim offset (deg)
+#define PRESET2_K_CTE                  0.55f     // CTE weight
+#define PRESET2_K_HEADING              0.90f     // Heading damping
+#define PRESET2_K_CTE_CORNER           0.55f
+#define PRESET2_K_HEADING_CORNER       0.90f
+#define PRESET2_H_LO                   12.0f     // Heading deadband floor (deg)
+#define PRESET2_H_HI                   35.0f     // Heading saturation ceiling (deg)
+#define PRESET2_BLEND_ATTACK           0.35f     // Corner blend attack rate
+#define PRESET2_BLEND_RELEASE          0.06f     // Corner blend release rate
+#define PRESET2_FRONT_ANGLE_THRESH     28.0f     // Front camera angle threshold (deg)
+#define PRESET2_BLEND_ENABLE           0U        // 0 = legacy discrete mode, 1 = continuous blend
+#define PRESET2_MOTOR_ENABLE           1U        // 1 = motors enabled, 0 = disabled
+
+// ---- Default Parameter Aliases (Mapped to Preset 1) ----
+#define DEFAULT_DRIVE_SCALE          PRESET1_DRIVE_SCALE
+#define SPEED_STRAIGHT               PRESET1_SPEED_STRAIGHT
+#define SPEED_OUTSIDE_CORNER         PRESET1_SPEED_OUTSIDE_CORNER
+#define SPEED_INSIDE_MIN             PRESET1_SPEED_INSIDE_MIN
+#define DECEL_RAMP_STEP              PRESET1_DECEL_RAMP
+#define ACCEL_RAMP_STEP              PRESET1_ACCEL_RAMP
+#define DEFAULT_K_CTE                PRESET1_K_CTE
+#define DEFAULT_K_HEADING            PRESET1_K_HEADING
+#define DEFAULT_MOTOR_ENABLE         PRESET1_MOTOR_ENABLE
+#define DEFAULT_H_LO                 PRESET1_H_LO
+#define DEFAULT_H_HI                 PRESET1_H_HI
+#define DEFAULT_BLEND_ATTACK         PRESET1_BLEND_ATTACK
+#define DEFAULT_BLEND_RELEASE        PRESET1_BLEND_RELEASE
+#define DEFAULT_FRONT_ANGLE_THRESH   PRESET1_FRONT_ANGLE_THRESH
+#define DEFAULT_BLEND_ENABLE         PRESET1_BLEND_ENABLE
+#define DEFAULT_K_CTE_CORNER         PRESET1_K_CTE_CORNER
+#define DEFAULT_K_HEADING_CORNER     PRESET1_K_HEADING_CORNER
 
 // ---- Differential Drag Scaling ----
 #define DIFFERENTIAL_DEADZONE_DEG    8.0f      // Steer angle deadzone below which zero differential drag applies
@@ -41,32 +101,15 @@
 #define FRONT_SEVERITY_FULL_DEG      40.0f     // Front angle (deg) where front severity reaches 1.0 (ramp starts at fa_th)
 #define CORNER_SEVERITY_HOLD_TICKS   6U        // Ticks the severity peak is held after it drops (120ms bridge + flicker guard)
 
-// ---- Bilateral Anti-Spin Traction Guard (per 20ms tick) ----
-#define DECEL_RAMP_STEP              30.0f     // Rapid pre-braking & pivot lock ramp (~2 ticks from 100% to 40%)
-#define ACCEL_RAMP_STEP              6.5f      // Smooth traction-preserving corner exit acceleration (~160ms)
-
 // ---- Error Weights & Heading Deadband ----
-#define DEFAULT_K_CTE                0.35f     // Calibrated CTE weight (smooth straight line centering)
-#define DEFAULT_K_HEADING            1.00f     // Direct base camera heading damping
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband on straights to prevent pixel jitter
 
 // ---- Control Loop & Failsafe ----
-#define DEFAULT_MOTOR_ENABLE         1U        // 1 = drive motors active, 0 = drive motors disabled for push calibration
 #define OFF_TRACK_FAILSAFE_TICKS     125U      // 125 ticks (2.5 seconds @ 50Hz) off-track emergency stop
 
 // ---- Geometric Boundary Validation ----
 #define MIN_LANE_WIDTH_PX            32.0f     // Minimum lane width to reject duplicate split line segments
 #define MAX_LANE_WIDTH_PX            68.0f     // Maximum lane width
-
-// ---- Continuous Asymmetric Corner Blend Governor ----
-#define DEFAULT_H_LO                 12.0f     // Heading deadband floor (deg): below this, hold = 0.0
-#define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
-#define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
-#define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   18.0f     // Front camera angle threshold (deg) where corner blend begins
-#define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
-#define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
-#define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
 
 // ---- Corner-Exit / Off-Center Recovery (all tick counts are 50 Hz loop ticks; 4 ticks = 1 telemetry line) ----
 #define STEER_SYMMETRIC_CLAMP        1U        // 1 = clamp steer_cmd to +/-min(right,left) throw around trim so CW == CCW authority
@@ -87,7 +130,7 @@
 #define STATE_IDLE                   0
 #define STATE_RUNNING                1
 
-// ---- Runtime-Tunable Parameter Struct (18 Active Fields) ----
+// ---- Runtime-Tunable Parameter Struct (19 Active Fields) ----
 typedef struct {
     float speed_straight;
     float speed_outside_corner;
@@ -108,10 +151,13 @@ typedef struct {
     uint8_t blend_enable;        // 1 = continuous blend active, 0 = legacy discrete mode
     uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
     uint8_t state;
+    uint8_t active_preset;       // 1 = Preset 1, 2 = Preset 2
 } robot_params_t;
 
 extern robot_params_t g_params;
 
 void params_init(void);
+void params_load_preset(uint8_t preset_id);
+void params_switch_preset(void);
 
 #endif // CONFIG_H

@@ -10,12 +10,17 @@
 #include "hbridge.h"
 #include "control_theory.h"
 
+#include "Config.h"
+
 //nume peripheral = LP_FLEXCOMM9_PERIPHERAL
 
 static int button_prev_state = 1;
 static int button_debounce_cnt = 0;
+static uint32_t button_hold_cnt = 0;
+static uint8_t button_hold_fired = 0;
+static uint8_t button_press_consumed = 0;
 
-void receive_message() {
+void receive_message(void) {
     uint8_t character;
     
     // Check if data has arrived in the hardware buffer
@@ -30,25 +35,71 @@ void receive_message() {
 
 void buttons_init(void)
 {
-    button_prev_state   = 1; // idles HIGH due to pull-up
-    button_debounce_cnt = 0;
+    button_prev_state     = 1; // idles HIGH due to pull-up
+    button_debounce_cnt   = 0;
+    button_hold_cnt       = 0;
+    button_hold_fired     = 0;
+    button_press_consumed = 0;
+}
+
+button_event_t button_update(void)
+{
+    button_event_t event = BUTTON_EVT_NONE;
+    int button_raw = GPIO_PinRead(GPIO0, 23U);
+
+    if (button_raw != button_prev_state) {
+        button_debounce_cnt++;
+        if (button_debounce_cnt >= 3) {
+            int was_released = (button_prev_state == 1);
+            button_prev_state = button_raw;
+            button_debounce_cnt = 0;
+
+            if (was_released && button_raw == 0) {
+                /* Falling edge: Button just pressed down */
+                button_hold_cnt = 0;
+                button_hold_fired = 0;
+                button_press_consumed = 0;
+                event = BUTTON_EVT_PRESS;
+            } else if (!was_released && button_raw == 1) {
+                /* Rising edge: Button just released */
+                if (!button_hold_fired && !button_press_consumed) {
+                    event = BUTTON_EVT_SHORT_CLICK;
+                }
+                button_hold_cnt = 0;
+                button_hold_fired = 0;
+                button_press_consumed = 0;
+            }
+        }
+    } else {
+        button_debounce_cnt = 0;
+
+        /* While stably held in pressed state (0) */
+        if (button_prev_state == 0) {
+            button_hold_cnt++;
+            if (!button_hold_fired && !button_press_consumed && (button_hold_cnt >= BUTTON_HOLD_TICKS)) {
+                button_hold_fired = 1;
+                event = BUTTON_EVT_HOLD;
+            }
+        }
+    }
+
+    return event;
+}
+
+void button_consume_press(void)
+{
+    button_press_consumed = 1;
 }
 
 int button_pressed_edge(void)
 {
-    int button_raw = GPIO_PinRead(GPIO0, 23U);
-    if (button_raw != button_prev_state) {
-        button_debounce_cnt++;
-        if (button_debounce_cnt >= 3) {
-            int edge = (button_prev_state == 1 && button_raw == 0);
-            button_prev_state   = button_raw;
-            button_debounce_cnt = 0;
-            return edge;
-        }
-    } else {
-        button_debounce_cnt = 0;
-    }
-    return 0;
+    button_event_t evt = button_update();
+    return (evt == BUTTON_EVT_PRESS) ? 1 : 0;
+}
+
+int button_is_pressed(void)
+{
+    return (button_prev_state == 0);
 }
 
 void print_double(const char *label, float val)
@@ -155,4 +206,9 @@ void TestPidSteer(void)
             return;
         }
     }
+}
+
+void TestHBridge(void)
+{
+    TestHbridge();
 }
