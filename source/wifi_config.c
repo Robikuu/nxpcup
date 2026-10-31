@@ -37,6 +37,20 @@ void params_init(void) {
     g_params.drive_scale          = DEFAULT_DRIVE_SCALE;
     g_params.motor_enable         = DEFAULT_MOTOR_ENABLE;
     g_params.state                = STATE_IDLE;
+    g_params.blind_speed_cap      = DEFAULT_BLIND_SPEED_CAP;
+    g_params.blind_speed_ticks    = DEFAULT_BLIND_SPEED_TICKS;
+    g_params.cte_jump_thresh_px   = DEFAULT_CTE_JUMP_THRESH_PX;
+    g_params.cte_jump_max_rejects = DEFAULT_CTE_JUMP_MAX_REJECTS;
+    g_params.ff_gain              = DEFAULT_FF_GAIN;
+    g_params.ff_w_lo              = DEFAULT_FF_W_LO;
+    g_params.ff_w_hi              = DEFAULT_FF_W_HI;
+    g_params.steer_slew_max       = DEFAULT_STEER_SLEW_MAX;
+    g_params.early_brake_cv_th    = DEFAULT_EARLY_BRAKE_CV_TH;
+    g_params.early_brake_h_max    = DEFAULT_EARLY_BRAKE_H_MAX;
+    g_params.early_brake_speed    = DEFAULT_EARLY_BRAKE_SPEED;
+    g_params.early_brake_release_cv = DEFAULT_EARLY_BRAKE_REL_CV;
+    g_params.cv_corner_th         = DEFAULT_CV_CORNER_TH;
+    g_params.cv_corner_ticks      = DEFAULT_CV_CORNER_TICKS;
 }
 
 static volatile uint32_t s_motor_test_ticks = 0;
@@ -310,6 +324,34 @@ static void command_execute(char *cmd) {
         }
         send_ack_dbl("motor_enable=", val);
     }
+    else if ((!strcmp(keyword, "ff_gain") || !strcmp(keyword, "gain_ff")) && has_val) {
+        g_params.ff_gain = val;
+        send_ack_dbl("ff_gain=", val);
+    }
+    else if ((!strcmp(keyword, "slew") || !strcmp(keyword, "steer_slew")) && has_val) {
+        g_params.steer_slew_max = val;
+        send_ack_dbl("steer_slew_max=", val);
+    }
+    else if ((!strcmp(keyword, "eb_spd") || !strcmp(keyword, "early_brake_speed")) && has_val) {
+        g_params.early_brake_speed = val;
+        send_ack_dbl("early_brake_speed=", val);
+    }
+    else if ((!strcmp(keyword, "eb_cv") || !strcmp(keyword, "early_brake_cv")) && has_val) {
+        g_params.early_brake_cv_th = val;
+        send_ack_dbl("early_brake_cv_th=", val);
+    }
+    else if ((!strcmp(keyword, "cv_th") || !strcmp(keyword, "cv_corner_th")) && has_val) {
+        g_params.cv_corner_th = val;
+        send_ack_dbl("cv_corner_th=", val);
+    }
+    else if ((!strcmp(keyword, "blind_spd") || !strcmp(keyword, "blind_speed_cap")) && has_val) {
+        g_params.blind_speed_cap = val;
+        send_ack_dbl("blind_speed_cap=", val);
+    }
+    else if ((!strcmp(keyword, "cte_jump") || !strcmp(keyword, "cte_jump_thresh")) && has_val) {
+        g_params.cte_jump_thresh_px = val;
+        send_ack_dbl("cte_jump_thresh_px=", val);
+    }
     else if (!strcmp(keyword, "dump_vectors") || !strcmp(keyword, "dump")) {
         if (has_val) {
             g_dump_vectors = (uint8_t)val;
@@ -342,6 +384,13 @@ static void command_execute(char *cmd) {
         n = append_flt(buf, n, sizeof(buf), "ramp_a=", g_params.accel_ramp);
         n = append_flt(buf, n, sizeof(buf), "ramp_d=", g_params.decel_ramp);
         n = append_flt(buf, n, sizeof(buf), "scale=", g_params.drive_scale);
+        n = append_flt(buf, n, sizeof(buf), "ff_gain=", g_params.ff_gain);
+        n = append_flt(buf, n, sizeof(buf), "slew=", g_params.steer_slew_max);
+        n = append_flt(buf, n, sizeof(buf), "eb_spd=", g_params.early_brake_speed);
+        n = append_flt(buf, n, sizeof(buf), "eb_cv=", g_params.early_brake_cv_th);
+        n = append_flt(buf, n, sizeof(buf), "cv_th=", g_params.cv_corner_th);
+        n = append_flt(buf, n, sizeof(buf), "blind_spd=", g_params.blind_speed_cap);
+        n = append_flt(buf, n, sizeof(buf), "cte_jump=", g_params.cte_jump_thresh_px);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "blend=%u\r\n", (unsigned)g_params.blend_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "drive=%u\r\n", (unsigned)g_params.motor_enable);
         n += snprintf(buf + n, sizeof(buf) - (size_t)n, "dump=%u\r\n", (unsigned)g_dump_vectors);

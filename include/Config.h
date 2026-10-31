@@ -46,7 +46,7 @@
 #define ACCEL_RAMP_STEP              6.5f      // Smooth traction-preserving corner exit acceleration (~160ms)
 
 // ---- Error Weights & Heading Deadband ----
-#define DEFAULT_K_CTE                0.35f     // Calibrated CTE weight (smooth straight line centering)
+#define DEFAULT_K_CTE                0.45f     // Calibrated CTE weight (smooth straight line centering)
 #define DEFAULT_K_HEADING            1.00f     // Direct base camera heading damping
 #define HEADING_DEADBAND_DEG         2.0f      // Heading deadband on straights to prevent pixel jitter
 
@@ -63,10 +63,26 @@
 #define DEFAULT_H_HI                 35.0f     // Heading saturation ceiling (deg): above this, hold = 1.0
 #define DEFAULT_BLEND_ATTACK         0.35f     // Fast attack rate (~100ms / 5 ticks to 88% corner engagement)
 #define DEFAULT_BLEND_RELEASE        0.06f     // Smooth release rate (~25-30 ticks gradual throttle recovery)
-#define DEFAULT_FRONT_ANGLE_THRESH   18.0f     // Front camera angle threshold (deg) where corner blend begins
+#define DEFAULT_FRONT_ANGLE_THRESH   12.0f     // Front camera angle threshold (deg) where corner blend begins
 #define DEFAULT_BLEND_ENABLE         0U        // 0 = legacy discrete mode default, 1 = continuous blend active
-#define DEFAULT_K_CTE_CORNER         DEFAULT_K_CTE
-#define DEFAULT_K_HEADING_CORNER     DEFAULT_K_HEADING
+#define DEFAULT_K_CTE_CORNER         0.65f     // Corner CTE weight
+#define DEFAULT_K_HEADING_CORNER     1.00f     // Corner heading weight
+
+// ---- Lookahead Gate & Trigger Tunables ----
+#define DEFAULT_BLIND_SPEED_CAP      70.0f     // Straight speed cap (%) when front camera is blind > 3 ticks
+#define DEFAULT_BLIND_SPEED_TICKS    3U        // Consecutive fv0 ticks before speed cap engages
+#define DEFAULT_CTE_JUMP_THRESH_PX   25.0f     // 150 mm jump reject threshold (~25 px lane half-width)
+#define DEFAULT_CTE_JUMP_MAX_REJECTS 3U        // Max consecutive single-boundary CTE rejects before accepting
+#define DEFAULT_FF_GAIN              0.80f     // S_target = TS + ff_gain * cv_ff * w
+#define DEFAULT_FF_W_LO              6.0f      // Feedforward gate ramp floor (deg)
+#define DEFAULT_FF_W_HI              12.0f     // Feedforward gate ramp ceiling (deg)
+#define DEFAULT_STEER_SLEW_MAX       9.0f      // Steering slew rate limit: 90 deg10 per tick (= 9.0 deg/tick)
+#define DEFAULT_EARLY_BRAKE_CV_TH    8.0f      // |cv| threshold for early brake (deg)
+#define DEFAULT_EARLY_BRAKE_H_MAX    12.0f     // |H| ceiling for early brake (deg)
+#define DEFAULT_EARLY_BRAKE_SPEED    70.0f     // Both wheels speed target during early brake (%)
+#define DEFAULT_EARLY_BRAKE_REL_CV   5.0f      // |cv| threshold to release early brake (deg)
+#define DEFAULT_CV_CORNER_TH         11.0f     // |cv| threshold for corner state entry (deg)
+#define DEFAULT_CV_CORNER_TICKS      2U        // Consecutive ticks of |cv| >= 11 for ST:C entry
 
 // ---- Corner-Exit / Off-Center Recovery (all tick counts are 50 Hz loop ticks; 4 ticks = 1 telemetry line) ----
 #define STEER_SYMMETRIC_CLAMP        1U        // 1 = clamp steer_cmd to +/-min(right,left) throw around trim so CW == CCW authority
@@ -87,7 +103,7 @@
 #define STATE_IDLE                   0
 #define STATE_RUNNING                1
 
-// ---- Runtime-Tunable Parameter Struct (18 Active Fields) ----
+// ---- Runtime-Tunable Parameter Struct ----
 typedef struct {
     float speed_straight;
     float speed_outside_corner;
@@ -108,6 +124,21 @@ typedef struct {
     uint8_t blend_enable;        // 1 = continuous blend active, 0 = legacy discrete mode
     uint8_t motor_enable;        // 1 = drive motors active, 0 = drive motors disabled for push-calibration
     uint8_t state;
+    /* Lookahead Gate & Trigger Tunables */
+    float blind_speed_cap;       // Default 70.0f
+    uint8_t blind_speed_ticks;   // Default 3U
+    float cte_jump_thresh_px;    // Default 25.0f (150 mm)
+    uint8_t cte_jump_max_rejects;// Default 3U
+    float ff_gain;               // Default 0.80f
+    float ff_w_lo;               // Default 6.0f
+    float ff_w_hi;               // Default 12.0f
+    float steer_slew_max;        // Default 9.0f (90 deg10/tick)
+    float early_brake_cv_th;     // Default 8.0f
+    float early_brake_h_max;     // Default 12.0f
+    float early_brake_speed;     // Default 70.0f
+    float early_brake_release_cv;// Default 5.0f
+    float cv_corner_th;          // Default 11.0f
+    uint8_t cv_corner_ticks;     // Default 2U
 } robot_params_t;
 
 extern robot_params_t g_params;

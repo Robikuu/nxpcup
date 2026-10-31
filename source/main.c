@@ -103,7 +103,7 @@ int main(void) {
     uint32_t s_reacquire_ticks         = 0; /* Slew-rate limiter ticks after blind gap */
     uint8_t  s_sharp_cancel_count      = 0; /* 3-tick hysteresis before canceling intersection latch */
     uint8_t  s_telemetry_div           = 0; /* 12.5 Hz telemetry divider */
-    uint8_t  s_corner_hold_ticks       = 0; /* 3-tick release hold for blend 0 corner latch */
+    uint8_t  s_corner_hold_ticks       = 0; /* Release hold for corner latch */
     uint8_t  s_front_wall_ticks        = 0; /* 2-tick consecutive filter for front corner wall */
     uint8_t  s_straight_ticks          = 0; /* Consecutive straight/centered 2-line ticks with blank front cam */
     uint8_t  s_lost_hold_ticks         = 0; /* Ticks of off-center gentle-decay hold while sr.found == 0 */
@@ -111,6 +111,20 @@ int main(void) {
     float    s_blend_target            = 0.0f; /* Debug target holding blend */
     corner_severity_t s_corner_sev;            /* Severity-scaled corner speed state (peak hold) */
     corner_severity_reset(&s_corner_sev);
+
+    /* Lookahead Gate & Trigger State Variables */
+    float    s_fs_ff                   = 0.0f; /* Lightly filtered front angle EMA(alpha=0.6) */
+    float    s_h_ff                    = 0.0f; /* Lightly filtered heading EMA(alpha=0.6) */
+    uint8_t  s_cv_sign_ticks           = 0;    /* Consecutive ticks with same sign(cv_ff) */
+    int      s_prev_cv_sign            = 0;    /* Previous sign of cv_ff (-1, 0, +1) */
+    uint8_t  s_early_brake_trig_ticks  = 0;    /* Consecutive ticks for early brake trigger */
+    uint8_t  s_early_brake_rel_ticks   = 0;    /* Consecutive ticks for early brake release */
+    bool     s_early_brake_active      = false;/* Early brake active latch */
+    uint8_t  s_cv_corner_ticks         = 0;    /* Consecutive ticks of |cv| >= 11 for ST:C */
+    uint8_t  s_fv0_ticks               = 0;    /* Consecutive blind front ticks (horizon.found == 0) */
+    uint8_t  s_cte_reject_count        = 0;    /* Consecutive single-boundary CTE jump rejects */
+    float    s_prev_valid_cte          = 0.0f; /* Previous accepted CTE for jump rejection */
+    uint8_t  s_has_prev_valid_cte      = 0;
 
     PRINTF("Running. Waiting for Start.\r\n");
 
@@ -160,6 +174,18 @@ int main(void) {
                 corner_severity_reset(&s_corner_sev);
                 s_corner_blend            = 0.0f;
                 s_blend_target            = 0.0f;
+                s_fs_ff                   = 0.0f;
+                s_h_ff                    = 0.0f;
+                s_cv_sign_ticks           = 0;
+                s_prev_cv_sign            = 0;
+                s_early_brake_trig_ticks  = 0;
+                s_early_brake_rel_ticks   = 0;
+                s_early_brake_active      = false;
+                s_cv_corner_ticks         = 0;
+                s_fv0_ticks               = 0;
+                s_cte_reject_count        = 0;
+                s_has_prev_valid_cte      = 0;
+                s_prev_valid_cte          = 0.0f;
 
                 if (motor_test_is_active()) {
                     motor_test_tick();
@@ -173,8 +199,14 @@ int main(void) {
             status_t s_front = pixy_get_vectors(&cam_front, vectors_front, MAX_VECTORS, &num_vectors_front);
             horizon_result_t horizon;
             memset(&horizon, 0, sizeof(horizon));
-            if (s_front == kStatus_Success && num_vectors_front > 0) {
+            uint8_t frej_code = 0U;
+            if (s_front != kStatus_Success) {
+                frej_code = 3U; /* Comm error */
+            } else if (num_vectors_front > 0) {
                 compute_front_camera_horizon(vectors_front, num_vectors_front, &horizon);
+                if (horizon.found == 0) {
+                    frej_code = horizon.has_transverse_tape ? 1U : 2U;
+                }
                 if (horizon.found > 0 &&
                     (!horizon.has_transverse_tape || fabsf(horizon.horizon_angle_deg) > 0.1f || horizon.is_intersection_ahead)) {
                     filtered_front_angle = 0.40f * horizon.horizon_angle_deg + 0.60f * filtered_front_angle;
@@ -186,18 +218,60 @@ int main(void) {
                 filtered_front_angle *= 0.85f;
             }
 
+            /* Blind-camera speed cap tick counter (Item B) */
+            if (horizon.found == 0) {
+                if (s_fv0_ticks < 255U) s_fv0_ticks++;
+            } else {
+                s_fv0_ticks = 0U;
+            }
+
+            /* Lightly filtered front angle for feedforward: EMA(alpha=0.6) (Item 2) */
+            if (horizon.found > 0) {
+                s_fs_ff = 0.60f * horizon.horizon_angle_deg + 0.40f * s_fs_ff;
+            } else {
+                s_fs_ff *= 0.85f;
+            }
+
             /* --- 2. Top / Homography View Camera (LP_FLEXCOMM3) --- */
             status_t s_pid = pixy_get_vectors(&cam_pid, vectors_pid, MAX_VECTORS, &num_vectors_pid);
             steering_result_t sr;
             memset(&sr, 0, sizeof(sr));
             if (s_pid == kStatus_Success && num_vectors_pid > 0) {
                 compute_top_camera_lane(vectors_pid, num_vectors_pid, &sr);
+
+                /* Single-boundary CTE jump rejection (Item D) */
+                if (sr.found == 1) {
+                    float cte_new = sr.cte;
+                    if (s_has_prev_valid_cte && fabsf(cte_new - s_prev_valid_cte) > g_params.cte_jump_thresh_px) {
+                        if (s_cte_reject_count < g_params.cte_jump_max_rejects) {
+                            s_cte_reject_count++;
+                            sr.cte = s_prev_valid_cte; /* Discard cte_new, hold cte_prev */
+                        } else {
+                            /* Accept after 3 consecutive rejects */
+                            s_cte_reject_count = 0U;
+                            s_prev_valid_cte = cte_new;
+                        }
+                    } else {
+                        s_cte_reject_count = 0U;
+                        s_prev_valid_cte = cte_new;
+                        s_has_prev_valid_cte = 1U;
+                    }
+                } else if (sr.found == 2) {
+                    s_cte_reject_count = 0U;
+                    s_prev_valid_cte = sr.cte;
+                    s_has_prev_valid_cte = 1U;
+                }
+
                 if (sr.found > 0) {
                     filtered_cte     = 0.60f * sr.cte + 0.40f * filtered_cte;
                     filtered_heading = 0.60f * sr.heading_deg + 0.40f * filtered_heading;
+                    s_h_ff           = 0.60f * sr.heading_deg + 0.40f * s_h_ff;
+                } else {
+                    s_h_ff *= 0.85f;
                 }
             } else {
                 num_vectors_pid = 0;
+                s_h_ff *= 0.85f;
             }
 
             /* --- Stale Front-Lookahead Release at Corner Exit (50 Hz tick math) ---
@@ -258,7 +332,11 @@ int main(void) {
              * but ALSO sees straight longitudinal lane lines OR top camera sees both boundaries (sr.found >= 2)
              * while heading and relative front curvature are small, treat the transverse tape as an
              * unconfirmed straight-corridor crossbar rather than a 90-deg corner wall. */
-            float curv = filtered_front_angle - filtered_heading;
+            /* Bug 3 Fix: When horizon.found == 0 (s_fv0_ticks > 0), set curv = 0.0f */
+            float curv = 0.0f;
+            if (horizon.found > 0 && s_fv0_ticks == 0U) {
+                curv = filtered_front_angle - filtered_heading;
+            }
             float front_curve_rel = curv;
             bool straight_corridor_crossbar = horizon.has_transverse_tape &&
                                               !horizon.is_intersection_ahead &&
@@ -284,17 +362,6 @@ int main(void) {
             uint8_t front_corner_wall = (s_front_wall_ticks >= 2U) ? 1U : 0U;
 
             float eff_front_angle = filtered_front_angle;
-            if (horizon.found > 0 && (filtered_front_angle * filtered_heading > 0.0f)) {
-                if (fabsf(filtered_front_angle) <= fabsf(filtered_heading)) {
-                    eff_front_angle = 0.0f;
-                } else {
-                    float net_front = filtered_front_angle - 0.65f * filtered_heading;
-                    if (net_front * filtered_front_angle < 0.0f) {
-                        net_front = 0.0f;
-                    }
-                    eff_front_angle = net_front;
-                }
-            }
 
             bool effective_sharp_corner = (front_corner_wall != 0U) ||
                                           (!straight_corridor_crossbar &&
@@ -425,55 +492,103 @@ int main(void) {
             }
 #endif
 
-            /* Responsive, sign-aware corner-entry gate for front-camera steering feedforward:
-             * - Activates when heading reaches 2.0 deg (ramping 2.0..12.0 deg) or when a true front corner is detected
-             *   (|FS - H| >= front_angle_thresh) with an immediate 0.30f floor for instant proactive turn-in.
-             * - Capped at 0.75f while both lane boundaries are visible in the top camera without a corner wall
-             *   (sr.found == 2 && !front_corner_wall); opens to full 1.0f at single-line apex or wall detection.
-             * - Scaled down smoothly by inside_scale (floor 0.40f over 4.0..16.0 px) when on the inside of the turn
-             *   (filtered_cte * eff_front_angle < 0) to avoid curb clipping while keeping entry responsiveness.
-             * - When crooked_straight_track is true, |filtered_heading| >= 20.0f is forbidden from triggering
-             *   top_in_corner or corner braking.
-             */
-            bool heading_turn_confirmed = (filtered_heading * eff_front_angle > 0.0f) ||
-                                          (fabsf(filtered_heading) >= 20.0f);
-            bool top_in_corner = (sr.found == 0) ||
-                                 (sr.transverse_crosses_center != 0U) ||
-                                 (fabsf(curv) >= g_params.front_angle_thresh) ||
-                                 (fabsf(filtered_heading) >= 2.0f && heading_turn_confirmed);
-            float top_turn_gate = 0.0f;
-            if (sr.found == 0 || sr.transverse_crosses_center != 0U) {
-                top_turn_gate = 1.0f;
-            } else if ((fabsf(eff_front_angle) >= g_params.front_angle_thresh || front_corner_wall != 0U) &&
-                       (filtered_heading * eff_front_angle > 0.0f || fabsf(filtered_heading) < 3.0f)) {
-                if (fabsf(front_curve_rel) >= g_params.front_angle_thresh) {
-                    top_turn_gate = 0.30f; /* Immediate confirmed corner entry floor */
-                }
-                if (fabsf(filtered_heading) >= 2.0f) {
-                    float h_norm = (fabsf(filtered_heading) - 2.0f) / (12.0f - 2.0f);
-                    if (h_norm > 1.0f) h_norm = 1.0f;
-                    if (h_norm > top_turn_gate) top_turn_gate = h_norm;
-                }
-                if (sr.found == 2 && !front_corner_wall && top_turn_gate > 0.75f) {
-                    top_turn_gate = 0.75f;
-                }
+            /* Item 1, 2, 3: cv = FS - H, feedforward cv_ff, confirm w */
+            /* Bug 3 Fix: When horizon.found == 0 (s_fv0_ticks > 0), set cv = 0.0f and cv_ff = 0.0f */
+            float cv = 0.0f;
+            float cv_ff = 0.0f;
+            if (horizon.found > 0 && s_fv0_ticks == 0U) {
+                cv = filtered_front_angle - filtered_heading;
+                cv_ff = s_fs_ff - s_h_ff;
             }
 
-            if ((sr.found > 0) && (filtered_cte * eff_front_angle < 0.0f) && !sr.transverse_crosses_center) {
-                float inside_scale = 0.40f + 0.60f * ((16.0f - fabsf(filtered_cte)) / (16.0f - 4.0f));
-                if (inside_scale < 0.40f) inside_scale = 0.40f;
-                if (inside_scale > 1.0f)  inside_scale = 1.0f;
-                top_turn_gate *= inside_scale;
+            /* Bug 2(a) Fix: cv_ff must only be active in the direction of fs_ff:
+             * if cv_ff * fs_ff <= 0.0f or |cv_ff| > |fs_ff| (meaning FS is closer to 0 deg than H is,
+             * i.e., the road ahead is straightening out relative to the car), clamp cv_ff = 0.0f */
+            if ((cv_ff * s_fs_ff <= 0.0f) || (fabsf(cv_ff) > fabsf(s_fs_ff))) {
+                cv_ff = 0.0f;
             }
+
+            /* Bug 2(b) Fix: When the car is off-center (|filtered_cte| > 8.0f) and filtered_cte * cv_ff < 0.0f
+             * (front curvature wants to steer further away from the track center while |H| < 15.0f),
+             * gate w = 0.0f and do not allow CV alone to trigger ST:C */
+            bool off_center_cv_conflict = (fabsf(filtered_cte) > 8.0f) &&
+                                          (filtered_cte * (s_fs_ff - s_h_ff) < 0.0f) &&
+                                          (fabsf(filtered_heading) < 15.0f);
+            if (off_center_cv_conflict) {
+                cv_ff = 0.0f;
+            }
+
+            /* Confirm: w = 0 unless horizon.found > 0 AND sign(cv_ff) has been the same for >= 2 ticks */
+            int cur_cv_sign = (cv_ff > 0.1f) ? 1 : ((cv_ff < -0.1f) ? -1 : 0);
+            if (cur_cv_sign != 0 && cur_cv_sign == s_prev_cv_sign) {
+                if (s_cv_sign_ticks < 255U) s_cv_sign_ticks++;
+            } else {
+                s_cv_sign_ticks = (cur_cv_sign != 0) ? 1U : 0U;
+                s_prev_cv_sign = cur_cv_sign;
+            }
+
+            float w = 0.0f;
+            if (horizon.found > 0 && s_cv_sign_ticks >= 2U && !off_center_cv_conflict) {
+                float abs_cv_ff = fabsf(cv_ff);
+                w = (abs_cv_ff - g_params.ff_w_lo) / (g_params.ff_w_hi - g_params.ff_w_lo);
+                if (w < 0.0f) w = 0.0f;
+                if (w > 1.0f) w = 1.0f;
+            }
+            float top_turn_gate = w;
+
+            /* Item 5: Early brake */
+            bool fv_valid = (horizon.found > 0 && num_vectors_front > 0);
+            if (fv_valid && fabsf(cv) >= g_params.early_brake_cv_th && fabsf(filtered_heading) < g_params.early_brake_h_max && !off_center_cv_conflict) {
+                if (s_early_brake_trig_ticks < 255U) s_early_brake_trig_ticks++;
+            } else {
+                s_early_brake_trig_ticks = 0U;
+            }
+
+            if (s_early_brake_trig_ticks >= 3U) {
+                s_early_brake_active = true;
+            }
+
+            if (s_early_brake_active) {
+                if (fabsf(cv) < g_params.early_brake_release_cv) {
+                    if (s_early_brake_rel_ticks < 255U) s_early_brake_rel_ticks++;
+                } else {
+                    s_early_brake_rel_ticks = 0U;
+                }
+                if (s_early_brake_rel_ticks >= 3U) {
+                    s_early_brake_active = false;
+                    s_early_brake_rel_ticks = 0U;
+                    s_early_brake_trig_ticks = 0U;
+                }
+            } else {
+                s_early_brake_rel_ticks = 0U;
+            }
+
+            /* Item 6: Corner state entry: also enter ST:C when |cv| >= 11 for 2 ticks (suppressed by off-center conflict) */
+            if (fabsf(cv) >= g_params.cv_corner_th && !off_center_cv_conflict) {
+                if (s_cv_corner_ticks < 255U) s_cv_corner_ticks++;
+            } else {
+                s_cv_corner_ticks = 0U;
+            }
+            bool cv_corner_entry = (s_cv_corner_ticks >= g_params.cv_corner_ticks);
+
+            bool top_in_corner = (sr.found == 0) ||
+                                 (sr.transverse_crosses_center != 0U) ||
+                                 (fabsf(cv) >= g_params.front_angle_thresh) ||
+                                 (fabsf(filtered_heading) >= 2.0f);
+
+            /* Bug 1 Fix: Inside ST:C (or upon entering), start front_sev ramping from cv_th */
+            float eff_fa_th = (s_corner_hold_ticks > 0U || cv_corner_entry) ?
+                              fminf(g_params.front_angle_thresh, g_params.cv_corner_th) :
+                              g_params.front_angle_thresh;
 
             /* Severity-scaled corner speed (both modes): max(front lookahead curv, top apex), 6-tick peak hold,
              * zero while an intersection is latched. */
             float corner_severity = corner_severity_update(&s_corner_sev,
-                                                           curv, filtered_heading,
+                                                           cv, filtered_heading,
                                                            front_corner_wall,
                                                            sr.transverse_crosses_center ? 1U : 0U,
                                                            s_intersection_ahead ? 1U : 0U,
-                                                           g_params.front_angle_thresh,
+                                                           eff_fa_th,
                                                            g_params.h_lo, g_params.h_hi);
             float severity_speed = corner_severity_speed(corner_severity,
                                                          g_params.speed_straight,
@@ -483,22 +598,24 @@ int main(void) {
                 /* =========================================================================
                  * LEGACY DISCRETE MODE BYPASS (blend 0)
                  * is_corner controls feedforward + differential mode only; speed comes from severity.
-                 * Latched corner state: exits only when |H| < 8 deg AND |curv| < 8 deg AND hold >= 10 ticks (200 ms).
+                 * Latched corner state: exits only when |H| < 8 deg AND |cv| < 8 deg AND hold >= 10 ticks (200 ms).
                  * ========================================================================= */
                 bool raw_corner = (!s_intersection_ahead) &&
-                                  top_in_corner &&
-                                  (effective_sharp_corner ||
-                                   sr.transverse_crosses_center ||
-                                   fabsf(filtered_heading) >= 24.0f);
+                                  (cv_corner_entry ||
+                                   (top_in_corner &&
+                                    (effective_sharp_corner ||
+                                     sr.transverse_crosses_center ||
+                                     fabsf(filtered_heading) >= 24.0f)));
                 if (s_intersection_ahead) {
                     s_corner_hold_ticks = 0U;
+                    s_early_brake_active = false;
                 } else if (s_corner_hold_ticks > 0U) {
                     if (s_corner_hold_ticks < 255U) {
                         s_corner_hold_ticks++;
                     }
                     if (s_corner_hold_ticks >= 10U &&
                         fabsf(filtered_heading) < 8.0f &&
-                        fabsf(curv) < 8.0f &&
+                        fabsf(cv) < 8.0f &&
                         !raw_corner) {
                         s_corner_hold_ticks = 0U;
                     }
@@ -506,19 +623,14 @@ int main(void) {
                     s_corner_hold_ticks = 1U;
                 }
                 bool is_corner = (s_corner_hold_ticks > 0U);
+                if (is_corner) {
+                    s_early_brake_active = false; /* ST:C takes over from early brake */
+                }
                 s_corner_blend = is_corner ? 1.0f : 0.0f;
                 s_blend_target = corner_severity; /* BT: in telemetry = speed severity (0..100) */
 
                 /* Steering Calculation */
                 if (sr.found == 0 && !s_intersection_ahead) {
-                    float active_ff = is_corner ? ((float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle) : 0.0f;
-                    float candidate_steer = last_valid_steer_top + active_ff;
-                    if (fabsf(candidate_steer) > fabsf(last_steer_cmd) &&
-                        (candidate_steer * last_steer_cmd >= 0.0f || fabsf(last_steer_cmd) < 5.0f)) {
-                        steer_cmd = candidate_steer;
-                    } else {
-                        steer_cmd = last_steer_cmd;
-                    }
                     steer_top = last_valid_steer_top;
                 } else {
                     float eff_heading = filtered_heading;
@@ -529,28 +641,22 @@ int main(void) {
                     if (sr.found > 0) {
                         last_valid_steer_top = steer_top;
                     }
-
-                    steer_cmd = steer_top;
-                    if (is_corner) {
-                        steer_cmd += top_turn_gate * (float)FRONT_FEEDFORWARD_GAIN * eff_front_angle;
-                    }
-
-                    if (s_intersection_ahead && sr.found == 0 &&
-                        fabsf(filtered_cte) <= OFFCENTER_HOLD_CTE_PX) {
-                        if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
-                        if (steer_cmd < -3.0f) steer_cmd = -3.0f;
-                    }
-
-                    if (s_reacquire_ticks > 0) {
-                        s_reacquire_ticks--;
-                        float delta = steer_cmd - last_steer_cmd;
-                        if (delta > 4.0f) {
-                            steer_cmd = last_steer_cmd + 4.0f;
-                        } else if (delta < -4.0f) {
-                            steer_cmd = last_steer_cmd - 4.0f;
-                        }
-                    }
                 }
+
+                /* S_target = TS + 0.8 * cv_ff * w */
+                float s_target = steer_top + (g_params.ff_gain * cv_ff * w);
+
+                if (s_intersection_ahead && sr.found == 0 &&
+                    fabsf(filtered_cte) <= OFFCENTER_HOLD_CTE_PX) {
+                    if (s_target > 3.0f)  s_target = 3.0f;
+                    if (s_target < -3.0f) s_target = -3.0f;
+                }
+
+                /* S = prev_S + clamp(S_target - prev_S, -90, +90) (deg10 per tick = 9.0 deg/tick) */
+                float delta_s = s_target - last_steer_cmd;
+                if (delta_s > g_params.steer_slew_max)  delta_s = g_params.steer_slew_max;
+                if (delta_s < -g_params.steer_slew_max) delta_s = -g_params.steer_slew_max;
+                steer_cmd = last_steer_cmd + delta_s;
 
                 if (s_rollout_ticks <= 5) {
                     steer_cmd = 0.0f;
@@ -560,16 +666,33 @@ int main(void) {
                 Steer(steer_cmd + g_params.steering_offset);
                 last_steer_cmd = steer_cmd;
 
-                /* Speed & Differential Braking (disabled during exit counter-steer / straight recovery) */
-                target_speed = severity_speed;
+                /* Speed & Differential Braking */
+                if (is_corner) {
+                    target_speed = severity_speed;
+                    /* Bug 1 Fix: never allow target_speed in ST:C to exceed eb_spd (70.0%) during first 12 ticks (HT <= 12) */
+                    if (s_corner_hold_ticks <= 12U) {
+                        target_speed = fminf(target_speed, g_params.early_brake_speed);
+                    }
+                } else {
+                    target_speed = g_params.speed_straight;
+                    /* Item 5: Early brake speed cap */
+                    if (s_early_brake_active) {
+                        target_speed = fminf(target_speed, g_params.early_brake_speed);
+                    }
+                }
+                /* Bug 3 Fix: enforce blind_spd (70%) cap across both ST:S and ST:C whenever s_fv0_ticks > 3 */
+                if (s_fv0_ticks > g_params.blind_speed_ticks) {
+                    target_speed = fminf(target_speed, g_params.blind_speed_cap);
+                }
+
                 float abs_steer = fabsf(steer_cmd);
                 bool exit_straightening = ((filtered_cte * steer_cmd < 0.0f) &&
                                            (fabsf(filtered_cte) > 3.0f) &&
                                            (fabsf(filtered_heading) < 18.0f) &&
-                                           (fabsf(front_curve_rel) < 15.0f) &&
+                                           (fabsf(cv) < 15.0f) &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center) ||
-                                          (fabsf(eff_front_angle) < g_params.front_angle_thresh &&
+                                          (fabsf(cv) < g_params.front_angle_thresh &&
                                            fabsf(filtered_heading) < 12.0f &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center &&
@@ -581,15 +704,14 @@ int main(void) {
                                             (filtered_heading * filtered_front_angle > 0.0f)) &&
                                            (fabsf(filtered_cte) > 4.0f) &&
                                            (fabsf(filtered_heading) < 24.0f) &&
-                                           (fabsf(front_curve_rel) < 15.0f) &&
+                                           (fabsf(cv) < 15.0f) &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center);
-                if (!exit_straightening && abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
+                if (!exit_straightening && abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG && is_corner) {
                     float steer_norm = (abs_steer - (float)DIFFERENTIAL_DEADZONE_DEG) /
                                        ((float)STEER_FULL_BRAKE_DEG - (float)DIFFERENTIAL_DEADZONE_DEG);
                     if (steer_norm > 1.0f) steer_norm = 1.0f;
-                    float mult = is_corner ? 1.0f : 0.25f;
-                    float diff_drag = mult * steer_norm * (target_speed - g_params.speed_inside_min);
+                    float diff_drag = steer_norm * (target_speed - g_params.speed_inside_min);
 
                     if (steer_cmd > 0.0f) {
                         target_left  = target_speed;
@@ -624,15 +746,6 @@ int main(void) {
 
                 /* 2. Steering Calculation */
                 if (sr.found == 0 && !s_intersection_ahead) {
-                    /* Corner apex dropout: preserve or increase turn angle if front camera sees tighter corner */
-                    float active_ff = s_corner_blend * (float)FRONT_FEEDFORWARD_GAIN * filtered_front_angle;
-                    float candidate_steer = last_valid_steer_top + active_ff;
-                    if (fabsf(candidate_steer) > fabsf(last_steer_cmd) &&
-                        (candidate_steer * last_steer_cmd >= 0.0f || fabsf(last_steer_cmd) < 5.0f)) {
-                        steer_cmd = candidate_steer;
-                    } else {
-                        steer_cmd = last_steer_cmd;
-                    }
                     steer_top = last_valid_steer_top;
                 } else {
                     /* Continuous Gain Scheduling between straight and corner gains */
@@ -649,29 +762,23 @@ int main(void) {
                     if (sr.found > 0) {
                         last_valid_steer_top = steer_top;
                     }
-
-                    steer_cmd = steer_top;
-                    /* Front feedforward pre-steer gated by top-camera turn entry (prevents early turn-in on straights) */
-                    steer_cmd += s_corner_blend * top_turn_gate * (float)FRONT_FEEDFORWARD_GAIN * eff_front_angle;
-
-                    if (s_intersection_ahead && sr.found == 0 &&
-                        fabsf(filtered_cte) <= OFFCENTER_HOLD_CTE_PX) {
-                        /* Intersection blind gap: clamp held steering to +-3.0 deg (only when near lane center) */
-                        if (steer_cmd > 3.0f)  steer_cmd = 3.0f;
-                        if (steer_cmd < -3.0f) steer_cmd = -3.0f;
-                    }
-
-                    /* Re-Acquisition Slew-Rate Limiter: <= 4.0 deg/tick for 3 ticks */
-                    if (s_reacquire_ticks > 0) {
-                        s_reacquire_ticks--;
-                        float delta = steer_cmd - last_steer_cmd;
-                        if (delta > 4.0f) {
-                            steer_cmd = last_steer_cmd + 4.0f;
-                        } else if (delta < -4.0f) {
-                            steer_cmd = last_steer_cmd - 4.0f;
-                        }
-                    }
                 }
+
+                /* S_target = TS + 0.8 * cv_ff * w */
+                float s_target = steer_top + (g_params.ff_gain * cv_ff * w);
+
+                if (s_intersection_ahead && sr.found == 0 &&
+                    fabsf(filtered_cte) <= OFFCENTER_HOLD_CTE_PX) {
+                    /* Intersection blind gap: clamp held steering to +-3.0 deg (only when near lane center) */
+                    if (s_target > 3.0f)  s_target = 3.0f;
+                    if (s_target < -3.0f) s_target = -3.0f;
+                }
+
+                /* S = prev_S + clamp(S_target - prev_S, -90, +90) (deg10 per tick = 9.0 deg/tick) */
+                float delta_s = s_target - last_steer_cmd;
+                if (delta_s > g_params.steer_slew_max)  delta_s = g_params.steer_slew_max;
+                if (delta_s < -g_params.steer_slew_max) delta_s = -g_params.steer_slew_max;
+                steer_cmd = last_steer_cmd + delta_s;
 
                 /* Rollout protection for first 5 ticks */
                 if (s_rollout_ticks <= 5) {
@@ -686,7 +793,19 @@ int main(void) {
 
                 /* 3. Speed & Differential Braking */
                 /* Continuous blend smoothly lowers speed target from straight to outside corner */
-                target_speed = g_params.speed_straight - s_corner_blend * (g_params.speed_straight - g_params.speed_outside_corner);
+                float base_speed = g_params.speed_straight - s_corner_blend * (g_params.speed_straight - g_params.speed_outside_corner);
+                /* Bug 3 Fix: enforce blind_spd across both straight and corner whenever s_fv0_ticks > 3 */
+                if (s_fv0_ticks > g_params.blind_speed_ticks) {
+                    base_speed = fminf(base_speed, g_params.blind_speed_cap);
+                }
+                if (s_early_brake_active && s_corner_blend < 0.20f) {
+                    base_speed = fminf(base_speed, g_params.early_brake_speed);
+                }
+                /* Bug 1 Fix: never allow target_speed in corner to exceed eb_spd during first 12 ticks */
+                if (s_corner_hold_ticks <= 12U && s_corner_blend > 0.20f) {
+                    base_speed = fminf(base_speed, g_params.early_brake_speed);
+                }
+                target_speed = base_speed;
                 target_left  = target_speed;
                 target_right = target_speed;
 
@@ -694,10 +813,10 @@ int main(void) {
                 bool exit_straightening = ((filtered_cte * steer_cmd < 0.0f) &&
                                            (fabsf(filtered_cte) > 3.0f) &&
                                            (fabsf(filtered_heading) < 18.0f) &&
-                                           (fabsf(front_curve_rel) < 15.0f) &&
+                                           (fabsf(cv) < 15.0f) &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center) ||
-                                          (fabsf(eff_front_angle) < g_params.front_angle_thresh &&
+                                          (fabsf(cv) < g_params.front_angle_thresh &&
                                            fabsf(filtered_heading) < 12.0f &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center &&
@@ -709,7 +828,7 @@ int main(void) {
                                             (filtered_heading * filtered_front_angle > 0.0f)) &&
                                            (fabsf(filtered_cte) > 4.0f) &&
                                            (fabsf(filtered_heading) < 24.0f) &&
-                                           (fabsf(front_curve_rel) < 15.0f) &&
+                                           (fabsf(cv) < 15.0f) &&
                                            !front_corner_wall &&
                                            !sr.transverse_crosses_center);
                 if (!exit_straightening && abs_steer > (float)DIFFERENTIAL_DEADZONE_DEG) {
@@ -783,7 +902,7 @@ int main(void) {
             /* --- 7. Telemetry Output (12.5 Hz = Every 4th Tick) --- */
             if (++s_telemetry_div >= 4) {
                 s_telemetry_div = 0;
-                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d CV:%d TG:%d HT:%u BL:%d BT:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d\r\n",
+                esp_printf("L:%u/%u R:%d F:%d H:%d TS:%d FS:%d S:%d CV:%d TG:%d HT:%u BL:%d BT:%d DOM:%c FV:%u IX:%u ST:%s VL:%d VR:%d CR:%u FRAW:%u FREJ:%u FV0:%u\r\n",
                            (unsigned)sr.found, (unsigned)horizon.found,
                            (int)(sr.cte * 10.0f), (int)(filtered_cte * 10.0f),
                            (int)(filtered_heading * 10.0f),
@@ -799,7 +918,11 @@ int main(void) {
                            horizon.found > 0 ? 1U : 0U,
                            (unsigned)s_intersection_ahead,
                            s_intersection_ahead ? "I" : (s_corner_blend > 0.30f ? "C" : "S"),
-                           (int)applied_speed_left, (int)applied_speed_right);
+                           (int)applied_speed_left, (int)applied_speed_right,
+                           (unsigned)s_cte_reject_count,
+                           (unsigned)num_vectors_front,
+                           (unsigned)frej_code,
+                           (unsigned)s_fv0_ticks);
             }
         }
     }

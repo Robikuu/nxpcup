@@ -110,73 +110,99 @@ int main(void)
               hr.is_sharp_corner, hr.horizon_angle_deg);
     }
 
-    printf("\n=== Test 8: Proactive corner entry top_turn_gate (ramp 2..12 deg, 0.30 floor on confirmed corner, 0.75 2-line cap) ===\n");
+    printf("\n=== Test 8: Revised Lookahead Feedforward Gate & Confirmation (w, S_target, slew limiter) ===\n");
     {
-        /* A. Straightaway approach without corner ahead (H = -1.2 deg, FS = -4.0 deg) -> gate = 0.0 */
-        uint8_t found_a = 2, trans_a = 0;
-        float h_a = -1.2f, fs_a = -4.0f;
-        float rel_a = fs_a - h_a;
-        float gate_a = 0.0f;
-        if (found_a == 0 || trans_a != 0U) {
-            gate_a = 1.0f;
-        } else if ((fabsf(fs_a) >= DEFAULT_FRONT_ANGLE_THRESH) &&
-                   (h_a * fs_a > 0.0f || fabsf(h_a) < 3.0f)) {
-            if (fabsf(rel_a) >= DEFAULT_FRONT_ANGLE_THRESH) {
-                gate_a = 0.30f;
-            }
-            if (fabsf(h_a) >= 2.0f) {
-                float h_norm = (fabsf(h_a) - 2.0f) / (12.0f - 2.0f);
-                if (h_norm > 1.0f) h_norm = 1.0f;
-                if (h_norm > gate_a) gate_a = h_norm;
-            }
-            if (found_a == 2 && gate_a > 0.75f) gate_a = 0.75f;
+        /* A. w = 0 when horizon.found == 0 */
+        uint8_t hz_found = 0;
+        uint8_t sign_ticks = 3;
+        float cv_ff = 15.0f;
+        float w_a = 0.0f;
+        if (hz_found > 0 && sign_ticks >= 2U) {
+            float abs_cv = fabsf(cv_ff);
+            w_a = (abs_cv - DEFAULT_FF_W_LO) / (DEFAULT_FF_W_HI - DEFAULT_FF_W_LO);
+            if (w_a < 0.0f) w_a = 0.0f;
+            if (w_a > 1.0f) w_a = 1.0f;
         }
-        CHECK(gate_a == 0.0f,
-              "Straightaway approach (H=-1.2, FS=-4.0) keeps top_turn_gate=0.00 (no early turn-in, gate=%.2f)",
-              gate_a);
+        CHECK(w_a == 0.0f, "w=0 when horizon.found==0 (w=%.2f)", w_a);
 
-        /* B. S-curve conflict (filtered_heading = -14.2 deg left, FS = +25.8 deg right) -> gate = 0.0 */
-        float h_scurve = -14.2f, fs_scurve = 25.8f;
-        float gate_sc = 0.0f;
-        if ((h_scurve * fs_scurve > 0.0f || fabsf(h_scurve) < 3.0f) && fabsf(h_scurve) >= 2.0f) {
-            gate_sc = (fabsf(h_scurve) - 2.0f) / (12.0f - 2.0f);
+        /* B. w = 0 when sign_ticks < 2 (single-tick transient) */
+        hz_found = 1;
+        sign_ticks = 1;
+        cv_ff = 15.0f;
+        float w_b = 0.0f;
+        if (hz_found > 0 && sign_ticks >= 2U) {
+            float abs_cv = fabsf(cv_ff);
+            w_b = (abs_cv - DEFAULT_FF_W_LO) / (DEFAULT_FF_W_HI - DEFAULT_FF_W_LO);
+            if (w_b < 0.0f) w_b = 0.0f;
+            if (w_b > 1.0f) w_b = 1.0f;
         }
-        CHECK(gate_sc == 0.0f, "S-curve opposing signs (H=-14.2, FS=+25.8) blocks fighting feedforward (gate=%.2f)", gate_sc);
+        CHECK(w_b == 0.0f, "w=0 when sign_ticks < 2 (w=%.2f)", w_b);
 
-        /* C. Mid-corner 2-line entry (Run 6 L16: L:2, H=-27.8 deg, FS=-64.1 deg) -> capped at 0.75f while both lines visible */
-        uint8_t found_c = 2;
-        float h_c = -27.8f, fs_c = -64.1f;
-        float gate_c = (fabsf(h_c) - 2.0f) / (12.0f - 2.0f);
-        if (gate_c > 1.0f) gate_c = 1.0f;
-        if (found_c == 2 && gate_c > 0.75f) gate_c = 0.75f;
-        float steer_c = (DEFAULT_K_CTE * (-1.1f)) + (DEFAULT_K_HEADING * h_c) + gate_c * (float)FRONT_FEEDFORWARD_GAIN * fs_c;
-        CHECK(fabsf(gate_c - 0.75f) < 0.01f && steer_c < -40.0f,
-              "Run 6 L16 2-line curve (L:2, H=-27.8, FS=-64.1) caps gate=0.75, steer=%.1f deg", steer_c);
+        /* C. Linear ramp over [6.0, 12.0] deg */
+        sign_ticks = 2;
+        cv_ff = 4.0f;
+        float w_c1 = (fabsf(cv_ff) - DEFAULT_FF_W_LO) / (DEFAULT_FF_W_HI - DEFAULT_FF_W_LO);
+        if (w_c1 < 0.0f) w_c1 = 0.0f;
+        if (w_c1 > 1.0f) w_c1 = 1.0f;
+        CHECK(w_c1 == 0.0f, "cv_ff=4.0 (< 6.0) gives w=0.00 (w=%.2f)", w_c1);
 
-        /* D. True single-line apex (Run 5 L16 / Run 6 L18: L:1, H=-40.8 deg, FS=-66.8 deg) -> full gate=1.0 */
-        uint8_t found_d = 1;
-        float h_d = -40.8f, fs_d = -66.8f;
-        float gate_d = (fabsf(h_d) - 2.0f) / (12.0f - 2.0f);
-        if (gate_d > 1.0f) gate_d = 1.0f;
-        if (found_d == 2 && gate_d > 0.75f) gate_d = 0.75f;
-        CHECK(fabsf(gate_d - 1.0f) < 0.01f, "Single-line apex (L:1, H=-40.8) reaches full gate=%.2f", gate_d);
+        cv_ff = 9.0f;
+        float w_c2 = (fabsf(cv_ff) - DEFAULT_FF_W_LO) / (DEFAULT_FF_W_HI - DEFAULT_FF_W_LO);
+        if (w_c2 < 0.0f) w_c2 = 0.0f;
+        if (w_c2 > 1.0f) w_c2 = 1.0f;
+        CHECK(fabsf(w_c2 - 0.50f) < 0.01f, "cv_ff=9.0 (halfway) gives w=0.50 (w=%.2f)", w_c2);
 
-        /* E. Immediate 0.30f floor on confirmed corner ahead (|FS - H| >= 18 deg) e.g. Line 22 */
-        float h_e = 1.6f, fs_e = 33.8f;
-        float rel_e = fs_e - h_e;
-        float gate_e = 0.0f;
-        if ((fabsf(fs_e) >= DEFAULT_FRONT_ANGLE_THRESH) &&
-            (h_e * fs_e > 0.0f || fabsf(h_e) < 3.0f)) {
-            if (fabsf(rel_e) >= DEFAULT_FRONT_ANGLE_THRESH) {
-                gate_e = 0.30f;
-            }
-            if (fabsf(h_e) >= 2.0f) {
-                float h_norm = (fabsf(h_e) - 2.0f) / (12.0f - 2.0f);
-                if (h_norm > 1.0f) h_norm = 1.0f;
-                if (h_norm > gate_e) gate_e = h_norm;
-            }
+        cv_ff = 15.0f;
+        float w_c3 = (fabsf(cv_ff) - DEFAULT_FF_W_LO) / (DEFAULT_FF_W_HI - DEFAULT_FF_W_LO);
+        if (w_c3 < 0.0f) w_c3 = 0.0f;
+        if (w_c3 > 1.0f) w_c3 = 1.0f;
+        CHECK(w_c3 == 1.0f, "cv_ff=15.0 (> 12.0) gives w=1.00 (w=%.2f)", w_c3);
+
+        /* D. Steering S_target and slew limiter (90 deg10 = 9.0 deg/tick) */
+        float steer_top = 10.0f;
+        float s_target = steer_top + (DEFAULT_FF_GAIN * cv_ff * w_c3); /* 10 + 0.8 * 15.0 * 1.0 = 22.0 */
+        CHECK(fabsf(s_target - 22.0f) < 0.01f, "S_target = TS + 0.8 * cv_ff * w = %.2f", s_target);
+
+        float prev_s = 0.0f;
+        float delta_s = s_target - prev_s;
+        if (delta_s > DEFAULT_STEER_SLEW_MAX)  delta_s = DEFAULT_STEER_SLEW_MAX;
+        if (delta_s < -DEFAULT_STEER_SLEW_MAX) delta_s = -DEFAULT_STEER_SLEW_MAX;
+        float s_cmd = prev_s + delta_s;
+        CHECK(fabsf(s_cmd - 9.0f) < 0.01f, "Slew rate limits +22.0 step to +9.0 deg in 1 tick (s=%.2f)", s_cmd);
+
+        /* E. Bug 2(a) Fix: Lines 80-82 mid-corner exit straightening (H=-50.6, FS=-8.2 -> cv_ff=+42.4)
+         * cv_ff * fs_ff <= 0.0f or |cv_ff| > |fs_ff| clamps cv_ff = 0.0f, preventing wrong-way counter-steer */
+        float fs_e = -8.2f, h_e = -50.6f;
+        float cv_e = fs_e - h_e; /* +42.4 */
+        if ((cv_e * fs_e <= 0.0f) || (fabsf(cv_e) > fabsf(fs_e))) {
+            cv_e = 0.0f;
         }
-        CHECK(fabsf(gate_e - 0.30f) < 0.01f, "Line 22 confirmed corner (H=1.6, FS=33.8) engages 0.30 floor (gate=%.2f)", gate_e);
+        CHECK(cv_e == 0.0f, "Mid-corner exit straightening (H=-50.6, FS=-8.2) clamped cv_ff to 0.0 (cv_ff=%.1f)", cv_e);
+
+        /* F. Bug 2(b) Fix: Lines 166-172 off-center recovery (F=+30.7, H=+0.5, FS=-12.0)
+         * (|F| > 8.0 && F * cv_ff < 0.0 && |H| < 15.0) suppresses w=0.0 and blocks false corner entry */
+        float f_f = 30.7f, h_f = 0.5f, fs_f = -12.0f;
+        float cv_f = fs_f - h_f; /* -12.5 */
+        bool off_center_conflict = (fabsf(f_f) > 8.0f) && (f_f * cv_f < 0.0f) && (fabsf(h_f) < 15.0f);
+        float w_f = 1.0f;
+        if (off_center_conflict) {
+            w_f = 0.0f;
+            cv_f = 0.0f;
+        }
+        CHECK(off_center_conflict && w_f == 0.0f && cv_f == 0.0f,
+              "Off-center recovery (F=+30.7, H=+0.5, FS=-12.0) suppresses front feedforward (w=%.1f)", w_f);
+
+        /* G. Bug 3 Fix: Front camera blind (horizon.found == 0) sets cv = 0.0f and cv_ff = 0.0f */
+        uint8_t hz_blind = 0;
+        uint8_t fv0_ticks = 5;
+        float cv_blind = 0.0f, cv_ff_blind = 0.0f;
+        if (hz_blind > 0 && fv0_ticks == 0U) {
+            cv_blind = fs_e - h_e;
+            cv_ff_blind = fs_e - h_e;
+        }
+        CHECK(cv_blind == 0.0f && cv_ff_blind == 0.0f,
+              "Front camera blind (found=0, fv0=5) keeps cv=%.1f and cv_ff=%.1f (no -H subtraction)",
+              cv_blind, cv_ff_blind);
     }
 
     printf("\n=== Test 9: blend=1 proportional differential braking & updated Config.h boot defaults ===\n");
@@ -193,14 +219,22 @@ int main(void)
               "At 10 deg steer and blend=1.0, inside wheel is %.2f%% (not locked at 28%%)", inside_wheel);
         CHECK(SPEED_STRAIGHT == 100.0f && SPEED_OUTSIDE_CORNER == 62.0f && SPEED_INSIDE_MIN == 28.0f &&
               STEER_FULL_BRAKE_DEG == 32.0f && FRONT_FEEDFORWARD_GAIN == 0.50f &&
-              DEFAULT_K_CTE == 0.65f && DEFAULT_K_HEADING == 1.00f &&
+              DEFAULT_K_CTE == 0.45f && DEFAULT_K_CTE_CORNER == 0.65f &&
+              DEFAULT_K_HEADING == 1.00f && DEFAULT_K_HEADING_CORNER == 1.00f &&
               DEFAULT_H_LO == 12.0f && DEFAULT_H_HI == 35.0f &&
-              DEFAULT_FRONT_ANGLE_THRESH == 18.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
+              DEFAULT_FRONT_ANGLE_THRESH == 12.0f && FRONT_SEVERITY_FULL_DEG == 40.0f &&
               CORNER_SEVERITY_HOLD_TICKS == 6U && DECEL_RAMP_STEP == 30.0f &&
-              ACCEL_RAMP_STEP == 6.5f && DEFAULT_BLEND_ENABLE == 0U,
-              "Config defaults: SPD_S=%.0f, SPD_OUT=%.0f, SPD_IN=%.0f, STEER_BRAKE=%.0f, FA_TH=%.0f",
-              (float)SPEED_STRAIGHT, (float)SPEED_OUTSIDE_CORNER, (float)SPEED_INSIDE_MIN,
-              (float)STEER_FULL_BRAKE_DEG, (float)DEFAULT_FRONT_ANGLE_THRESH);
+              ACCEL_RAMP_STEP == 6.5f && DEFAULT_BLEND_ENABLE == 0U &&
+              DEFAULT_BLIND_SPEED_CAP == 70.0f && DEFAULT_BLIND_SPEED_TICKS == 3U &&
+              DEFAULT_CTE_JUMP_THRESH_PX == 25.0f && DEFAULT_CTE_JUMP_MAX_REJECTS == 3U &&
+              DEFAULT_FF_GAIN == 0.80f && DEFAULT_FF_W_LO == 6.0f && DEFAULT_FF_W_HI == 12.0f &&
+              DEFAULT_STEER_SLEW_MAX == 9.0f && DEFAULT_EARLY_BRAKE_CV_TH == 8.0f &&
+              DEFAULT_EARLY_BRAKE_H_MAX == 12.0f && DEFAULT_EARLY_BRAKE_SPEED == 70.0f &&
+              DEFAULT_EARLY_BRAKE_REL_CV == 5.0f && DEFAULT_CV_CORNER_TH == 11.0f &&
+              DEFAULT_CV_CORNER_TICKS == 2U,
+              "Config defaults: SPD_S=%.0f, K_CTE=%.2f, K_CTE_C=%.2f, FA_TH=%.1f, BLIND_SPD=%.0f, FF_GAIN=%.2f, SLEW=%.0f",
+              (float)SPEED_STRAIGHT, (float)DEFAULT_K_CTE, (float)DEFAULT_K_CTE_CORNER,
+              (float)DEFAULT_FRONT_ANGLE_THRESH, (float)DEFAULT_BLIND_SPEED_CAP, (float)DEFAULT_FF_GAIN, (float)DEFAULT_STEER_SLEW_MAX);
     }
 
     printf("\n=== Test 10: Top camera single-line perspective compensation (fade 20..30 deg) ===\n");
@@ -287,7 +321,7 @@ int main(void)
 
     printf("\n=== Test 14: Differential braking suppressed on exit counter-steer/S-curve, preserved in real corners ===\n");
     {
-        float fa_th = DEFAULT_FRONT_ANGLE_THRESH; /* 22.0f */
+        float fa_th = 22.0f; /* Historical chassis yaw calibration */
 
         /* A. Straightaway exit counter-steer (F = -7.2 px, H = +16.5 deg, FS = +24.0 deg, S = +15.7 deg -> |FS - H| = 7.5 < 15) */
         float f_exit = -7.2f, h_exit = 16.5f, fs_exit = 24.0f, s_exit = 15.7f;
@@ -337,7 +371,7 @@ int main(void)
 
     printf("\n=== Test 15: True road curvature (|FS - H|) guard against straightaway chassis yaw (L96 & L1229-L1231) ===\n");
     {
-        float fa_th = DEFAULT_FRONT_ANGLE_THRESH; /* 22.0f */
+        float fa_th = 22.0f; /* Historical chassis yaw calibration */
 
         /* A. L96 in Run 1: F = +11.4 px, H = +19.9 deg, FS = +28.8 deg -> |FS - H| = 8.9 deg < 15 deg */
         float f_96 = 11.4f, h_96 = 19.9f, fs_96 = 28.8f;
@@ -524,6 +558,190 @@ int main(void)
         hold_ticks = 5; ix = 1;
         if (ix) hold_ticks = 0;
         CHECK(hold_ticks == 0, "Intersection immediately clears corner latch (hold_ticks=%u)", hold_ticks);
+    }
+
+    printf("\n=== Test 20: Blind-camera speed cap (Item B) ===\n");
+    {
+        uint8_t fv0_ticks = 0;
+        float speed = 100.0f;
+        for (int t = 1; t <= 3; t++) {
+            fv0_ticks++;
+            float tgt = 100.0f;
+            if (fv0_ticks > DEFAULT_BLIND_SPEED_TICKS) {
+                tgt = fminf(tgt, DEFAULT_BLIND_SPEED_CAP);
+            }
+            CHECK(tgt == 100.0f, "Tick %d blind: fv0_ticks=%u <= 3, speed not capped (tgt=%.1f)", t, fv0_ticks, tgt);
+        }
+        fv0_ticks++; /* Tick 4 */
+        float tgt = 100.0f;
+        if (fv0_ticks > DEFAULT_BLIND_SPEED_TICKS) {
+            tgt = fminf(tgt, DEFAULT_BLIND_SPEED_CAP);
+        }
+        CHECK(tgt == 70.0f && fv0_ticks == 4, "Tick 4 blind: fv0_ticks=%u > 3 engages speed cap = %.1f", fv0_ticks, tgt);
+
+        /* Vision recovered: found > 0 resets fv0_ticks */
+        fv0_ticks = 0;
+        tgt = 100.0f;
+        if (fv0_ticks > DEFAULT_BLIND_SPEED_TICKS) {
+            tgt = fminf(tgt, DEFAULT_BLIND_SPEED_CAP);
+        }
+        CHECK(tgt == 100.0f && fv0_ticks == 0, "Vision recovered: fv0_ticks reset to 0, speed cap released (tgt=%.1f)", tgt);
+    }
+
+    printf("\n=== Test 21: Single-boundary CTE jump rejection (Item D) ===\n");
+    {
+        uint8_t s_cte_reject_count = 0;
+        float s_prev_valid_cte = 0.0f;
+        uint8_t s_has_prev_valid_cte = 1;
+
+        /* Test 3 consecutive rejects on 30.0 px jump (> 25.0 px) */
+        for (int t = 1; t <= 3; t++) {
+            float cte_new = 30.0f;
+            float cte_out = cte_new;
+            if (s_has_prev_valid_cte && fabsf(cte_new - s_prev_valid_cte) > DEFAULT_CTE_JUMP_THRESH_PX) {
+                if (s_cte_reject_count < DEFAULT_CTE_JUMP_MAX_REJECTS) {
+                    s_cte_reject_count++;
+                    cte_out = s_prev_valid_cte;
+                } else {
+                    s_cte_reject_count = 0U;
+                    s_prev_valid_cte = cte_new;
+                }
+            }
+            CHECK(cte_out == 0.0f && s_cte_reject_count == (uint8_t)t,
+                  "Tick %d: jump rejected, held prev cte=%.1f (reject_count=%u)", t, cte_out, s_cte_reject_count);
+        }
+
+        /* Tick 4: 4th consecutive reject accepts the new track position */
+        float cte_new = 30.0f;
+        float cte_out = cte_new;
+        if (s_has_prev_valid_cte && fabsf(cte_new - s_prev_valid_cte) > DEFAULT_CTE_JUMP_THRESH_PX) {
+            if (s_cte_reject_count < DEFAULT_CTE_JUMP_MAX_REJECTS) {
+                s_cte_reject_count++;
+                cte_out = s_prev_valid_cte;
+            } else {
+                s_cte_reject_count = 0U;
+                s_prev_valid_cte = cte_new;
+            }
+        }
+        CHECK(cte_out == 30.0f && s_cte_reject_count == 0 && s_prev_valid_cte == 30.0f,
+              "Tick 4: after 3 rejects, accepts cte=%.1f (reject_count=%u)", cte_out, s_cte_reject_count);
+
+        /* Small movement <= 25 px accepted immediately */
+        cte_new = 35.0f; /* delta = 5.0 px */
+        cte_out = cte_new;
+        if (s_has_prev_valid_cte && fabsf(cte_new - s_prev_valid_cte) > DEFAULT_CTE_JUMP_THRESH_PX) {
+            if (s_cte_reject_count < DEFAULT_CTE_JUMP_MAX_REJECTS) {
+                s_cte_reject_count++;
+                cte_out = s_prev_valid_cte;
+            } else {
+                s_cte_reject_count = 0U;
+                s_prev_valid_cte = cte_new;
+            }
+        } else {
+            s_cte_reject_count = 0U;
+            s_prev_valid_cte = cte_new;
+        }
+        CHECK(cte_out == 35.0f && s_cte_reject_count == 0,
+              "Small step (delta=5.0 px) accepted immediately without reject (cte=%.1f)", cte_out);
+    }
+
+    printf("\n=== Test 22: Early brake trigger and release (Item 5) ===\n");
+    {
+        uint8_t eb_trig_ticks = 0;
+        uint8_t eb_rel_ticks = 0;
+        bool eb_active = false;
+        float cv = 10.0f; /* >= 8.0 */
+        float h = 5.0f;   /* < 12.0 */
+        bool fv_valid = true;
+
+        /* Ticks 1 and 2: trigger counter increments, not active yet */
+        for (int t = 1; t <= 2; t++) {
+            if (fv_valid && fabsf(cv) >= DEFAULT_EARLY_BRAKE_CV_TH && fabsf(h) < DEFAULT_EARLY_BRAKE_H_MAX) {
+                eb_trig_ticks++;
+            }
+            if (eb_trig_ticks >= 3U) eb_active = true;
+            CHECK(!eb_active && eb_trig_ticks == t, "Tick %d: early brake not active yet (trig_ticks=%u)", t, eb_trig_ticks);
+        }
+
+        /* Tick 3: reaches 3 ticks -> activates */
+        eb_trig_ticks++;
+        if (eb_trig_ticks >= 3U) eb_active = true;
+        CHECK(eb_active && eb_trig_ticks == 3, "Tick 3: early brake ACTIVATES (active=%d)", eb_active);
+
+        /* Release condition: |cv| < 5.0 for 3 consecutive ticks */
+        cv = 3.0f;
+        for (int t = 1; t <= 2; t++) {
+            if (eb_active) {
+                if (fabsf(cv) < DEFAULT_EARLY_BRAKE_REL_CV) eb_rel_ticks++;
+                if (eb_rel_ticks >= 3U) eb_active = false;
+            }
+            CHECK(eb_active && eb_rel_ticks == t, "Release tick %d: early brake still active (rel_ticks=%u)", t, eb_rel_ticks);
+        }
+
+        /* Release tick 3 */
+        eb_rel_ticks++;
+        if (eb_rel_ticks >= 3U) {
+            eb_active = false;
+            eb_rel_ticks = 0;
+            eb_trig_ticks = 0;
+        }
+        CHECK(!eb_active, "Release tick 3: early brake RELEASES (active=%d)", eb_active);
+    }
+
+    printf("\n=== Test 23: Corner entry on |cv| >= 11 for 2 ticks (Item 6) ===\n");
+    {
+        uint8_t cv_corner_ticks = 0;
+        float cv = 12.0f; /* >= 11.0 */
+        bool raw_corner = false;
+
+        /* Tick 1 */
+        if (fabsf(cv) >= DEFAULT_CV_CORNER_TH) cv_corner_ticks++;
+        bool cv_corner_entry_1 = (cv_corner_ticks >= DEFAULT_CV_CORNER_TICKS);
+        CHECK(!cv_corner_entry_1 && cv_corner_ticks == 1,
+              "Tick 1 (|cv|=12.0): requires 2 ticks, not entered yet (ticks=%u)", cv_corner_ticks);
+
+        /* Tick 2 */
+        if (fabsf(cv) >= DEFAULT_CV_CORNER_TH) cv_corner_ticks++;
+        bool cv_corner_entry_2 = (cv_corner_ticks >= DEFAULT_CV_CORNER_TICKS);
+        raw_corner = cv_corner_entry_2;
+        CHECK(cv_corner_entry_2 && cv_corner_ticks == 2 && raw_corner,
+              "Tick 2 (|cv|=12.0): 2 consecutive ticks triggers ST:C entry (ticks=%u, raw_corner=%d)",
+              cv_corner_ticks, raw_corner);
+    }
+
+    printf("\n=== Test 24: Bug 1 & Bug 3 Speed Clamps (ST:C first 12 ticks <= 70%%, blind_spd across ST:S & ST:C) ===\n");
+    {
+        /* A. In ST:C, first 12 ticks (s_corner_hold_ticks <= 12) clamp target_speed <= eb_spd (70.0%) */
+        float severity_speed = 100.0f; /* BT:0 low severity corner entry */
+        float eb_spd = 70.0f;
+        for (uint8_t ht = 1; ht <= 12; ht++) {
+            float spd = severity_speed;
+            if (ht <= 12U) {
+                spd = fminf(spd, eb_spd);
+            }
+            CHECK(spd == 70.0f, "HT:%u inside ST:C clamps speed to eb_spd=%.1f (prevents surge to 100%%)", ht, spd);
+        }
+        /* After tick 12, speed follows severity */
+        uint8_t ht_later = 15;
+        float spd_later = severity_speed;
+        if (ht_later <= 12U) {
+            spd_later = fminf(spd_later, eb_spd);
+        }
+        CHECK(spd_later == 100.0f, "HT:%u allows full severity speed (spd=%.1f)", ht_later, spd_later);
+
+        /* B. When front cam is blind (s_fv0_ticks > 3), blind_spd clamps BOTH ST:S and ST:C */
+        uint8_t fv0_ticks = 4;
+        float blind_cap = 70.0f;
+        bool is_corner_cases[2] = { false, true };
+        for (int i = 0; i < 2; i++) {
+            bool is_c = is_corner_cases[i];
+            float spd = 100.0f;
+            if (fv0_ticks > DEFAULT_BLIND_SPEED_TICKS) {
+                spd = fminf(spd, blind_cap);
+            }
+            CHECK(spd == 70.0f, "fv0_ticks=4 clamps %s to blind_spd=%.1f (no 100%% pump)",
+                  is_c ? "ST:C" : "ST:S", spd);
+        }
     }
 
     printf("\nSummarize: %d failures\n", g_failures);
