@@ -477,117 +477,53 @@ int main(void)
         }
     }
 
-    printf("\n=== Test 19: Regression test for Line 74 (H=-29.1, FS=-30.4) and Line 97 (H=-42.6, FS=-29.6) ===\n");
+    printf("\n=== Test 19: Corner state latch (no mid-corner C->S flip, min 10 ticks, exit on |H|<8 & |curv|<8) ===\n");
     {
-        /* Case 1: Line 74: H=-29.1 deg, FS=-30.4 deg on straight track
-         * Relative curvature |FS - H| = 1.3 deg < 15.0 deg -> crooked_straight_track = true
-         * eff_front_angle must be 0.0f, top_in_corner must be false, is_corner must be false (ST:S),
-         * and extra left feedforward added to steer_cmd must be 0.0f. */
-        float h_74 = -29.1f, fs_74 = -30.4f;
-        uint8_t horizon_found_74 = 1, front_wall_74 = 0, trans_center_74 = 0, found_74 = 2;
-        float rel_74 = fs_74 - h_74;
+        /* Case 1: Corner entry on Line 21 (H=30.1, FS=52.6, curv=22.5 >= 18) triggers raw_corner -> latches */
+        uint8_t hold_ticks = 0;
+        float h = 30.1f, fs = 52.6f;
+        float curv = fs - h;
+        bool top_in_corner = (fabsf(curv) >= DEFAULT_FRONT_ANGLE_THRESH);
+        bool raw_corner = top_in_corner && (fabsf(curv) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h) >= 24.0f);
+        uint8_t ix = 0;
 
-        bool crooked_74 = (horizon_found_74 > 0) && (!front_wall_74) && (!trans_center_74) && (fabsf(rel_74) < 15.0f);
-        float eff_front_74 = fs_74;
-        if (crooked_74) {
-            eff_front_74 = 0.0f;
-        } else if (horizon_found_74 > 0 && (fs_74 * h_74 > 0.0f)) {
-            if (fabsf(fs_74) <= fabsf(h_74)) {
-                eff_front_74 = 0.0f;
-            } else {
-                float net_front = fs_74 - 0.65f * h_74;
-                if (net_front * fs_74 < 0.0f) net_front = 0.0f;
-                eff_front_74 = net_front;
-            }
+        /* Tick 1: Enter latch */
+        if (ix) hold_ticks = 0;
+        else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+        else if (raw_corner) hold_ticks = 1;
+
+        CHECK(hold_ticks == 1, "Tick 1: raw_corner triggers latch (hold_ticks=%u)", hold_ticks);
+
+        /* Case 2: Mid-corner apex Line 22 (H=45.9, FS=57.1, curv=11.2) - previously flipped C->S due to crooked_straight_track.
+         * Now must STAY latched (no mid-corner flip)! */
+        h = 45.9f; fs = 57.1f; curv = fs - h;
+        raw_corner = (fabsf(h) >= 24.0f);
+        for (int t = 2; t <= 5; t++) {
+            if (ix) hold_ticks = 0;
+            else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+            else if (raw_corner) hold_ticks = 1;
         }
+        CHECK(hold_ticks == 5, "Tick 2..5 (H=45.9, FS=57.1): stays solidly latched (hold_ticks=%u, no C->S flip)", hold_ticks);
 
-        bool heading_turn_conf_74 = (h_74 * eff_front_74 > 0.0f) || (!crooked_74 && fabsf(h_74) >= 20.0f);
-        bool top_in_corner_74 = (found_74 == 0) || (trans_center_74 != 0U) ||
-                                (!crooked_74 && fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH) ||
-                                (fabsf(h_74) >= 4.0f && heading_turn_conf_74);
-        bool raw_corner_74 = !crooked_74 && top_in_corner_74 && (fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h_74) >= 24.0f);
-        bool is_corner_74 = raw_corner_74;
-
-        float gate_74 = 0.0f;
-        if (fabsf(eff_front_74) >= DEFAULT_FRONT_ANGLE_THRESH && (h_74 * eff_front_74 > 0.0f || fabsf(h_74) < 3.0f)) {
-            if (fabsf(h_74) >= 4.0f) {
-                gate_74 = (fabsf(h_74) - 4.0f) / (16.0f - 4.0f);
-                if (gate_74 > 1.0f) gate_74 = 1.0f;
-            }
+        /* Case 3: Heading drops below 8 at tick 7, but hold_ticks < 10 -> MUST NOT EXIT YET */
+        h = 6.0f; fs = 6.0f; curv = 0.0f; raw_corner = false;
+        for (int t = 6; t <= 9; t++) {
+            if (ix) hold_ticks = 0;
+            else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+            else if (raw_corner) hold_ticks = 1;
         }
-        float extra_ff_74 = is_corner_74 ? (gate_74 * FRONT_FEEDFORWARD_GAIN * eff_front_74) : 0.0f;
+        CHECK(hold_ticks == 9, "Tick 9: hold_ticks < 10 enforces min 200ms hold (hold_ticks=%u)", hold_ticks);
 
-        CHECK(crooked_74 == true && eff_front_74 == 0.0f,
-              "Line 74 (H=-29.1, FS=-30.4): crooked_straight_track=true, eff_front_angle=%.2f", eff_front_74);
-        CHECK(top_in_corner_74 == false && is_corner_74 == false,
-              "Line 74: top_in_corner=false, is_corner=false -> ST:S verified");
-        CHECK(extra_ff_74 == 0.0f,
-              "Line 74: extra left feedforward is exactly 0.0f (no fighting pull)");
+        /* Case 4: Tick 10 with |H| < 8 and |curv| < 8 -> cleanly exits latch */
+        if (ix) hold_ticks = 0;
+        else if (hold_ticks > 0) { hold_ticks++; if (hold_ticks >= 10 && fabsf(h) < 8.0f && fabsf(curv) < 8.0f && !raw_corner) hold_ticks = 0; }
+        else if (raw_corner) hold_ticks = 1;
+        CHECK(hold_ticks == 0, "Tick 10: reaches 10 ticks with |H|<8 & |curv|<8 -> cleanly exits (hold_ticks=%u)", hold_ticks);
 
-        /* Case 2: Line 97: H=-42.6 deg, FS=-29.6 deg on straight track
-         * Relative curvature |FS - H| = 13.0 deg < 15.0 deg AND |FS| <= |H| (road ahead is straighter)
-         * eff_front_angle must be 0.0f, top_in_corner must be false, is_corner must be false (ST:S),
-         * and extra left feedforward added to steer_cmd must be 0.0f. */
-        float h_97 = -42.6f, fs_97 = -29.6f;
-        uint8_t horizon_found_97 = 1, front_wall_97 = 0, trans_center_97 = 0, found_97 = 2;
-        float rel_97 = fs_97 - h_97;
-
-        bool crooked_97 = (horizon_found_97 > 0) && (!front_wall_97) && (!trans_center_97) && (fabsf(rel_97) < 15.0f);
-        float eff_front_97 = fs_97;
-        if (crooked_97) {
-            eff_front_97 = 0.0f;
-        } else if (horizon_found_97 > 0 && (fs_97 * h_97 > 0.0f)) {
-            if (fabsf(fs_97) <= fabsf(h_97)) {
-                eff_front_97 = 0.0f;
-            } else {
-                float net_front = fs_97 - 0.65f * h_97;
-                if (net_front * fs_97 < 0.0f) net_front = 0.0f;
-                eff_front_97 = net_front;
-            }
-        }
-
-        bool heading_turn_conf_97 = (h_97 * eff_front_97 > 0.0f) || (!crooked_97 && fabsf(h_97) >= 20.0f);
-        bool top_in_corner_97 = (found_97 == 0) || (trans_center_97 != 0U) ||
-                                (!crooked_97 && fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH) ||
-                                (fabsf(h_97) >= 4.0f && heading_turn_conf_97);
-        bool raw_corner_97 = !crooked_97 && top_in_corner_97 && (fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH || fabsf(h_97) >= 24.0f);
-        bool is_corner_97 = raw_corner_97;
-
-        float gate_97 = 0.0f;
-        if (fabsf(eff_front_97) >= DEFAULT_FRONT_ANGLE_THRESH && (h_97 * eff_front_97 > 0.0f || fabsf(h_97) < 3.0f)) {
-            if (fabsf(h_97) >= 4.0f) {
-                gate_97 = (fabsf(h_97) - 4.0f) / (16.0f - 4.0f);
-                if (gate_97 > 1.0f) gate_97 = 1.0f;
-            }
-        }
-        float extra_ff_97 = is_corner_97 ? (gate_97 * FRONT_FEEDFORWARD_GAIN * eff_front_97) : 0.0f;
-
-        CHECK(crooked_97 == true && eff_front_97 == 0.0f,
-              "Line 97 (H=-42.6, FS=-29.6): crooked_straight_track=true, eff_front_angle=%.2f", eff_front_97);
-        CHECK(top_in_corner_97 == false && is_corner_97 == false,
-              "Line 97: top_in_corner=false, is_corner=false -> ST:S verified");
-        CHECK(extra_ff_97 == 0.0f,
-              "Line 97: extra left feedforward is exactly 0.0f (no fighting pull)");
-
-        /* Case 3: Confirmed real corner approach (H=5.0 deg, FS=35.0 deg, rel=30.0 deg >= 15.0 deg)
-         * Must NOT be treated as crooked straight track. Net front curvature computed and preserved. */
-        float h_real = 5.0f, fs_real = 35.0f;
-        float rel_real = fs_real - h_real;
-        bool crooked_real = (1 > 0) && (!0) && (!0) && (fabsf(rel_real) < 15.0f);
-        float eff_front_real = fs_real;
-        if (crooked_real) {
-            eff_front_real = 0.0f;
-        } else if (fs_real * h_real > 0.0f) {
-            if (fabsf(fs_real) <= fabsf(h_real)) {
-                eff_front_real = 0.0f;
-            } else {
-                float net_front = fs_real - 0.65f * h_real;
-                if (net_front * fs_real < 0.0f) net_front = 0.0f;
-                eff_front_real = net_front;
-            }
-        }
-        CHECK(crooked_real == false && fabsf(eff_front_real - (35.0f - 0.65f * 5.0f)) < 0.01f,
-              "Real corner (H=5, FS=35): net_front=%.2f deg preserved", eff_front_real);
+        /* Case 5: Intersection immediately cancels corner latch */
+        hold_ticks = 5; ix = 1;
+        if (ix) hold_ticks = 0;
+        CHECK(hold_ticks == 0, "Intersection immediately clears corner latch (hold_ticks=%u)", hold_ticks);
     }
 
     printf("\nSummarize: %d failures\n", g_failures);
