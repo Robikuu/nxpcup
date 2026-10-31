@@ -116,25 +116,36 @@ nxpcup-ciorba_curata/
     └── wifi_config.c / .h    # Dynamic ASCII command shell & throttled telemetry engine
 ```
 
-### 4.1 [`include/Config.h`](file:///d:/robotica/workspace/nxpcup-ciorba_curata/include/Config.h) — Central Calibration Repository
-All vehicle parameters are consolidated into centralized definitions:
+### 4.1 [`include/Config.h`](file:///home/robert/facultate/Practica/workspace/nxpcup/include/Config.h) — Central Calibration Repository & Presets
+All vehicle parameters are consolidated into centralized definitions, now supporting **Dual Runtime Presets** and hold-button switching:
 - **Geometry**: `PIXY_FRAME_WIDTH (79.0)`, `PIXY_FRAME_HEIGHT (52.0)`, `PIXY_CENTER_X (39.5)`, `PIXY_TRACK_HALF_WIDTH (25.0)`.
-- **Physical Steering Limits**: `STEERING_LIMIT_RIGHT (+87.0)`, `STEERING_LIMIT_LEFT (-70.0)`, `STEERING_OFFSET (+14.0)`.
-- **Motor Speed Profile**:
-  - `SPEED_STRAIGHT (100.0%)`: Straight line sprint speed (full battery push).
-  - `SPEED_OUTSIDE_CORNER (88.0%)`: Outside wheel drive speed in turns (maintains momentum).
-  - `SPEED_INSIDE_MIN (62.0%)`: Inside wheel pivot anchor duty cycle (prevents bogging down).
+- **Physical Steering Limits**: `STEERING_LIMIT_RIGHT (+77.0)`, `STEERING_LIMIT_LEFT (-67.0)`, `STEERING_OFFSET (+10.0)`.
+- **Dual Car Parameter Presets**:
+  - **Preset 1 (Calibrated Race Setup)**:
+    - Straight speed: `PRESET1_SPEED_STRAIGHT (100.0%)`
+    - Outside corner speed: `PRESET1_SPEED_OUTSIDE_CORNER (65.0%)`
+    - Inside pivot speed: `PRESET1_SPEED_INSIDE_MIN (34.0%)`
+    - Drive plant scale: `PRESET1_DRIVE_SCALE (1.00)`
+    - Accel / Decel ramps: `PRESET1_ACCEL_RAMP (6.5%)`, `PRESET1_DECEL_RAMP (30.0%)`
+    - LED Status: Green on Top Camera
+  - **Preset 2 (Conservative / Technical Track Setup)**:
+    - Straight speed: `PRESET2_SPEED_STRAIGHT (85.0%)`
+    - Outside corner speed: `PRESET2_SPEED_OUTSIDE_CORNER (55.0%)`
+    - Inside pivot speed: `PRESET2_SPEED_INSIDE_MIN (30.0%)`
+    - Drive plant scale: `PRESET2_DRIVE_SCALE (1.00)`
+    - Accel / Decel ramps: `PRESET2_ACCEL_RAMP (5.0%)`, `PRESET2_DECEL_RAMP (30.0%)`
+    - LED Status: Magenta on Top Camera
+- **Hardware Button Interaction**:
+  - `BUTTON_HOLD_TICKS (50 ticks = 1.0s @ 50 Hz)`:
+    - **In `STATE_IDLE`**: Short tap (< 1.0s) & release starts the vehicle (`STATE_RUNNING`). Long hold (>= 1.0s) toggles between Preset 1 and Preset 2.
+    - **In `STATE_RUNNING`**: Any press immediately halts the vehicle into `STATE_IDLE` with motor brake (fail-safe emergency stop).
 - **Ramp Rates & Traction Guards**:
-  - `DECEL_RAMP_STEP (16.0% / tick)`: Rapid pre-braking ramp (~75ms from 100% to 62%).
-  - `ACCEL_RAMP_STEP (8.5% / tick)`: Punchy corner exit acceleration (~90ms back to 100%).
-  - `REVERSAL_RELEASE_STEP (35.0% / tick)`: Chicane instant release of dragging wheel.
-  - `REVERSAL_DECEL_STEP (18.0% / tick)`: Chicane rapid engagement of new pivot wheel.
+  - `DECEL_RAMP_STEP (30.0% / tick)`: Rapid pre-braking ramp (~2 ticks from 100% to 40%).
+  - `ACCEL_RAMP_STEP (6.5% / tick)`: Smooth traction-preserving corner exit acceleration (~160ms).
 - **Deadzones & Gates**:
-  - `DIFFERENTIAL_DEADZONE_DEG (6.0°)`: Steering deadband below which zero differential drag applies.
-  - `CORNER_HEADING_THRESHOLD_DEG (18.0°)`: Prevents straightaway heading jitter from triggering turn mode.
-  - `STEER_FULL_BRAKE_DEG (30.0°)`: Steering angle for 100% pivot drag.
-  - `HEADING_FULL_BRAKE_DEG (22.0°)`: Heading angle for full corner intensity scaling.
-  - `APEX_CUT_RATIO (0.20f)`: Fraction of half lane-width to shift trajectory inside corners.
+  - `DIFFERENTIAL_DEADZONE_DEG (8.0°)`: Steering deadband below which zero differential drag applies.
+  - `STEER_FULL_BRAKE_DEG (40.0°)`: Steering angle for 100% pivot drag.
+  - `FRONT_ANGLE_THRESH (28.0°)`: Front camera corner angle threshold.
 - **Dynamic PID Gain Matrix**:
   - $K_p \in [0.70, 2.30]$
   - $K_d \in [0.160, 0.130]$

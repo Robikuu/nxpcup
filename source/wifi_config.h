@@ -5,6 +5,8 @@
 #include <stdbool.h>
 
 void params_init(void);
+void params_load_preset(uint8_t preset_id);
+void params_switch_preset(void);
 void command_poll(void);
 void esp_printf(const char *fmt, ...);
 
